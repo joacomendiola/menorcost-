@@ -5,9 +5,117 @@
 
 generator client {
   provider = "prisma-client"
-  output   = "../generated/prisma"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum Rol {
+  CLIENTE
+  COMERCIANTE
+  ADMINISTRADOR
+}
+
+enum EstadoUsuario {
+  HABILITADO
+  PENDIENTE_VERIFICACION
+  SUSPENDIDO
+  SOLICITUD_BAJA_PENDIENTE
+  BAJO_INVESTIGACION
+  DOCUMENTACION_RECHAZADA
+}
+
+enum TipoCodigo {
+  VERIFICACION_EMAIL
+  RECUPERACION_PASSWORD
+}
+
+enum EstadoSolicitudBaja {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+}
+
+model Usuario {
+  id             String        @id @default(uuid())
+  dni            String        @unique
+  nombre         String
+  apellido       String
+  email          String        @unique
+  telefono       String
+  fechaNacimiento DateTime
+  passwordHash   String
+  rol            Rol           @default(CLIENTE)
+  estado         EstadoUsuario @default(PENDIENTE_VERIFICACION)
+  tokenVersion   Int           @default(0)
+  deletedAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  direcciones Direccion[]
+  codigos     CodigoSeguridad[]
+
+  solicitudesBaja SolicitudBaja[] @relation("BajaSolicitada")
+  bajasResueltas  SolicitudBaja[] @relation("BajaResuelta")
+
+  @@map("usuarios")
+}
+
+model Direccion {
+  id              String   @id @default(uuid())
+  usuarioId       String
+  etiqueta        String
+  calle           String
+  numero          String
+  piso            String?
+  localidad       String
+  descripcion     String?
+  latitud         Decimal  @db.Decimal(9, 6)
+  longitud        Decimal  @db.Decimal(9, 6)
+  esPredeterminada Boolean @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("direcciones")
+}
+
+model CodigoSeguridad {
+  id         String     @id @default(uuid())
+  usuarioId  String
+  tipo       TipoCodigo
+  codigoHash String
+  expiraEn   DateTime
+  usadoEn    DateTime?
+  createdAt  DateTime   @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, tipo])
+  @@index([codigoHash])
+  @@map("codigos_seguridad")
+}
+
+model SolicitudBaja {
+  id            String               @id @default(uuid())
+  usuarioId     String
+  motivo        String
+  estado        EstadoSolicitudBaja  @default(PENDIENTE)
+  observaciones String?
+  resueltoPorId String?
+  resueltoEn    DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  usuario     Usuario  @relation("BajaSolicitada", fields: [usuarioId], references: [id], onDelete: Cascade)
+  resueltoPor Usuario? @relation("BajaResuelta", fields: [resueltoPorId], references: [id])
+
+  @@index([usuarioId])
+  @@index([estado])
+  @@map("solicitudes_baja")
 }
