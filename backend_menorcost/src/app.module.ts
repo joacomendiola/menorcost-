@@ -6,6 +6,8 @@ import { BajaModule } from './modules/bajas/baja.module.js';
 import { DireccionesModule } from './modules/direcciones/direcciones.module.js';
 import { UsuariosModule } from './modules/usuarios/usuarios.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { ConfigModule } from '@nestjs/config';
+import { OffersModule } from './modules/ofertas/ofertas.module.js';
 
 @Module({
   imports: [
@@ -14,6 +16,8 @@ import { PrismaModule } from './prisma/prisma.module.js';
     UsuariosModule,
     DireccionesModule,
     BajaModule,
+    ConfigModule.forRoot({ isGlobal: true }),
+    OffersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

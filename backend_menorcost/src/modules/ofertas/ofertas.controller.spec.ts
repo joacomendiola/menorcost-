@@ -1,10 +1,10 @@
-import { UnauthorizedException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface.js';
 import { CreateOfferDto } from './dto/create-offer.dto.js';
-import type { OfferRecord } from './offer-creation.ports.js';
-import { OffersController } from './offers.controller.js';
-import { OffersService } from './offers.service.js';
+import type { OfferRecord } from './ofertas-creation.ports.js';
+import { OffersController } from './ofertas.controller.js';
+import { OffersService } from './ofertas.service.js';
 
 describe('OffersController', () => {
   let controller: OffersController;
@@ -20,6 +20,13 @@ describe('OffersController', () => {
     stock: 5,
     precioLista: '100.00',
     precioMenorcost: '75.00',
+  };
+
+  const usuario: AuthenticatedUser = {
+    id: 'user-1',
+    email: 'comerciante@example.com',
+    rol: 'COMERCIANTE',
+    estado: 'HABILITADO',
   };
 
   const image = {
@@ -49,24 +56,11 @@ describe('OffersController', () => {
     controller = moduleRef.get(OffersController);
   });
 
-  it('rechaza la solicitud si no hay usuario autenticado', () => {
-    expect(() =>
-      controller.create(
-        {} as Parameters<OffersController['create']>[0],
-        dto,
-        image,
-      ),
-    ).toThrow(UnauthorizedException);
-
-    expect(createOffer).not.toHaveBeenCalled();
-  });
 
   it('envía los datos, el usuario y la imagen al servicio', async () => {
-    const request = {
-      user: { id: 'user-1' },
-    } as Parameters<OffersController['create']>[0];
-
-    await expect(controller.create(request, dto, image)).resolves.toEqual(offer);
+    await expect(controller.create(usuario, dto, image)).resolves.toEqual(
+      offer,
+    );
 
     expect(createOffer).toHaveBeenCalledWith('user-1', dto, {
       buffer: image.buffer,

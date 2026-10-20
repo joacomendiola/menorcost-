@@ -7,6 +7,7 @@ import { Recuperar } from './pages/Recuperar';
 import { Registro } from './pages/Registro';
 import { Restablecer } from './pages/Restablecer';
 import { VerificarCorreo } from './pages/VerificarCorreo';
+import { NuevaOfertaPage } from './ofertas/NewOfertaPage';
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
 
         <Route element={<RutaProtegida />}>
           <Route path="/perfil" element={<Perfil />} />
+          <Route path="/ofertas/nueva" element={<NuevaOfertaPage />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/perfil" replace />} />

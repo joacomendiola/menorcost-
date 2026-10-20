@@ -49,6 +49,10 @@ model Producto {
 // CLASES MINIMAS PARA LA COMPILACION DE LA RELACIONES DEL MODEL PRODUCTO (ELIMINAR EN CUANTO SE HAGA EL PR QUE CONTENGA LOS MODEL COMPLETOS)
 model Comercio {
   idComercio String     @id @default(uuid()) @map("id_comercio") @db.Uuid
+  usuarioId String     @unique @map("usuario_id")
+  mercadoPagoVinculado Boolean @default(false) @map("mercado_pago_vinculado")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
   productos   Producto[]
 
   @@map("comercio")
@@ -104,6 +108,10 @@ model Usuario {
 
   direcciones Direccion[]
   codigos     CodigoSeguridad[]
+
+  // TODO integración: adaptar si el modelo real permite varios comercios
+  // por usuario o define esta relación desde el módulo de comercios.
+  comercio Comercio?
 
   solicitudesBaja SolicitudBaja[] @relation("BajaSolicitada")
   bajasResueltas  SolicitudBaja[] @relation("BajaResuelta")

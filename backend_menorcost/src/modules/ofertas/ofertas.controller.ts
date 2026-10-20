@@ -1,32 +1,28 @@
 import {
+  Body,
   Controller,
   FileTypeValidator,
   MaxFileSizeValidator,
   ParseFilePipe,
   Post,
-  Req,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
-  UnauthorizedException,
-  Body,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import type { Request } from 'express';
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
+import { Roles } from '../auth/decorators/roles.decorator.js';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { RolesGuard } from '../auth/guards/roles.guard.js';
+import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface.js';
 import { CreateOfferDto } from './dto/create-offer.dto.js';
-import type { OfferRecord } from './offer-creation.ports.js';
-import { OffersService } from './offers.service.js';
-
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id?: string;
-  };
-}
+import type { OfferRecord } from './ofertas-creation.ports.js';
+import { OffersService } from './ofertas.service.js';
 
 @Controller('offers')
-// TODO integración: activar el guard real para que request.user provenga
-// de una sesión validada, no de un middleware de prueba.
-// @UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('COMERCIANTE')
 export class OffersController {
   constructor(private readonly offersService: OffersService) {}
 
@@ -41,7 +37,7 @@ export class OffersController {
     }),
   )
   create(
-    @Req() request: AuthenticatedRequest,
+    @CurrentUser() usuario: AuthenticatedUser,
     @Body() dto: CreateOfferDto,
     @UploadedFile(
       new ParseFilePipe({
@@ -55,13 +51,7 @@ export class OffersController {
     )
     image: Express.Multer.File,
   ): Promise<OfferRecord> {
-    const userId = request.user?.id;
-
-    if (!userId) {
-      throw new UnauthorizedException('Se requiere una sesión activa');
-    }
-
-    return this.offersService.create(userId, dto, {
+    return this.offersService.create(usuario.id, dto, {
       buffer: image.buffer,
       mimetype: image.mimetype,
     });

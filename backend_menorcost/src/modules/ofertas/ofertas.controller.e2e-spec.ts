@@ -1,27 +1,44 @@
 import {
+  UnauthorizedException,
   ValidationPipe,
+  type CanActivate,
+  type ExecutionContext,
   type INestApplication,
 } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { RolesGuard } from '../auth/guards/roles.guard.js';
+import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface.js';
 import { Test } from '@nestjs/testing';
-import type { Request, RequestHandler } from 'express';
 import request from 'supertest';
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
-import { OffersController } from './offers.controller.js';
-import { OffersService } from './offers.service.js';
+import { OffersController } from './ofertas.controller.js';
+import { OffersService } from './ofertas.service.js';
 
-interface TestRequest extends Request {
-  user?: { id: string };
-}
 
-const TEST_AUTHORIZATION = 'Bearer e2e-test-token';
+const TEST_AUTHORIZATION = 'Bearer test-token';
+
+const testJwtGuard: CanActivate = {
+  canActivate(context: ExecutionContext): boolean {
+    const request = context
+      .switchToHttp()
+      .getRequest<{
+        headers: { authorization?: string };
+        user?: AuthenticatedUser;
+      }>();
+
+    if (request.headers.authorization !== TEST_AUTHORIZATION) {
+      throw new UnauthorizedException('Token de prueba no válido');
+    }
+
+    request.user = {
+      id: 'user-test',
+      email: 'comerciante@example.com',
+      rol: 'COMERCIANTE',
+      estado: 'HABILITADO',
+    };
+
+    return true;
+  },
+};
 
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC',
@@ -37,28 +54,23 @@ describe('POST /offers', () => {
     estado: 'ACTIVO',
   });
 
-  const testSessionMiddleware: RequestHandler = (req, _res, next) => {
-    if (req.headers.authorization === TEST_AUTHORIZATION) {
-      (req as TestRequest).user = { id: 'user-test' };
-    }
-
-    next();
-  };
-
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [OffersController],
       providers: [
+        RolesGuard,
         {
           provide: OffersService,
           useValue: { create: createOffer },
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue(testJwtGuard)
+      .compile();
 
     app = moduleRef.createNestApplication();
 
-    app.use(testSessionMiddleware);
     app.useGlobalPipes(
       new ValidationPipe({
         transform: true,

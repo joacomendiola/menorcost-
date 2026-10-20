@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
-import { validateOfferRules } from './offer-rules.js';
+import { validateOfferRules } from './ofertas-rules.js';
 
 describe('validateOfferRules', () => {
   const today = new Date('2026-10-19T15:00:00.000Z');

@@ -12,10 +12,10 @@ import {
   type OfferImage,
   type OfferRecord,
   type OfferRepository,
-} from './offer-creation.ports.js';
+} from './ofertas-creation.ports.js';
 import { CreateOfferDto } from './dto/create-offer.dto.js';
 import { ImageStorageService } from './image-store.service.js';
-import { validateOfferRules } from './offer-rules.js';
+import { validateOfferRules } from './ofertas-rules.js';
 
 @Injectable()
 export class OffersService {
@@ -37,7 +37,7 @@ export class OffersService {
     image: OfferImage,
   ): Promise<OfferRecord> {
     await this.access.assertCanPublish(userId, dto.comercioId);
-    await this.access.assertMercadoPagoLinked(userId);
+    await this.access.assertMercadoPagoLinked(userId, dto.comercioId);
     await this.categories.assertExists(dto.categoriaId);
 
     validateOfferRules(dto);

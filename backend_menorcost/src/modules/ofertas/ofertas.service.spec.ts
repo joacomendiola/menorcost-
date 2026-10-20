@@ -7,9 +7,9 @@ import type {
   OfferImage,
   OfferRecord,
   OfferRepository,
-} from './offer-creation.ports.js';
+} from './ofertas-creation.ports.js';
 import { ImageStorageService } from './image-store.service.js';
-import { OffersService } from './offers.service.js';
+import { OffersService } from './ofertas.service.js';
 
 describe('OffersService', () => {
   let service: OffersService;
@@ -117,7 +117,10 @@ describe('OffersService', () => {
       'user-1',
       dto.comercioId,
     );
-    expect(access.assertMercadoPagoLinked).toHaveBeenCalledWith('user-1');
+    expect(access.assertMercadoPagoLinked).toHaveBeenCalledWith(
+      'user-1',
+      dto.comercioId,
+    );
     expect(categories.assertExists).toHaveBeenCalledWith(dto.categoriaId);
     expect(imageStorage.save).toHaveBeenCalledWith(image.buffer, image.mimetype);
     expect(repository.create).toHaveBeenCalledWith({

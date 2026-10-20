@@ -6,7 +6,10 @@ export const OFFER_REPOSITORY = Symbol('OFFER_REPOSITORY');
 
 export interface OfferAccess {
   assertCanPublish(userId: string, comercioId: string): Promise<void>;
-  assertMercadoPagoLinked(userId: string): Promise<void>;
+  assertMercadoPagoLinked(
+    userId: string,
+    comercioId: string,
+  ): Promise<void>;
 }
 
 export interface OfferCategories {

@@ -1,12 +1,37 @@
+import 'dotenv/config';
 import { execSync } from 'node:child_process';
 import { Client } from 'pg';
 
-const ADMIN_URL =
-  process.env.TEST_ADMIN_DATABASE_URL ??
-  'postgresql://postgres:postgresql@localhost:5432/postgres';
-const TEST_URL =
-  process.env.TEST_DATABASE_URL ??
-  'postgresql://postgres:postgresql@localhost:5432/menorcost_test?schema=public';
+function getDatabaseUrl(): string {
+  const value = process.env.DATABASE_URL;
+
+  if (!value) {
+    throw new Error('Falta DATABASE_URL para configurar las pruebas e2e');
+  }
+
+  return value;
+}
+
+const databaseUrl: string = getDatabaseUrl();
+
+if (!databaseUrl) {
+  throw new Error('Falta DATABASE_URL para configurar las pruebas e2e');
+}
+
+function urlForDatabase(databaseName: string): string {
+  const url = new URL(databaseUrl);
+  url.pathname = `/${databaseName}`;
+  url.searchParams.delete('schema');
+
+  if (databaseName === 'menorcost_test') {
+    url.searchParams.set('schema', 'public');
+  }
+
+  return url.toString();
+}
+
+const ADMIN_URL = urlForDatabase('postgres');
+const TEST_URL = urlForDatabase('menorcost_test');
 
 const TEST_DB_NAME = 'menorcost_test';
 
@@ -25,7 +50,7 @@ export default async function globalSetup(): Promise<void> {
 
   await admin.end();
 
-  execSync('npx prisma migrate deploy', {
+  execSync('npx prisma migrate deploy --config ./prisma7.config.ts', {
     stdio: 'inherit',
     env: { ...process.env, DATABASE_URL: TEST_URL },
   });
