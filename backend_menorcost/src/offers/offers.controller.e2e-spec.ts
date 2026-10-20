@@ -172,6 +172,28 @@ describe('POST /offers', () => {
     expect(createOffer).not.toHaveBeenCalled();
   });
 
+  it('rechaza un archivo que declara ser PNG pero no tiene contenido PNG', async () => {
+    await request(app.getHttpServer())
+      .post('/offers')
+      .set('Authorization', TEST_AUTHORIZATION)
+      .field('tipo', 'INDIVIDUAL')
+      .field('comercioId', '11111111-1111-4111-8111-111111111111')
+      .field('categoriaId', '22222222-2222-4222-8222-222222222222')
+      .field('titulo', 'Yogur')
+      .field('descripcion', 'Pack de yogures')
+      .field('fechaVencimiento', '2099-12-31')
+      .field('stock', '5')
+      .field('precioLista', '100.00')
+      .field('precioMenorcost', '75.00')
+      .attach('imagen', Buffer.from('esto no es una imagen real'), {
+        filename: 'falso.png',
+        contentType: 'image/png',
+      })
+      .expect(400);
+
+    expect(createOffer).not.toHaveBeenCalled();
+  });
+
   it('rechaza campos inválidos antes de llamar al servicio', async () => {
     await request(app.getHttpServer())
       .post('/offers')

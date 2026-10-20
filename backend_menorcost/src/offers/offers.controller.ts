@@ -24,6 +24,9 @@ interface AuthenticatedRequest extends Request {
 }
 
 @Controller('offers')
+// TODO integración: activar el guard real para que request.user provenga
+// de una sesión validada, no de un middleware de prueba.
+// @UseGuards(JwtAuthGuard)
 export class OffersController {
   constructor(private readonly offersService: OffersService) {}
 
