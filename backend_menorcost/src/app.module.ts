@@ -1,13 +1,20 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
-import { OffersModule } from './offers/offers.module.js';
+import { AuthModule } from './modules/auth/auth.module.js';
+import { BajaModule } from './modules/bajas/baja.module.js';
+import { DireccionesModule } from './modules/direcciones/direcciones.module.js';
+import { UsuariosModule } from './modules/usuarios/usuarios.module.js';
+import { PrismaModule } from './prisma/prisma.module.js';
 
 @Module({
-  // TODO integración: importar aquí los módulos reales que deban compartirse
-  // (por ejemplo, autenticación, Prisma, comercios o categorías), según cómo
-  // los organicemos más adelante.
-  imports: [OffersModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    UsuariosModule,
+    DireccionesModule,
+    BajaModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
