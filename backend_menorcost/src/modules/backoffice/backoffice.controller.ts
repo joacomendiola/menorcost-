@@ -1,15 +1,25 @@
-import { Controller, Get, Patch, Param, Body, Query, ParseIntPipe, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Patch,
+  Param,
+  Body,
+  Query,
+  ParseIntPipe,
+  UseGuards,
+} from '@nestjs/common';
 import { BackofficeService } from './backoffice.service.js';
-import { FiltroAdminDto } from './dto/filtro-admin.dto.js';
 import { RechazarAltaDto } from './dto/rechazar-alta.dto.js';
-
+import { FiltroAdminDto } from './dto/filtro-admin.dto.js';
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
+import { Roles } from '../auth/decorators/roles.decorator.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface.js';
 
 @Controller('admin')
-@UseGuards(JwtAuthGuard, RolesGuard) // 1. Exige estar logueado y pasar por el control de roles
-@Roles('ADMINISTRADOR')              // 2. Exige estrictamente que el rol en el token sea Admin
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ADMINISTRADOR')
 export class BackofficeController {
   constructor(private readonly backofficeService: BackofficeService) {}
 
@@ -30,24 +40,11 @@ export class BackofficeController {
   }
 
   @Patch('altas/:id/rechazar')
-  async rechazarAlta(@Param('id') idComercio: string, @Body() dto: RechazarAltaDto) {
+  async rechazarAlta(
+    @Param('id') idComercio: string,
+    @Body() dto: RechazarAltaDto,
+  ) {
     return this.backofficeService.rechazarAlta(idComercio, dto.motivo);
-  }
-
-  // --- MÓDULO BAJAS ---
-  @Get('bajas')
-  async getBajas(@Query() filtro: FiltroAdminDto) {
-    return this.backofficeService.listarBajas(filtro.search);
-  }
-
-  @Patch('bajas/:id/aprobar')
-  async aprobarBaja(@Param('id') idUsuario: string) {
-    return this.backofficeService.aprobarBaja(idUsuario);
-  }
-
-  @Patch('bajas/:id/rechazar')
-  async rechazarBaja(@Param('id') idUsuario: string) {
-    return this.backofficeService.rechazarBaja(idUsuario);
   }
 
   // --- MÓDULO DENUNCIAS ---
@@ -64,19 +61,16 @@ export class BackofficeController {
   @Patch('denuncias/:id/resolver')
   async marcarResuelto(
     @Param('id', ParseIntPipe) idReporte: number,
-    @Req() req: any // Extraemos la Request para obtener el usuario del token
+    @CurrentUser() admin: AuthenticatedUser,
   ) {
-    // El JwtAuthGuard inyecta los datos del token decodificado en req.user
-    const idAdmin = req.user.id; 
-    return this.backofficeService.marcarResuelto(idReporte, idAdmin);
+    return this.backofficeService.marcarResuelto(idReporte, admin.id);
   }
 
   @Patch('denuncias/:id/sancionar')
   async sancionar(
     @Param('id', ParseIntPipe) idReporte: number,
-    @Req() req: any 
+    @CurrentUser() admin: AuthenticatedUser,
   ) {
-    const idAdmin = req.user.id; 
-    return this.backofficeService.sancionar(idReporte, idAdmin);
+    return this.backofficeService.sancionar(idReporte, admin.id);
   }
 }

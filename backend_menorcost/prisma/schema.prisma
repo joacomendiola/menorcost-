@@ -48,12 +48,13 @@ model Producto {
 
 // CLASES MINIMAS PARA LA COMPILACION DE LA RELACIONES DEL MODEL PRODUCTO (ELIMINAR EN CUANTO SE HAGA EL PR QUE CONTENGA LOS MODEL COMPLETOS)
 model Comercio {
-  idComercio String     @id @default(uuid()) @map("id_comercio") @db.Uuid
-  usuarioId String     @unique @map("usuario_id")
-  mercadoPagoVinculado Boolean @default(false) @map("mercado_pago_vinculado")
-
-  usuario Usuario @relation(fields: [usuarioId], references: [id])
-  productos   Producto[]
+  idComercio           String     @id @default(uuid()) @map("id_comercio") @db.Uuid
+  usuarioId            String     @unique @map("usuario_id")
+  mercadoPagoVinculado Boolean    @default(false) @map("mercado_pago_vinculado")
+  reputacionPromedio   Float      @default(0) @map("reputacion_promedio")
+  totalCalificaciones  Int        @default(0) @map("total_calificaciones")
+  usuario              Usuario    @relation(fields: [usuarioId], references: [id])
+  productos            Producto[]
 
   @@map("comercio")
 }

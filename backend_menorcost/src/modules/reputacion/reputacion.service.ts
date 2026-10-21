@@ -1,62 +1,171 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service.js'; 
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import type { CrearCalificacionDto } from './dto/crear-calificacion.dto.js';
+import type { ListarResenasQueryDto } from './dto/listar-resenas-query.dto.js';
 
 @Injectable()
 export class ReputacionService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async recalcularReputacionComercio(id_comercio: string) {
-    return this.prisma.$transaction(async (tx) => {
-      // Agrupación de calificaciones asociadas a los pedidos entregados de este comercio
-      const agregacion = await tx.calificacion.aggregate({
-        _avg: { puntaje: true },
-        _count: { id_calificacion: true },
-        where: {
-          // Nota: Ajustar "comercioId" y "estado" cuando el Dev 4 suba el modelo Pedido definitivo
-          pedido: { /* comercioId: id_comercio, estado: 'ENTREGADO' */ } as any, 
-        },
-      });
+  async crearCalificacion(idUsuario: string, dto: CrearCalificacionDto) {
+    const maxIntentos = 3;
 
-      const promedioOriginal = agregacion._avg.puntaje || 0;
-      const promedioRedondeado = Math.round(promedioOriginal * 10) / 10;
-      const totalCalificaciones = agregacion._count.id_calificacion || 0;
+    for (let intento = 1; intento <= maxIntentos; intento++) {
+      try {
+        return await this.prisma.$transaction(
+          async (tx) => {
+            const pedido = await tx.pedido.findUnique({
+              where: { id_pedido: dto.idPedido },
+              include: { calificacion: true },
+            });
 
-      // Actualización de la caché en el modelo Comercio (dev 2)
-      await tx.comercio.update({
-        where: { idComercio: id_comercio },
-        data: {
-          // reputacionPromedio: promedioRedondeado,
-          // totalCalificaciones: totalCalificaciones,
-        } as any, // Quitar el "as any" cuando Dev 2 agregue los campos en schema.prisma
-      });
+            if (!pedido) {
+              throw new NotFoundException('Pedido no encontrado');
+            }
 
-      return { promedio: promedioRedondeado, total: totalCalificaciones };
-    });
+            if (pedido.usuarioId !== idUsuario) {
+              throw new ForbiddenException('No puedes calificar un pedido que no te pertenece');
+            }
+
+            if (pedido.estado !== 'ENTREGADO') {
+              throw new BadRequestException('Solo se pueden calificar pedidos en estado ENTREGADO');
+            }
+
+            if (pedido.calificacion) {
+              throw new ConflictException('Este pedido ya fue calificado previamente');
+            }
+
+            const calificacion = await tx.calificacion.create({
+              data: {
+                id_pedido: dto.idPedido,
+                puntaje: dto.puntaje,
+                comentario: dto.comentario,
+              },
+            });
+
+            const reputacionComercio = await this.recalcularReputacionTx(tx, pedido.comercioId);
+
+            return {
+              calificacion,
+              reputacionComercio,
+            };
+          },
+          { isolationLevel: 'Serializable' },
+        );
+      } catch (error: unknown) {
+        const codigo =
+          error && typeof error === 'object' && 'code' in error
+            ? (error as { code?: string }).code
+            : undefined;
+
+        // Restricción única de id_pedido ante solicitudes concurrentes
+        if (codigo === 'P2002') {
+          throw new ConflictException('Este pedido ya fue calificado previamente');
+        }
+
+        // Conflicto de serialización (P2034): reintentamos si quedan intentos disponibles
+        if (codigo === 'P2034' && intento < maxIntentos) {
+          continue;
+        }
+
+        throw error;
+      }
+    }
   }
 
-  async obtenerReputacionComercio(id_comercio: string) {
-    const calificaciones = await this.prisma.calificacion.findMany({
-      where: {
-        // Nota: Ajustar cuando el Dev 4 suba el modelo Pedido definitivo
-        pedido: { /* comercioId: id_comercio, estado: 'ENTREGADO' */ } as any,
-      },
-      include: {
-        pedido: {
-          // include: { usuario: true }, // Descomentar cuando Pedido tenga la relación con Usuario
-        },
-      },
-      orderBy: { fecha_creacion: 'desc' },
+  async obtenerReputacionComercioPorUsuario(
+    idUsuario: string,
+    query?: ListarResenasQueryDto,
+  ) {
+    const comercio = await this.prisma.comercio.findUnique({
+      where: { usuarioId: idUsuario },
     });
 
-    const distribucion: Record<string, number> = { "5": 0, "4": 0, "3": 0, "2": 0, "1": 0 };
+    if (!comercio) {
+      throw new NotFoundException('Comercio no encontrado para este usuario');
+    }
+
+    return this.obtenerReputacionComercio(comercio.idComercio, query);
+  }
+
+  async obtenerReputacionComercio(
+    id_comercio: string,
+    query?: ListarResenasQueryDto,
+  ) {
+    const limit = Math.min(Math.max(query?.limit ?? 10, 1), 50);
+    const cursor = query?.cursor;
+    const filtroComercio = { comercioId: id_comercio, estado: 'ENTREGADO' };
+
+    const [gruposPuntaje, calificacionesPagina] = await Promise.all([
+      this.prisma.calificacion.groupBy({
+        by: ['puntaje'],
+        where: { pedido: filtroComercio },
+        _count: { id_calificacion: true },
+      }),
+      this.prisma.calificacion.findMany({
+        where: { pedido: filtroComercio },
+        take: limit + 1,
+        ...(cursor
+          ? {
+              cursor: { id_calificacion: cursor },
+              skip: 1,
+            }
+          : {}),
+        include: {
+          pedido: {
+            include: {
+              usuario: {
+                select: {
+                  nombre: true,
+                  apellido: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [
+          { fecha_creacion: 'desc' },
+          { id_calificacion: 'desc' },
+        ],
+      }),
+    ]);
+
+    const distribucion: Record<string, number> = {
+      '5': 0,
+      '4': 0,
+      '3': 0,
+      '2': 0,
+      '1': 0,
+    };
+    let totalResenas = 0;
     let sumaPuntajes = 0;
 
-    const resenas = calificaciones.map((cal) => {
-      distribucion[cal.puntaje.toString()] += 1;
-      sumaPuntajes += cal.puntaje;
+    for (const grupo of gruposPuntaje) {
+      const cantidad = grupo._count.id_calificacion;
+      distribucion[grupo.puntaje.toString()] = cantidad;
+      totalResenas += cantidad;
+      sumaPuntajes += grupo.puntaje * cantidad;
+    }
 
-      //temporal hasta que Dev 4 integre el modelo Usuario dentro de Pedido
-      const cliente = (cal.pedido as any)?.usuario || { nombre: 'Cliente', apellido: 'Anónimo' };
+    const promedio =
+      totalResenas > 0 ? Math.round((sumaPuntajes / totalResenas) * 10) / 10 : 0;
+
+    const hasMore = calificacionesPagina.length > limit;
+    const itemsPagina = hasMore
+      ? calificacionesPagina.slice(0, limit)
+      : calificacionesPagina;
+
+    const resenas = itemsPagina.map((cal) => {
+      const cliente = cal.pedido?.usuario ?? {
+        nombre: 'Cliente',
+        apellido: 'Anónimo',
+      };
 
       return {
         id: cal.id_calificacion,
@@ -67,14 +176,52 @@ export class ReputacionService {
       };
     });
 
-    const totalResenas = calificaciones.length;
-    const promedio = totalResenas > 0 ? Math.round((sumaPuntajes / totalResenas) * 10) / 10 : 0;
+    const nextCursor =
+      hasMore && itemsPagina.length > 0
+        ? itemsPagina[itemsPagina.length - 1].id_calificacion
+        : null;
 
     return {
       promedio,
       totalResenas,
       distribucion,
       resenas,
+      paginacion: {
+        limit,
+        nextCursor,
+        hasMore,
+      },
     };
+  }
+
+  async recalcularReputacionComercio(id_comercio: string) {
+    return this.prisma.$transaction(
+      async (tx) => this.recalcularReputacionTx(tx, id_comercio),
+      { isolationLevel: 'Serializable' },
+    );
+  }
+
+  private async recalcularReputacionTx(tx: any, id_comercio: string) {
+    const agregacion = await tx.calificacion.aggregate({
+      _avg: { puntaje: true },
+      _count: { id_calificacion: true },
+      where: {
+        pedido: { comercioId: id_comercio, estado: 'ENTREGADO' },
+      },
+    });
+
+    const promedioOriginal = agregacion._avg.puntaje || 0;
+    const promedioRedondeado = Math.round(promedioOriginal * 10) / 10;
+    const totalCalificaciones = agregacion._count.id_calificacion || 0;
+
+    await tx.comercio.update({
+      where: { idComercio: id_comercio },
+      data: {
+        reputacionPromedio: promedioRedondeado,
+        totalCalificaciones: totalCalificaciones,
+      },
+    });
+
+    return { promedio: promedioRedondeado, total: totalCalificaciones };
   }
 }

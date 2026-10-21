@@ -8,6 +8,8 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ConfigModule } from '@nestjs/config';
 import { OffersModule } from './modules/ofertas/ofertas.module.js';
+import { ReputacionModule } from './modules/reputacion/reputacion.module.js';
+import { BackofficeModule } from './modules/backoffice/backoffice.module.js';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { OffersModule } from './modules/ofertas/ofertas.module.js';
     UsuariosModule,
     DireccionesModule,
     BajaModule,
+    ReputacionModule,
+    BackofficeModule,
     ConfigModule.forRoot({ isGlobal: true }),
     OffersModule,
   ],
