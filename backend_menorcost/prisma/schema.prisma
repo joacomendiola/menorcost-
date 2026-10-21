@@ -116,6 +116,10 @@ model Usuario {
   solicitudesBaja SolicitudBaja[] @relation("BajaSolicitada")
   bajasResueltas  SolicitudBaja[] @relation("BajaResuelta")
 
+  reportesEmitidos   Reporte[] @relation("ReportesEmitidos")
+  reportesRecibidos  Reporte[] @relation("ReportesRecibidos")
+  reportesSupervisados Reporte[] @relation("ReportesSupervisados")
+
   @@map("usuarios")
 }
 
@@ -174,4 +178,68 @@ model SolicitudBaja {
   @@index([usuarioId])
   @@index([estado])
   @@map("solicitudes_baja")
+}
+
+//Dev 5: faltaria crear modelo pedido para Calificacion y Reporte
+
+enum EstadoReporte {
+  PENDIENTE_REVISION 
+  BAJO_INVESTIGACION 
+  RESUELTO           
+  DESESTIMADO        
+}
+
+enum TipoDestinoReporte {
+  COMERCIO
+  CLIENTE
+}
+
+model Calificacion {
+  id_calificacion Int      @id @default(autoincrement())
+  puntaje         Int      // Escala obligatoria de 1 a 5
+  comentario      String?  @db.VarChar(250) // Máximo 250 caracteres según CU-5.01
+  fecha_creacion  DateTime @default(now())  // Necesario para mostrar por ej:"02 sep" en Pantalla
+
+  // Relación 1 a 1 con Pedido (Pedido --(0,1)Genera/(1,1)--> Calificacion)
+  id_pedido       String   @unique
+  pedido          Pedido   @relation(fields: [id_pedido], references: [id_pedido])
+   
+  @@map("calificacion") 
+}
+
+model Reporte {
+  id_reporte      Int                @id @default(autoincrement())
+  motivo          String             // Categoría seleccionada en el select
+  descripcion     String?            @db.VarChar(300) // Máximo 300 caracteres según CU-5.02
+  estado_reporte  EstadoReporte      @default(PENDIENTE_REVISION)
+  tipo_destino    TipoDestinoReporte // Hacia quién va dirigida la denuncia
+  fecha_reporte   DateTime           @default(now())
+  fecha_resolucion DateTime?
+
+  // Relación con Pedido (En el DER: Reporte --Referencia (1,1)--> Pedido)
+  id_pedido       String
+  pedido          Pedido             @relation(fields: [id_pedido], references: [id_pedido])
+
+  // Relación Usuario Emite Reporte (1,n)
+  id_emisor       String
+  emisor          Usuario            @relation("ReportesEmitidos", fields: [id_emisor], references: [id])
+
+  // Usuario o Comercio denunciado (Requerido por CU-5.02 para contar el umbral de 3 reportes)
+  id_denunciado   String
+  denunciado      Usuario            @relation("ReportesRecibidos", fields: [id_denunciado], references: [id])
+
+  // Relación Usuario (Admin) Supervisa Reporte (0,n) 
+  id_admin        String?
+  admin           Usuario?            @relation("ReportesSupervisados", fields: [id_admin], references: [id])
+
+  @@map("reporte")
+}
+
+// modelo temporal de Pedido (A reemplazar cuando dev 4 lo suba)
+model Pedido {
+  id_pedido     String        @id @default(uuid()) 
+  calificacion  Calificacion?
+  reportes      Reporte[]
+
+  @@map("pedido")
 }
