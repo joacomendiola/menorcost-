@@ -16,7 +16,7 @@ import { Roles } from '../auth/decorators/roles.decorator.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface.js';
-import { CreateOfferDto } from './dto/create-offer.dto.js';
+import { CreateOfferDto } from './dto/create-oferta.dto.js';
 import type { OfferRecord } from './ofertas-creation.ports.js';
 import { OffersService } from './ofertas.service.js';
 

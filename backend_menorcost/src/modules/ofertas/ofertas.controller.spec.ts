@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface.js';
-import { CreateOfferDto } from './dto/create-offer.dto.js';
+import { CreateOfferDto } from './dto/create-oferta.dto.js';
 import type { OfferRecord } from './ofertas-creation.ports.js';
 import { OffersController } from './ofertas.controller.js';
 import { OffersService } from './ofertas.service.js';

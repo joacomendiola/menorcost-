@@ -1,6 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CreateOfferDto } from './dto/create-offer.dto.js';
+import { CreateOfferDto } from './dto/create-oferta.dto.js';
 import type {
   OfferAccess,
   OfferCategories,
@@ -53,6 +53,9 @@ describe('OffersService', () => {
 
     repository = {
       create: vi.fn().mockResolvedValue(savedOffer),
+      listByOwner: vi.fn(),
+      findByIdForOwner: vi.fn(),
+      updateForOwner: vi.fn(),
     };
 
     imageStorage = new ImageStorageService();

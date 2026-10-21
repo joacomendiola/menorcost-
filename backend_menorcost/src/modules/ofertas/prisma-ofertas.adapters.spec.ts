@@ -5,7 +5,7 @@ import {
 import { Test } from '@nestjs/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { CreateOfferDto } from './dto/create-offer.dto.js';
+import { CreateOfferDto } from './dto/create-oferta.dto.js';
 import {
   PrismaOfferAccessAdapter,
   PrismaOfferCategoriesAdapter,
