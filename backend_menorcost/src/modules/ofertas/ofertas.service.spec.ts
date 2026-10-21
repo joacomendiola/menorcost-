@@ -1,15 +1,22 @@
-import { ForbiddenException } from '@nestjs/common';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CreateOfferDto } from './dto/create-oferta.dto.js';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import type { UpdateOfferDto } from './dto/update-oferta.dto.js';
 import type {
   OfferAccess,
   OfferCategories,
+  OfferDetails,
   OfferImage,
   OfferRecord,
   OfferRepository,
 } from './ofertas-creation.ports.js';
+import type { CreateOfferDto } from './dto/create-oferta.dto.js';
 import { ImageStorageService } from './image-store.service.js';
 import { OffersService } from './ofertas.service.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('OffersService', () => {
   let service: OffersService;
@@ -41,6 +48,21 @@ describe('OffersService', () => {
     estado: 'ACTIVO',
   };
 
+  const offerDetails: OfferDetails = {
+    id: '33333333-3333-4333-8333-333333333333',
+    comercioId: dto.comercioId,
+    categoriaId: dto.categoriaId,
+    tipo: 'INDIVIDUAL',
+    titulo: 'Yogur',
+    descripcion: 'Pack de yogures',
+    fechaVencimiento: '2099-12-31',
+    stock: 5,
+    precioLista: '100.00',
+    precioMenorcost: '75.00',
+    imagen: '/uploads/yogur.webp',
+    estado: 'ACTIVO',
+  };
+
   beforeEach(() => {
     access = {
       assertCanPublish: vi.fn().mockResolvedValue(undefined),
@@ -53,9 +75,9 @@ describe('OffersService', () => {
 
     repository = {
       create: vi.fn().mockResolvedValue(savedOffer),
-      listByOwner: vi.fn(),
-      findByIdForOwner: vi.fn(),
-      updateForOwner: vi.fn(),
+      listByOwner: vi.fn().mockResolvedValue([offerDetails]),
+      findByIdForOwner: vi.fn().mockResolvedValue(offerDetails),
+      updateForOwner: vi.fn().mockResolvedValue(offerDetails),
     };
 
     imageStorage = new ImageStorageService();
@@ -155,5 +177,144 @@ describe('OffersService', () => {
     );
 
     expect(imageStorage.delete).toHaveBeenCalledWith('/uploads/test.webp');
+  });
+
+  it('actualiza los campos permitidos de la oferta', async () => {
+  const update: UpdateOfferDto = {
+    precioMenorcost: '70.00',
+    stock: 8,
+  };
+  const updatedOffer = { ...offerDetails, ...update };
+
+  vi.mocked(repository.updateForOwner).mockResolvedValueOnce(updatedOffer);
+
+  await expect(
+    service.update('user-1', offerDetails.id, update),
+  ).resolves.toEqual(updatedOffer);
+
+  expect(repository.updateForOwner).toHaveBeenCalledWith(
+    'user-1',
+    offerDetails.id,
+    update,
+  );
+  expect(repository.create).not.toHaveBeenCalled();
+  expect(imageStorage.save).not.toHaveBeenCalled();
+});
+
+  it('lista las ofertas del comerciante', async () => {
+    await expect(service.listByOwner('user-1')).resolves.toEqual([
+      offerDetails,
+    ]);
+
+    expect(repository.listByOwner).toHaveBeenCalledWith('user-1');
+  });
+
+  it('devuelve una oferta propia por su identificador', async () => {
+    await expect(
+      service.getByIdForOwner('user-1', offerDetails.id),
+    ).resolves.toEqual(offerDetails);
+
+    expect(repository.findByIdForOwner).toHaveBeenCalledWith(
+      'user-1',
+      offerDetails.id,
+    );
+  });
+
+  it('responde como no encontrada si no existe una oferta propia', async () => {
+    vi.mocked(repository.findByIdForOwner).mockResolvedValueOnce(null);
+
+    await expect(
+      service.getByIdForOwner('user-1', offerDetails.id),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rechaza una actualización sin ningún campo', async () => {
+    await expect(
+      service.update('user-1', offerDetails.id, {}),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(repository.updateForOwner).not.toHaveBeenCalled();
+  });
+
+  it('rechaza precios promocionales que no sean inferiores al precio de lista actual', async () => {
+    const update: UpdateOfferDto = { precioLista: '70.00' };
+
+    await expect(
+      service.update('user-1', offerDetails.id, update),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(repository.updateForOwner).not.toHaveBeenCalled();
+  });
+
+  it('bloquea la reducción de stock mientras no se pueda consultar las reservas', async () => {
+    const update: UpdateOfferDto = { stock: 4 };
+
+    await expect(
+      service.update('user-1', offerDetails.id, update),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+
+    expect(repository.updateForOwner).not.toHaveBeenCalled();
+  });
+
+  it('actualiza los campos permitidos de la oferta', async () => {
+    const update: UpdateOfferDto = {
+      precioMenorcost: '70.00',
+      stock: 8,
+    };
+    const updatedOffer = { ...offerDetails, ...update };
+
+    vi.mocked(repository.updateForOwner).mockResolvedValueOnce(updatedOffer);
+
+    await expect(
+      service.update('user-1', offerDetails.id, update),
+    ).resolves.toEqual(updatedOffer);
+
+    expect(repository.updateForOwner).toHaveBeenCalledWith(
+      'user-1',
+      offerDetails.id,
+      update,
+    );
+    expect(repository.create).not.toHaveBeenCalled();
+    expect(imageStorage.save).not.toHaveBeenCalled();
+  });
+
+  it('reemplaza la imagen solo después de guardar la nueva referencia', async () => {
+    const updatedOffer = {
+      ...offerDetails,
+      imagen: '/uploads/nueva-imagen.webp',
+    };
+
+    vi.mocked(imageStorage.save).mockResolvedValueOnce(
+      '/uploads/nueva-imagen.webp',
+    );
+    vi.mocked(repository.updateForOwner).mockResolvedValueOnce(updatedOffer);
+
+    await expect(
+      service.update('user-1', offerDetails.id, {}, image),
+    ).resolves.toEqual(updatedOffer);
+
+    expect(repository.updateForOwner).toHaveBeenCalledWith(
+      'user-1',
+      offerDetails.id,
+      { imagen: '/uploads/nueva-imagen.webp' },
+    );
+    expect(imageStorage.delete).toHaveBeenCalledWith(offerDetails.imagen);
+  });
+
+  it('limpia la nueva imagen y propaga el error si falla la persistencia', async () => {
+    const databaseError = new Error('Database unavailable');
+
+    vi.mocked(imageStorage.save).mockResolvedValueOnce(
+      '/uploads/nueva-imagen.webp',
+    );
+    vi.mocked(repository.updateForOwner).mockRejectedValueOnce(databaseError);
+
+    await expect(
+      service.update('user-1', offerDetails.id, {}, image),
+    ).rejects.toBe(databaseError);
+
+    expect(imageStorage.delete).toHaveBeenCalledWith(
+      '/uploads/nueva-imagen.webp',
+    );
   });
 });
