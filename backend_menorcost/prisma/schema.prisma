@@ -42,6 +42,7 @@ model Producto {
 
   comercio         Comercio       @relation(fields: [comercioId], references: [idComercio])
   categoria        Categoria      @relation(fields: [categoriaId], references: [idCategoria])
+  pedidoItems      PedidoItem[]
 
   @@map("producto")
 }
@@ -55,6 +56,7 @@ model Comercio {
   totalCalificaciones  Int        @default(0) @map("total_calificaciones")
   usuario              Usuario    @relation(fields: [usuarioId], references: [id])
   productos            Producto[]
+  pedidos              Pedido[]
 
   @@map("comercio")
 }
@@ -203,7 +205,7 @@ model Calificacion {
   fecha_creacion  DateTime @default(now())  // Necesario para mostrar por ej:"02 sep" en Pantalla
 
   // Relación 1 a 1 con Pedido (Pedido --(0,1)Genera/(1,1)--> Calificacion)
-  id_pedido       String   @unique
+  id_pedido       String   @unique   @db.Uuid
   pedido          Pedido   @relation(fields: [id_pedido], references: [id_pedido])
    
   @@map("calificacion") 
@@ -219,7 +221,7 @@ model Reporte {
   fecha_resolucion DateTime?
 
   // Relación con Pedido (En el DER: Reporte --Referencia (1,1)--> Pedido)
-  id_pedido       String
+  id_pedido       String             @db.Uuid
   pedido          Pedido             @relation(fields: [id_pedido], references: [id_pedido])
 
   // Relación Usuario Emite Reporte (1,n)
@@ -237,16 +239,48 @@ model Reporte {
   @@map("reporte")
 }
 
-// modelo temporal de Pedido (A reemplazar cuando dev 4 lo suba)
+//Modelo Pedido completo del DEV4(en caso de reemplazar o modificar tener cuidado)
 model Pedido {
-  id_pedido     String        @id @default(uuid()) 
-  comercioId    String        @db.Uuid
-  estado        String
-  usuarioId     String
+  id_pedido       String         @id @default(uuid()) @map("id_pedido") @db.Uuid
+  usuarioId       String         @map("usuario_id")
+  comercioId      String         @map("id_comercio") @db.Uuid
+  estado          EstadoPedido   @default(PENDIENTE_DE_RETIRO)
+  codigoQR        String         @unique @map("codigo_qr") @db.VarChar(100)
+  codigoAlfanumerico String      @unique @map("codigo_alfanumerico") @db.VarChar(20)
+  fecha_pedido    DateTime       @default(now()) @map("fecha_pedido") @db.Timestamp(0)
+  franjaHorarioId String?        @map("franja_horario_id") @db.Uuid
+  subtotal        Decimal        @db.Decimal(10, 2)
+  tarifa_servicio Decimal        @map("tarifa_servicio") @db.Decimal(10, 2)
+  total           Decimal        @db.Decimal(10, 2)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
-  usuario       Usuario       @relation(fields: [usuarioId], references: [id])
-  calificacion  Calificacion?
-  reportes      Reporte[]
+  usuario         Usuario        @relation(fields: [usuarioId], references: [id])
+  comercio        Comercio       @relation(fields: [comercioId], references: [idComercio])
+  calificacion    Calificacion?
+  reportes        Reporte[]
+  items           PedidoItem[]
 
   @@map("pedido")
+}
+
+model PedidoItem {
+  id_pedido_item String   @id @default(uuid()) @map("id_pedido_item") @db.Uuid
+  pedidoId       String   @map("id_pedido") @db.Uuid
+  productoId     String   @map("id_producto") @db.Uuid
+  cantidad       Int
+  precio_unitario Decimal  @map("precio_unitario") @db.Decimal(10, 2)
+  subtotal       Decimal  @db.Decimal(10, 2)
+
+  pedido         Pedido   @relation(fields: [pedidoId], references: [id_pedido])
+  producto       Producto @relation(fields: [productoId], references: [idProducto])
+
+  @@map("pedido_item")
+}
+
+enum EstadoPedido {
+  PENDIENTE_DE_RETIRO
+  ENTREGADO
+  CANCELADO
+  CANCELADO_POR_FALTA_RETIRO
 }
