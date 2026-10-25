@@ -26,6 +26,13 @@ enum EstadoProducto {
   ELIMINADO
 }
 
+enum EstadoComercio {
+  PENDIENTE_VERIFICACION
+  HABILITADO
+  DOCUMENTACION_RECHAZADA
+  SUSPENDIDO
+}
+
 model Producto {
   idProducto       String         @id @default(uuid()) @map("id_producto") @db.Uuid
   comercioId       String         @map("id_comercio") @db.Uuid
@@ -46,21 +53,82 @@ model Producto {
   @@map("producto")
 }
 
-// CLASES MINIMAS PARA LA COMPILACION DE LA RELACIONES DEL MODEL PRODUCTO (ELIMINAR EN CUANTO SE HAGA EL PR QUE CONTENGA LOS MODEL COMPLETOS)
 model Comercio {
-  idComercio String     @id @default(uuid()) @map("id_comercio") @db.Uuid
-  usuarioId String     @unique @map("usuario_id")
-  mercadoPagoVinculado Boolean @default(false) @map("mercado_pago_vinculado")
+  idComercio           String         @id @default(uuid()) @map("id_comercio") @db.Uuid
+  usuarioId            String         @unique @map("usuario_id")
+  mercadoPagoVinculado Boolean        @default(false) @map("mercado_pago_vinculado")
+  nombreFantasia       String         @map("nombre_fantasia") @db.VarChar(120)
+  razonSocial          String         @map("razon_social") @db.VarChar(160)
+  cuit                 String         @unique @db.VarChar(13)
+  telefono             String         @db.VarChar(30)
+  descripcion          String?        @db.Text
+  calle                String         @db.VarChar(120)
+  numero               String         @db.VarChar(20)
+  piso                 String?        @db.VarChar(20)
+  localidad            String         @db.VarChar(120)
+  provincia            String         @db.VarChar(120)
+  codigoPostal         String?        @map("codigo_postal") @db.VarChar(10)
+  latitud              Decimal        @db.Decimal(9, 6)
+  longitud             Decimal        @db.Decimal(9, 6)
+  googlePlaceId        String         @unique @map("google_place_id") @db.VarChar(255)
+  logoUrl              String?        @map("logo_url") @db.VarChar(500)
+  portadaUrl           String?        @map("portada_url") @db.VarChar(500)
+  abierto              Boolean        @default(false)
+  estado               EstadoComercio @default(PENDIENTE_VERIFICACION)
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
 
-  usuario Usuario @relation(fields: [usuarioId], references: [id])
-  productos   Producto[]
+  usuario   Usuario           @relation(fields: [usuarioId], references: [id])
+  productos Producto[]
+  horarios  HorarioAtencion[]
+  franjas   FranjaRetiro[]
 
+  @@index([localidad])
+  @@index([estado])
   @@map("comercio")
 }
 
+model HorarioAtencion {
+  id         String   @id @default(uuid()) @db.Uuid
+  comercioId String   @map("comercio_id") @db.Uuid
+  diaSemana  Int      @map("dia_semana")
+  horaInicio String   @map("hora_inicio") @db.VarChar(5)
+  horaFin    String   @map("hora_fin") @db.VarChar(5)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  comercio Comercio @relation(fields: [comercioId], references: [idComercio], onDelete: Cascade)
+
+  @@index([comercioId, diaSemana])
+  @@map("horario_atencion")
+}
+
+model FranjaRetiro {
+  id         String   @id @default(uuid()) @db.Uuid
+  comercioId String   @map("comercio_id") @db.Uuid
+  diaSemana  Int      @map("dia_semana")
+  horaInicio String   @map("hora_inicio") @db.VarChar(5)
+  horaFin    String   @map("hora_fin") @db.VarChar(5)
+  activa     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  comercio Comercio @relation(fields: [comercioId], references: [idComercio], onDelete: Cascade)
+
+  @@index([comercioId, diaSemana])
+  @@map("franja_retiro")
+}
+
 model Categoria {
-  idCategoria String     @id @default(uuid()) @map("id_categoria") @db.Uuid
-  productos    Producto[]
+  idCategoria String   @id @default(uuid()) @map("id_categoria") @db.Uuid
+  nombre      String   @unique @db.VarChar(80)
+  slug        String   @unique @db.VarChar(80)
+  orden       Int      @default(0)
+  activa      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  productos Producto[]
 
   @@map("categoria")
 }
