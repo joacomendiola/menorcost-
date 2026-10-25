@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface.js';
 import { CategoriasController } from './categorias.controller.js';
+import { ComerciosPublicosController } from './comercios-publicos.controller.js';
 import { ComerciosController } from './comercios.controller.js';
 import { ComerciosService } from './comercios.service.js';
 import type { CrearComercioDto } from './dto/crear-comercio.dto.js';
@@ -30,6 +31,8 @@ describe('Controladores de comercios', () => {
 
   const serviceMock = {
     listarCategorias: vi.fn(),
+    obtenerPublico: vi.fn(),
+    subirImagen: vi.fn(),
     obtenerMio: vi.fn(),
     crear: vi.fn(),
     actualizarMio: vi.fn(),
@@ -42,13 +45,18 @@ describe('Controladores de comercios', () => {
   };
 
   let comerciosController: ComerciosController;
+  let comerciosPublicosController: ComerciosPublicosController;
   let categoriasController: CategoriasController;
 
   beforeEach(async () => {
     vi.clearAllMocks();
 
     const moduleRef = await Test.createTestingModule({
-      controllers: [ComerciosController, CategoriasController],
+      controllers: [
+        ComerciosController,
+        ComerciosPublicosController,
+        CategoriasController,
+      ],
       providers: [
         {
           provide: ComerciosService,
@@ -58,6 +66,7 @@ describe('Controladores de comercios', () => {
     }).compile();
 
     comerciosController = moduleRef.get(ComerciosController);
+    comerciosPublicosController = moduleRef.get(ComerciosPublicosController);
     categoriasController = moduleRef.get(CategoriasController);
   });
 
@@ -67,6 +76,50 @@ describe('Controladores de comercios', () => {
 
     await expect(categoriasController.listar()).resolves.toEqual(categorias);
     expect(serviceMock.listarCategorias).toHaveBeenCalledOnce();
+  });
+
+  it('obtiene la tienda pública sin sesión', async () => {
+    const tienda = { id: 'c1', nombreFantasia: 'Almacén Don José' };
+    serviceMock.obtenerPublico.mockResolvedValue(tienda);
+
+    await expect(comerciosPublicosController.obtener('c1')).resolves.toEqual(
+      tienda,
+    );
+    expect(serviceMock.obtenerPublico).toHaveBeenCalledWith('c1');
+  });
+
+  it('sube el logo del comercio autenticado', async () => {
+    const comercio = { id: 'c1', logoUrl: '/uploads/logo.png' };
+    const imagen = {
+      buffer: Buffer.from('imagen'),
+      mimetype: 'image/png',
+    } as Express.Multer.File;
+    serviceMock.subirImagen.mockResolvedValue(comercio);
+
+    await expect(
+      comerciosController.subirLogo(usuario, imagen),
+    ).resolves.toEqual(comercio);
+    expect(serviceMock.subirImagen).toHaveBeenCalledWith('u1', 'logo', {
+      buffer: imagen.buffer,
+      mimetype: 'image/png',
+    });
+  });
+
+  it('sube la portada del comercio autenticado', async () => {
+    const comercio = { id: 'c1', portadaUrl: '/uploads/portada.png' };
+    const imagen = {
+      buffer: Buffer.from('imagen'),
+      mimetype: 'image/png',
+    } as Express.Multer.File;
+    serviceMock.subirImagen.mockResolvedValue(comercio);
+
+    await expect(
+      comerciosController.subirPortada(usuario, imagen),
+    ).resolves.toEqual(comercio);
+    expect(serviceMock.subirImagen).toHaveBeenCalledWith('u1', 'portada', {
+      buffer: imagen.buffer,
+      mimetype: 'image/png',
+    });
   });
 
   it('obtiene el comercio del usuario autenticado', async () => {

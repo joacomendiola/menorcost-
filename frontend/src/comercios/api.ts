@@ -4,6 +4,20 @@ const API_URL =
   (import.meta.env.VITE_API_URL as string | undefined) ??
   'http://localhost:3000';
 
+export function resolverImagen(url: string | null | undefined): string | null {
+  if (!url) return null;
+
+  if (
+    /^(https?:)?\/\//.test(url) ||
+    url.startsWith('data:') ||
+    url.startsWith('blob:')
+  ) {
+    return url;
+  }
+
+  return `${API_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
 export type EstadoComercio =
   | 'PENDIENTE_VERIFICACION'
   | 'HABILITADO'
@@ -47,6 +61,42 @@ export interface Comercio {
   horarios: HorarioAtencion[];
   franjas: FranjaRetiro[];
 }
+
+export interface ProductoTienda {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  imagen: string;
+  precioLista: string | number;
+  precioMenorcost: string | number;
+  fechaVencimiento: string;
+  stock: number;
+  categoria: {
+    nombre: string;
+    slug: string;
+  };
+}
+
+export interface TiendaPublica {
+  id: string;
+  nombreFantasia: string;
+  descripcion: string | null;
+  logoUrl: string | null;
+  portadaUrl: string | null;
+  calle: string;
+  numero: string;
+  piso: string | null;
+  localidad: string;
+  provincia: string;
+  latitud: string | number;
+  longitud: string | number;
+  abierto: boolean;
+  horarios: HorarioAtencion[];
+  reputacion: number | null;
+  productos: ProductoTienda[];
+}
+
+export type TipoImagenComercio = 'logo' | 'portada';
 
 export interface ComercioPayload {
   nombreFantasia: string;
@@ -132,16 +182,24 @@ async function pedir<T>(
   { method = 'GET', body, token, signal }: Opciones = {},
 ): Promise<T> {
   let respuesta: Response;
+  const esFormData = body instanceof FormData;
 
   try {
     respuesta = await fetch(`${API_URL}${path}`, {
       method,
       signal,
       headers: {
-        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(body !== undefined && !esFormData
+          ? { 'Content-Type': 'application/json' }
+          : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body:
+        body !== undefined
+          ? esFormData
+            ? body
+            : JSON.stringify(body)
+          : undefined,
     });
   } catch (error) {
     if ((error as Error).name === 'AbortError') {
@@ -175,6 +233,9 @@ async function pedir<T>(
 }
 
 export const comerciosApi = {
+  tienda: (id: string) =>
+    pedir<TiendaPublica>(`/comercios/publicos/${encodeURIComponent(id)}`),
+
   mio: async (token: string): Promise<Comercio | null> => {
     try {
       return await pedir<Comercio>('/comercios/mio', { token });
@@ -195,6 +256,17 @@ export const comerciosApi = {
       body: payload,
       token,
     }),
+
+  subirImagen: (token: string, tipo: TipoImagenComercio, imagen: File) => {
+    const formulario = new FormData();
+    formulario.append('imagen', imagen);
+
+    return pedir<Comercio>(`/comercios/mio/${tipo}`, {
+      method: 'POST',
+      body: formulario,
+      token,
+    });
+  },
 
   cambiarApertura: (token: string, abierto: boolean) =>
     pedir<{ id: string; abierto: boolean }>('/comercios/mio/abierto', {

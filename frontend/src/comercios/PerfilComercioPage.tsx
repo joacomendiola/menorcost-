@@ -17,10 +17,12 @@ import { BuscadorComercio } from './BuscadorComercio';
 import { MapaComercio } from './MapaComercio';
 import {
   comerciosApi,
+  resolverImagen,
   type Comercio,
   type ComercioPayload,
   type EstadoComercio,
   type PlacesDetalle,
+  type TipoImagenComercio,
 } from './api';
 import { DIAS, formatearRango, ORDEN_DIAS } from './configuracion';
 import './comercios.css';
@@ -56,6 +58,65 @@ const ESTADOS: Record<EstadoComercio, { etiqueta: string; clase: string }> = {
   },
   SUSPENDIDO: { etiqueta: 'Suspendido', clase: 'comercio-estado--malo' },
 };
+
+const MAX_IMAGEN = 5 * 1024 * 1024;
+const TIPOS_IMAGEN = ['image/jpeg', 'image/png'];
+
+function validarImagen(file: File): string | null {
+  if (!TIPOS_IMAGEN.includes(file.type)) {
+    return 'Elegí una imagen JPG o PNG.';
+  }
+
+  if (file.size > MAX_IMAGEN) {
+    return 'La imagen no puede superar los 5 MB.';
+  }
+
+  return null;
+}
+
+interface ImagenComercioProps {
+  etiqueta: string;
+  url: string | null;
+  subiendo: boolean;
+  onArchivo: (file: File) => void;
+}
+
+function ImagenComercio({
+  etiqueta,
+  url,
+  subiendo,
+  onArchivo,
+}: ImagenComercioProps) {
+  const imagen = resolverImagen(url);
+
+  return (
+    <div className="comercio-imagen-campo">
+      <span className="mantine-InputWrapper-label">{etiqueta}</span>
+      <div className="comercio-imagen-vista">
+        {imagen ? (
+          <img src={imagen} alt={etiqueta} />
+        ) : (
+          <span className="muted">Sin imagen</span>
+        )}
+      </div>
+      <label className={`chip${subiendo ? ' chip--disabled' : ''}`}>
+        {subiendo ? 'Subiendo…' : 'Subir imagen'}
+        <input
+          type="file"
+          accept="image/jpeg,image/png"
+          hidden
+          disabled={subiendo}
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0];
+            event.currentTarget.value = '';
+            if (file) onArchivo(file);
+          }}
+        />
+      </label>
+      <p className="help">JPG o PNG, hasta 5 MB.</p>
+    </div>
+  );
+}
 
 function aFormulario(comercio: Comercio): FormularioComercio {
   return {
@@ -95,6 +156,8 @@ export function PerfilComercioPage() {
   const [cambiandoApertura, setCambiandoApertura] = useState(false);
   const [errorFormulario, setErrorFormulario] = useState('');
   const [editandoUbicacion, setEditandoUbicacion] = useState(false);
+  const [subiendoImagen, setSubiendoImagen] =
+    useState<TipoImagenComercio | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -190,6 +253,43 @@ export function PerfilComercioPage() {
       });
     } finally {
       setCambiandoApertura(false);
+    }
+  }
+
+  async function subirImagen(tipo: TipoImagenComercio, file: File) {
+    if (!token) return;
+
+    const errorImagen = validarImagen(file);
+    if (errorImagen) {
+      notifications.show({ color: 'red', message: errorImagen });
+      return;
+    }
+
+    setSubiendoImagen(tipo);
+
+    try {
+      const actualizado = await comerciosApi.subirImagen(token, tipo, file);
+      setComercio(actualizado);
+      setFormulario(aFormulario(actualizado));
+      notifications.show({
+        color: 'green',
+        message:
+          tipo === 'logo'
+            ? 'Logo actualizado correctamente.'
+            : 'Portada actualizada correctamente.',
+      });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        cerrarSesion();
+        navigate('/login', { replace: true });
+        return;
+      }
+      notifications.show({
+        color: 'red',
+        message: mensajeError(err, 'No pudimos subir la imagen.'),
+      });
+    } finally {
+      setSubiendoImagen(null);
     }
   }
 
@@ -299,6 +399,8 @@ export function PerfilComercioPage() {
   }
 
   const estado = ESTADOS[comercio.estado];
+  const portada = resolverImagen(comercio.portadaUrl);
+  const logo = resolverImagen(comercio.logoUrl);
   const horariosPorDia = ORDEN_DIAS.map((dia) => ({
     dia,
     horarios: comercio.horarios.filter((horario) => horario.diaSemana === dia),
@@ -313,17 +415,13 @@ export function PerfilComercioPage() {
       <div className="card comercio-cabecera" style={{ marginTop: 14 }}>
         <div
           className="comercio-portada"
-          style={
-            comercio.portadaUrl
-              ? { backgroundImage: `url(${comercio.portadaUrl})` }
-              : undefined
-          }
+          style={portada ? { backgroundImage: `url(${portada})` } : undefined}
         />
         <div className="comercio-cabecera__cuerpo">
-          {comercio.logoUrl ? (
+          {logo ? (
             <img
               className="comercio-logo"
-              src={comercio.logoUrl}
+              src={logo}
               alt={`Logo de ${comercio.nombreFantasia}`}
             />
           ) : (
@@ -372,6 +470,14 @@ export function PerfilComercioPage() {
             >
               Configurar horarios y franjas
             </Button>
+            {comercio.estado === 'HABILITADO' && (
+              <Button
+                variant="default"
+                onClick={() => navigate(`/comercios/${comercio.id}`)}
+              >
+                Ver tienda pública
+              </Button>
+            )}
           </div>
           <span className="muted">
             {comercio.mercadoPagoVinculado
@@ -474,17 +580,17 @@ export function PerfilComercioPage() {
           />
 
           <div className="grid-2">
-            <TextInput
-              label="Logo (URL)"
-              placeholder="https://…"
-              value={formulario.logoUrl}
-              onChange={campo('logoUrl')}
+            <ImagenComercio
+              etiqueta="Logo"
+              url={formulario.logoUrl}
+              subiendo={subiendoImagen === 'logo'}
+              onArchivo={(file) => void subirImagen('logo', file)}
             />
-            <TextInput
-              label="Portada (URL)"
-              placeholder="https://…"
-              value={formulario.portadaUrl}
-              onChange={campo('portadaUrl')}
+            <ImagenComercio
+              etiqueta="Portada"
+              url={formulario.portadaUrl}
+              subiendo={subiendoImagen === 'portada'}
+              onArchivo={(file) => void subirImagen('portada', file)}
             />
           </div>
 

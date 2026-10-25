@@ -24,13 +24,26 @@ const txMock = {
 
 const prismaMock = {
   categoria: { findMany: vi.fn() },
-  comercio: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+  comercio: {
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+  },
   horarioAtencion: { findMany: vi.fn() },
   franjaRetiro: { findMany: vi.fn() },
   $transaction: vi.fn(),
 };
 
-const service = new ComerciosService(prismaMock as never);
+const imageStorageMock = {
+  save: vi.fn(),
+  delete: vi.fn(),
+};
+
+const service = new ComerciosService(
+  prismaMock as never,
+  imageStorageMock as never,
+);
 
 const dto = {
   nombreFantasia: 'Almacén Don José',
@@ -117,6 +130,131 @@ describe('ComerciosService.listarCategorias', () => {
         orden: true,
       },
     });
+  });
+});
+
+describe('ComerciosService.obtenerPublico', () => {
+  it('oculta comercios que no están habilitados', async () => {
+    prismaMock.comercio.findFirst.mockResolvedValue(null);
+
+    await expect(service.obtenerPublico('c1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(prismaMock.comercio.findFirst).toHaveBeenCalledWith({
+      where: { idComercio: 'c1', estado: 'HABILITADO' },
+      select: expect.any(Object),
+    });
+  });
+
+  it('devuelve la tienda con sus productos activos y sin reputación de D5', async () => {
+    prismaMock.comercio.findFirst.mockResolvedValue({
+      ...comercioBase,
+      productos: [
+        {
+          idProducto: 'p1',
+          titulo: 'Yogur',
+          precioLista: '100',
+          precioMenorcost: '75',
+        },
+      ],
+    });
+
+    const resultado = await service.obtenerPublico('c1');
+
+    expect(resultado).toMatchObject({
+      id: 'c1',
+      nombreFantasia: 'Almacén Don José',
+      reputacion: null,
+      productos: [{ id: 'p1', titulo: 'Yogur' }],
+    });
+    expect(resultado).not.toHaveProperty('idComercio');
+    expect(resultado.productos[0]).not.toHaveProperty('idProducto');
+  });
+});
+
+describe('ComerciosService.subirImagen', () => {
+  it('guarda el logo y elimina la imagen anterior subida', async () => {
+    prismaMock.comercio.findUnique.mockResolvedValue({
+      idComercio: 'c1',
+      logoUrl: '/uploads/anterior.png',
+      portadaUrl: null,
+    });
+    imageStorageMock.save.mockResolvedValue('/uploads/nuevo.png');
+    prismaMock.comercio.update.mockResolvedValue({
+      ...comercioBase,
+      logoUrl: '/uploads/nuevo.png',
+    });
+
+    const resultado = await service.subirImagen('u1', 'logo', {
+      buffer: Buffer.from('imagen'),
+      mimetype: 'image/png',
+    });
+
+    expect(imageStorageMock.save).toHaveBeenCalledWith(
+      Buffer.from('imagen'),
+      'image/png',
+    );
+    expect(prismaMock.comercio.update).toHaveBeenCalledWith({
+      where: { usuarioId: 'u1' },
+      data: { logoUrl: '/uploads/nuevo.png' },
+      select: expect.any(Object),
+    });
+    expect(imageStorageMock.delete).toHaveBeenCalledWith(
+      '/uploads/anterior.png',
+    );
+    expect(resultado).toMatchObject({ id: 'c1' });
+  });
+
+  it('no elimina una portada externa cuando sube una nueva', async () => {
+    prismaMock.comercio.findUnique.mockResolvedValue({
+      idComercio: 'c1',
+      logoUrl: null,
+      portadaUrl: 'https://cdn.menorcost.test/portada.png',
+    });
+    imageStorageMock.save.mockResolvedValue('/uploads/nueva.png');
+    prismaMock.comercio.update.mockResolvedValue({
+      ...comercioBase,
+      portadaUrl: '/uploads/nueva.png',
+    });
+
+    await service.subirImagen('u1', 'portada', {
+      buffer: Buffer.from('imagen'),
+      mimetype: 'image/png',
+    });
+
+    expect(imageStorageMock.delete).not.toHaveBeenCalled();
+  });
+
+  it('borra la imagen nueva si falla la actualización', async () => {
+    prismaMock.comercio.findUnique.mockResolvedValue({
+      idComercio: 'c1',
+      logoUrl: null,
+      portadaUrl: null,
+    });
+    imageStorageMock.save.mockResolvedValue('/uploads/nueva.png');
+    prismaMock.comercio.update.mockRejectedValue(new Error('db caída'));
+
+    await expect(
+      service.subirImagen('u1', 'logo', {
+        buffer: Buffer.from('imagen'),
+        mimetype: 'image/png',
+      }),
+    ).rejects.toThrow('db caída');
+
+    expect(imageStorageMock.delete).toHaveBeenCalledWith('/uploads/nueva.png');
+  });
+
+  it('rechaza la subida si el usuario no tiene comercio', async () => {
+    prismaMock.comercio.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.subirImagen('u1', 'logo', {
+        buffer: Buffer.from('imagen'),
+        mimetype: 'image/png',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(imageStorageMock.save).not.toHaveBeenCalled();
   });
 });
 

@@ -2,10 +2,12 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { ImageStorageService } from '../ofertas/image-store.service.js';
 import {
   esCuitValido,
   esRangoHorarioValido,
@@ -22,6 +24,7 @@ import type { ReemplazarFranjasDto } from './dto/franja-retiro.dto.js';
 import type { ReemplazarHorariosDto } from './dto/horario-atencion.dto.js';
 
 const COMERCIO_NO_ENCONTRADO = 'Todavía no tenés un comercio registrado';
+const COMERCIO_PUBLICO_NO_ENCONTRADO = 'La tienda no está disponible';
 
 const SELECT_HORARIO = {
   id: true,
@@ -73,6 +76,46 @@ const SELECT_COMERCIO = {
   },
 } satisfies Prisma.ComercioSelect;
 
+const SELECT_TIENDA_PUBLICA = {
+  idComercio: true,
+  nombreFantasia: true,
+  descripcion: true,
+  logoUrl: true,
+  portadaUrl: true,
+  calle: true,
+  numero: true,
+  piso: true,
+  localidad: true,
+  provincia: true,
+  latitud: true,
+  longitud: true,
+  abierto: true,
+  horarios: {
+    select: SELECT_HORARIO,
+    orderBy: ORDEN_HORARIOS,
+  },
+  productos: {
+    where: { estado: 'ACTIVO' },
+    orderBy: [{ fechaVencimiento: 'asc' }, { titulo: 'asc' }],
+    select: {
+      idProducto: true,
+      titulo: true,
+      descripcion: true,
+      imagen: true,
+      precioLista: true,
+      precioMenorcost: true,
+      fechaVencimiento: true,
+      stock: true,
+      categoria: {
+        select: {
+          nombre: true,
+          slug: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.ComercioSelect;
+
 function aComercioPropio<T extends { idComercio: string }>(
   comercio: T,
 ): Omit<T, 'idComercio'> & { id: string } {
@@ -83,7 +126,12 @@ function aComercioPropio<T extends { idComercio: string }>(
 
 @Injectable()
 export class ComerciosService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ComerciosService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly imageStorage: ImageStorageService,
+  ) {}
 
   async listarCategorias() {
     const categorias = await this.prisma.categoria.findMany({
@@ -103,6 +151,84 @@ export class ComerciosService {
       slug: categoria.slug,
       orden: categoria.orden,
     }));
+  }
+
+  async obtenerPublico(idComercio: string) {
+    const comercio = await this.prisma.comercio.findFirst({
+      where: {
+        idComercio,
+        estado: 'HABILITADO',
+      },
+      select: SELECT_TIENDA_PUBLICA,
+    });
+
+    if (!comercio) {
+      throw new NotFoundException(COMERCIO_PUBLICO_NO_ENCONTRADO);
+    }
+
+    const { idComercio: id, productos, ...tienda } = comercio;
+
+    return {
+      id,
+      ...tienda,
+      reputacion: null,
+      productos: productos.map(({ idProducto, ...producto }) => ({
+        id: idProducto,
+        ...producto,
+      })),
+    };
+  }
+
+  async subirImagen(
+    usuarioId: string,
+    tipo: 'logo' | 'portada',
+    imagen: { buffer: Buffer; mimetype: string },
+  ) {
+    const comercio = await this.prisma.comercio.findUnique({
+      where: { usuarioId },
+      select: {
+        idComercio: true,
+        logoUrl: true,
+        portadaUrl: true,
+      },
+    });
+
+    if (!comercio) {
+      throw new NotFoundException(COMERCIO_NO_ENCONTRADO);
+    }
+
+    const imagenAnterior =
+      tipo === 'logo' ? comercio.logoUrl : comercio.portadaUrl;
+    const imagenUrl = await this.imageStorage.save(
+      imagen.buffer,
+      imagen.mimetype,
+    );
+
+    let actualizado;
+
+    try {
+      actualizado = await this.prisma.comercio.update({
+        where: { usuarioId },
+        data:
+          tipo === 'logo'
+            ? { logoUrl: imagenUrl }
+            : { portadaUrl: imagenUrl },
+        select: SELECT_COMERCIO,
+      });
+    } catch (error) {
+      await this.eliminarImagen(imagenUrl);
+      throw error;
+    }
+
+    if (
+      imagenAnterior &&
+      imagenAnterior !== imagenUrl &&
+      imagenAnterior.startsWith('/uploads/')
+    ) {
+      await this.eliminarImagen(imagenAnterior);
+    }
+
+    return aComercioPropio(actualizado);
   }
 
   async obtenerMio(usuarioId: string) {
@@ -410,6 +536,17 @@ export class ComerciosService {
     }
 
     return comercio.idComercio;
+  }
+
+  private async eliminarImagen(imagenUrl: string): Promise<void> {
+    try {
+      await this.imageStorage.delete(imagenUrl);
+    } catch (error) {
+      this.logger.error(
+        `No se pudo eliminar la imagen del comercio: ${imagenUrl}`,
+        error,
+      );
+    }
   }
 
   private lanzarSiDuplicado(error: unknown): void {

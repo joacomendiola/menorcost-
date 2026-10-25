@@ -379,8 +379,8 @@ export function RegistroComercioPage() {
               />
             </div>
             <p className="help">
-              Por ahora las imágenes se cargan con una URL pública. La subida de
-              archivos queda para una próxima iteración.
+              Después de crear el comercio vas a poder subir el logo y la portada
+              desde tu perfil.
             </p>
           </Stack>
         </div>

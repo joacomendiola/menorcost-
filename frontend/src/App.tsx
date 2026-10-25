@@ -3,6 +3,7 @@ import { RutaProtegida, RutaPublica } from './auth/Rutas';
 import { HorariosComercioPage } from './comercios/HorariosComercioPage';
 import { PerfilComercioPage } from './comercios/PerfilComercioPage';
 import { RegistroComercioPage } from './comercios/RegistroComercioPage';
+import { TiendaPublicaPage } from './comercios/TiendaPublicaPage';
 import { TopBar } from './components/TopBar';
 import { Login } from './pages/Login';
 import { Perfil } from './pages/Perfil';
@@ -24,6 +25,8 @@ export default function App() {
           <Route path="/registro" element={<Registro />} />
           <Route path="/verificar-correo" element={<VerificarCorreo />} />
         </Route>
+
+        <Route path="/comercios/:id" element={<TiendaPublicaPage />} />
 
         <Route element={<RutaProtegida />}>
           <Route path="/perfil" element={<Perfil />} />
