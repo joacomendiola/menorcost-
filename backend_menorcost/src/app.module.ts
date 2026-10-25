@@ -10,7 +10,7 @@ import { ConfigModule } from '@nestjs/config';
 import { OffersModule } from './modules/ofertas/ofertas.module.js';
 import { ReputacionModule } from './modules/reputacion/reputacion.module.js';
 import { BackofficeModule } from './modules/backoffice/backoffice.module.js';
-
+import { ReportesModule } from './modules/reportes/reportes.module.js';
 @Module({
   imports: [
     PrismaModule,
@@ -20,6 +20,7 @@ import { BackofficeModule } from './modules/backoffice/backoffice.module.js';
     BajaModule,
     ReputacionModule,
     BackofficeModule,
+    ReportesModule,
     ConfigModule.forRoot({ isGlobal: true }),
     OffersModule,
   ],

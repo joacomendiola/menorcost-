@@ -8,6 +8,8 @@ import {
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { CrearCalificacionDto } from './dto/crear-calificacion.dto.js';
 import type { ListarResenasQueryDto } from './dto/listar-resenas-query.dto.js';
+import { EstadoPedido } from '../../generated/prisma/enums.js';
+import type { Prisma } from '../../generated/prisma/client.js';
 
 @Injectable()
 export class ReputacionService {
@@ -100,13 +102,15 @@ export class ReputacionService {
   ) {
     const limit = Math.min(Math.max(query?.limit ?? 10, 1), 50);
     const cursor = query?.cursor;
-    const filtroComercio = { comercioId: id_comercio, estado: 'ENTREGADO' };
-
+    const filtroComercio: Prisma.PedidoWhereInput = {
+    comercioId: id_comercio,
+    estado: EstadoPedido.ENTREGADO,
+ };
     const [gruposPuntaje, calificacionesPagina] = await Promise.all([
       this.prisma.calificacion.groupBy({
         by: ['puntaje'],
         where: { pedido: filtroComercio },
-        _count: { id_calificacion: true },
+        _count: true,
       }),
       this.prisma.calificacion.findMany({
         where: { pedido: filtroComercio },
@@ -147,7 +151,7 @@ export class ReputacionService {
     let sumaPuntajes = 0;
 
     for (const grupo of gruposPuntaje) {
-      const cantidad = grupo._count.id_calificacion;
+      const cantidad = grupo._count;
       distribucion[grupo.puntaje.toString()] = cantidad;
       totalResenas += cantidad;
       sumaPuntajes += grupo.puntaje * cantidad;
