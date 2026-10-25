@@ -469,19 +469,24 @@ export function Perfil() {
       ? longitudNumero
       : -68.3084;
 
-  const accesos =
+  const accesos: Array<{ icono: string; texto: string; ruta?: string }> =
     perfil.rol === 'ADMINISTRADOR'
       ? [{ icono: '🛡', texto: 'Backoffice' }]
       : perfil.rol === 'COMERCIANTE'
         ? [
             { icono: '📦', texto: 'Productos' },
-            { icono: '🏪', texto: 'Mi local' },
+            { icono: '🏪', texto: 'Mi local', ruta: '/comercios/perfil' },
             { icono: '⭐', texto: 'Reputación' },
           ]
         : [
             { icono: '📦', texto: 'Mis pedidos' },
             { icono: '🧺', texto: 'Mis canastas' },
             { icono: '🔎', texto: 'Buscar ofertas' },
+            {
+              icono: '🏪',
+              texto: 'Mi comercio',
+              ruta: '/comercios/registro',
+            },
           ];
 
   return (
@@ -506,7 +511,11 @@ export function Perfil() {
               key={acceso.texto}
               type="button"
               className="chip chip--active"
-              onClick={() => notificar('Disponible en el próximo módulo')}
+              onClick={() =>
+                acceso.ruta
+                  ? navigate(acceso.ruta)
+                  : notificar('Disponible en el próximo módulo')
+              }
             >
               <span aria-hidden="true">{acceso.icono}</span>
               {acceso.texto}
