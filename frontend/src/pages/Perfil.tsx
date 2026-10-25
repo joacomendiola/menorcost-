@@ -662,6 +662,7 @@ export function Perfil() {
                 />
 
                 <BuscadorDireccion
+                  token={token}
                   onSeleccion={(sugerencia) =>
                     setFormDireccion((prev) => ({
                       ...prev,
