@@ -1,6 +1,12 @@
 import { Loader, TextInput } from '@mantine/core';
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
+import { ApiError } from '../api';
+import {
+  placesApi,
+  type PlacesDetalle,
+  type PlacesSugerencia,
+} from '../comercios/api';
 
 export interface DireccionSugerida {
   displayName: string;
@@ -12,24 +18,8 @@ export interface DireccionSugerida {
   longitud: number;
 }
 
-interface NominatimResult {
-  display_name: string;
-  lat: string;
-  lon: string;
-  address?: {
-    road?: string;
-    pedestrian?: string;
-    house_number?: string;
-    city?: string;
-    town?: string;
-    village?: string;
-    municipality?: string;
-    county?: string;
-    state?: string;
-  };
-}
-
 interface BuscadorDireccionProps {
+  token: string | null;
   onSeleccion: (sugerencia: DireccionSugerida) => void;
 }
 
@@ -52,20 +42,6 @@ function IconoPin() {
   );
 }
 
-function lineaPrincipal(sugerencia: DireccionSugerida): string {
-  const calle = [sugerencia.calle, sugerencia.numero]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-  return calle || sugerencia.displayName;
-}
-
-function lineaSecundaria(sugerencia: DireccionSugerida): string {
-  return [sugerencia.localidad, sugerencia.provincia]
-    .filter(Boolean)
-    .join(', ');
-}
-
 function IconoLupa() {
   return (
     <svg
@@ -84,37 +60,43 @@ function IconoLupa() {
   );
 }
 
-function normalizar(resultado: NominatimResult): DireccionSugerida {
-  const direccion = resultado.address ?? {};
-
+function normalizar(detalle: PlacesDetalle): DireccionSugerida {
   return {
-    displayName: resultado.display_name,
-    calle: direccion.road ?? direccion.pedestrian ?? '',
-    numero: direccion.house_number ?? '',
-    localidad:
-      direccion.city ??
-      direccion.town ??
-      direccion.village ??
-      direccion.municipality ??
-      direccion.county ??
-      '',
-    provincia: direccion.state ?? '',
-    latitud: Number(resultado.lat),
-    longitud: Number(resultado.lon),
+    displayName: detalle.direccion || detalle.nombre,
+    calle: detalle.calle,
+    numero: detalle.numero,
+    localidad: detalle.localidad,
+    provincia: detalle.provincia,
+    latitud: detalle.latitud,
+    longitud: detalle.longitud,
   };
 }
 
-export function BuscadorDireccion({ onSeleccion }: BuscadorDireccionProps) {
+function mensajeDeError(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 503) {
+      return 'Google Places no está configurado. Avisá al equipo para habilitar la búsqueda de direcciones.';
+    }
+    return error.message;
+  }
+  return 'No pudimos buscar direcciones. Intentá de nuevo.';
+}
+
+export function BuscadorDireccion({
+  token,
+  onSeleccion,
+}: BuscadorDireccionProps) {
   const [texto, setTexto] = useState('');
-  const [sugerencias, setSugerencias] = useState<DireccionSugerida[]>([]);
+  const [sugerencias, setSugerencias] = useState<PlacesSugerencia[]>([]);
   const [abierto, setAbierto] = useState(false);
   const [buscando, setBuscando] = useState(false);
+  const [seleccionando, setSeleccionando] = useState(false);
   const [error, setError] = useState('');
   const contenedorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const consulta = texto.trim();
-    if (consulta.length < 3) return;
+    if (!token || consulta.length < 3) return;
 
     const controlador = new AbortController();
 
@@ -123,38 +105,19 @@ export function BuscadorDireccion({ onSeleccion }: BuscadorDireccionProps) {
       setError('');
 
       try {
-        const parametros = new URLSearchParams({
-          format: 'json',
-          addressdetails: '1',
-          countrycodes: 'ar',
-          limit: '6',
-          'accept-language': 'es',
-          q: consulta,
-        });
-
-        const respuesta = await fetch(
-          `https://nominatim.openstreetmap.org/search?${parametros.toString()}`,
-          {
-            signal: controlador.signal,
-            headers: { Accept: 'application/json' },
-          },
+        const resultados = await placesApi.autocompletar(
+          token,
+          consulta,
+          controlador.signal,
         );
-
-        if (!respuesta.ok) {
-          throw new Error('Error de geocodificación');
-        }
-
-        const datos = (await respuesta.json()) as NominatimResult[];
-
         if (controlador.signal.aborted) return;
-
-        setSugerencias(datos.map(normalizar));
+        setSugerencias(resultados);
         setAbierto(true);
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
         setSugerencias([]);
         setAbierto(true);
-        setError('No pudimos buscar direcciones. Intentá de nuevo.');
+        setError(mensajeDeError(err));
       } finally {
         if (!controlador.signal.aborted) {
           setBuscando(false);
@@ -166,7 +129,7 @@ export function BuscadorDireccion({ onSeleccion }: BuscadorDireccionProps) {
       clearTimeout(temporizador);
       controlador.abort();
     };
-  }, [texto]);
+  }, [texto, token]);
 
   useEffect(() => {
     function alClicFuera(evento: MouseEvent) {
@@ -191,13 +154,27 @@ export function BuscadorDireccion({ onSeleccion }: BuscadorDireccionProps) {
     }
   }
 
-  function seleccionar(sugerencia: DireccionSugerida) {
-    setTexto(sugerencia.displayName);
+  async function seleccionar(sugerencia: PlacesSugerencia) {
+    if (!token) return;
+
+    setTexto(sugerencia.descripcion);
     setAbierto(false);
-    onSeleccion(sugerencia);
+    setSeleccionando(true);
+    setError('');
+
+    try {
+      const detalle = await placesApi.detalle(token, sugerencia.placeId);
+      onSeleccion(normalizar(detalle));
+    } catch (err) {
+      setError(mensajeDeError(err));
+      setAbierto(true);
+    } finally {
+      setSeleccionando(false);
+    }
   }
 
   const mostrarLista = abierto && texto.trim().length >= 3;
+  const cargando = buscando || seleccionando;
 
   return (
     <div className="buscador" ref={contenedorRef}>
@@ -206,7 +183,7 @@ export function BuscadorDireccion({ onSeleccion }: BuscadorDireccionProps) {
         aria-label="Buscar dirección o punto de referencia"
         leftSection={<IconoLupa />}
         leftSectionPointerEvents="none"
-        rightSection={buscando ? <Loader size="xs" /> : undefined}
+        rightSection={cargando ? <Loader size="xs" /> : undefined}
         autoComplete="off"
         value={texto}
         onChange={cambiarTexto}
@@ -215,25 +192,21 @@ export function BuscadorDireccion({ onSeleccion }: BuscadorDireccionProps) {
         }}
         onKeyDown={(evento) => {
           if (evento.key === 'Escape') setAbierto(false);
-          if (evento.key === 'Enter') {
+          if (evento.key === 'Enter' && sugerencias.length > 0) {
             evento.preventDefault();
-            if (sugerencias.length > 0) {
-              seleccionar(sugerencias[0]);
-            }
+            void seleccionar(sugerencias[0]);
           }
         }}
       />
 
       {mostrarLista && (
-        <ul
-          className="buscador__lista"
-          id="sugerencias-direcciones"
-          role="listbox"
-        >
+        <ul className="buscador__lista" role="listbox">
           {buscando && <li className="buscador__estado">Buscando…</li>}
 
           {!buscando && error && (
-            <li className="buscador__estado">{error}</li>
+            <li className="buscador__estado" role="alert">
+              {error}
+            </li>
           )}
 
           {!buscando && !error && sugerencias.length === 0 && (
@@ -245,27 +218,24 @@ export function BuscadorDireccion({ onSeleccion }: BuscadorDireccionProps) {
           {!buscando &&
             !error &&
             sugerencias.map((sugerencia) => (
-              <li
-                key={`${sugerencia.latitud}-${sugerencia.longitud}`}
-                className="buscador__fila"
-              >
+              <li key={sugerencia.placeId} className="buscador__fila">
                 <button
                   type="button"
                   className="buscador__item"
                   role="option"
                   aria-selected={false}
-                  onClick={() => seleccionar(sugerencia)}
+                  onClick={() => void seleccionar(sugerencia)}
                 >
                   <span className="buscador__pin">
                     <IconoPin />
                   </span>
                   <span className="buscador__texto">
                     <span className="buscador__texto--principal">
-                      {lineaPrincipal(sugerencia)}
+                      {sugerencia.textoPrincipal || sugerencia.descripcion}
                     </span>
-                    {lineaSecundaria(sugerencia) && (
+                    {sugerencia.textoSecundario && (
                       <span className="buscador__texto--secundario">
-                        {lineaSecundaria(sugerencia)}
+                        {sugerencia.textoSecundario}
                       </span>
                     )}
                   </span>

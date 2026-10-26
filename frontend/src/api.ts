@@ -243,3 +243,301 @@ export const bajasApi = {
       token,
     }),
 };
+
+export interface Calificacion {
+  id: number;
+  clienteNombre: string;
+  fecha: string;
+  puntaje: number;
+  comentario: string;
+}
+
+export interface ReputacionComercio {
+  promedio: number;
+  totalResenas: number;
+  distribucion: Record<string, number>;
+  resenas: Calificacion[];
+  paginacion: {
+    limit: number;
+    nextCursor: number | null;
+    hasMore: boolean;
+  };
+}
+
+export interface ListarResenasQuery {
+  limit?: number;
+  cursor?: number;
+}
+
+export type EstadoPedido =
+  | 'PENDIENTE_DE_RETIRO'
+  | 'ENTREGADO'
+  | 'CANCELADO'
+  | 'CANCELADO_POR_FALTA_RETIRO';
+
+export interface PedidoTicketItem {
+  id: string;
+  titulo: string;
+  imagen: string | null;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+}
+
+export interface PedidoTicket {
+  idPedido: string;
+  codigoAlfanumerico: string;
+  codigoQR: string;
+  estado: EstadoPedido;
+  fechaPedido: string;
+  subtotal: number;
+  tarifaServicio: number;
+  total: number;
+  comercio: { idComercio: string; nombre: string } | null;
+  franjaHorario: { inicio: string; fin: string } | null;
+  localAbierto: boolean | null;
+  items: PedidoTicketItem[];
+  calificacion: {
+    id: number;
+    puntaje: number;
+    comentario: string | null;
+    fecha: string;
+  } | null;
+  misReportes: Array<{
+    id: number;
+    motivo: string;
+    estado: string;
+    fecha: string;
+  }>;
+}
+
+export const pedidosApi = {
+  obtenerPorCodigo: (token: string, codigo: string) =>
+    api<PedidoTicket>(`/pedidos/${encodeURIComponent(codigo)}`, { token }),
+};
+
+/* ---------- Reputación (Pantalla 15 + 22) ---------- */
+
+export const reputacionApi = {
+  // Pantalla 15
+  obtenerMiReputacion: (token: string, query?: ListarResenasQuery) => {
+    const params = new URLSearchParams();
+    if (query?.limit) params.set('limit', String(query.limit));
+    if (query?.cursor) params.set('cursor', String(query.cursor));
+    const qs = params.toString();
+    return api<ReputacionComercio>(
+      `/reputation/my-store${qs ? `?${qs}` : ''}`,
+      { token },
+    );
+  },
+
+  // Pantalla 22
+  calificar: (
+    token: string,
+    data: { idPedido: string; puntaje: number; comentario?: string },
+  ) =>
+    api<{
+      calificacion: {
+        id_calificacion: number;
+        puntaje: number;
+        comentario: string | null;
+        fecha_creacion: string;
+      };
+      reputacionComercio: { promedio: number; total: number };
+    }>('/reputation/rate', { method: 'POST', body: data, token }),
+};
+
+/* ---------- Reportes (Pantalla 22 y 23) ---------- */
+
+export interface ReporteCreado {
+  id_reporte: number;
+  motivo: string;
+  descripcion: string | null;
+  estado_reporte: string;
+  tipo_destino: 'COMERCIO' | 'CLIENTE';
+  fecha_reporte: string;
+}
+
+export const reportesApi = {
+  crear: (
+    token: string,
+    data: {
+      idPedido: string;
+      motivo: string;
+      descripcion?: string;
+      tipo_destino: 'COMERCIO' | 'CLIENTE';
+    },
+  ) =>
+    api<ReporteCreado>('/reports', { method: 'POST', body: data, token }),
+
+  misReportes: (
+    token: string,
+    query?: { page?: number; limit?: number; estado?: string },
+  ) => {
+    const params = new URLSearchParams();
+    if (query?.page) params.set('page', String(query.page));
+    if (query?.limit) params.set('limit', String(query.limit));
+    if (query?.estado) params.set('estado', query.estado);
+    const qs = params.toString();
+    return api<{
+      total: number;
+      page: number;
+      limit: number;
+      reportes: Array<{
+        id: number;
+        motivo: string;
+        descripcion: string | null;
+        estado: string;
+        tipo_destino: string;
+        fecha: string;
+        comercio: string | null;
+      }>;
+    }>(`/reports/my-reports${qs ? `?${qs}` : ''}`, { token });
+  },
+};
+
+export interface AdminKpis {
+  altasPendientes: number;
+  altasAprobadas30Dias: number;
+  bajasSolicitadas: number;
+  denunciasAbiertas: number;
+}
+
+export interface AdminUsuario {
+  id: string;
+  dni: string;
+  nombre: string;
+  apellido: string;
+  email: string;
+  telefono?: string;
+  rol: Rol;
+  estado: EstadoUsuario;
+  createdAt?: string;
+  updatedAt?: string;
+  direcciones?: Direccion[];
+}
+
+export interface AdminAlta {
+  idComercio: string;
+  usuarioId: string;
+  mercadoPagoVinculado: boolean;
+  reputacionPromedio: number;
+  totalCalificaciones: number;
+  usuario: AdminUsuario & { direcciones: Direccion[] };
+}
+
+export type EstadoBaja = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
+
+export interface AdminBaja {
+  id: string;
+  usuarioId: string;
+  motivo: string;
+  estado: EstadoBaja;
+  observaciones: string | null;
+  createdAt: string;
+  updatedAt: string;
+  usuario: AdminUsuario;
+}
+
+export type EstadoDenuncia =
+  | 'PENDIENTE_REVISION'
+  | 'BAJO_INVESTIGACION'
+  | 'RESUELTO'
+  | 'DESESTIMADO';
+
+export interface AdminDenuncia {
+  id_reporte: number;
+  motivo: string;
+  descripcion: string | null;
+  estado_reporte: EstadoDenuncia;
+  tipo_destino: 'COMERCIO' | 'CLIENTE';
+  fecha_reporte: string;
+  fecha_resolucion: string | null;
+  id_pedido: string;
+  id_emisor: string;
+  id_denunciado: string;
+  id_admin: string | null;
+  pedido: {
+    id_pedido: string;
+    estado: EstadoPedido;
+    codigoAlfanumerico: string;
+    total: number | string;
+  } | null;
+  emisor: AdminUsuario;
+  denunciado: AdminUsuario;
+  admin: AdminUsuario | null;
+}
+
+interface AdminNotificacion {
+  enviada: boolean;
+  aviso?: string;
+}
+
+function construirQuery(query: Record<string, string | undefined>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value && value !== 'todos') params.set(key, value);
+  }
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
+export const adminApi = {
+  kpis: (token: string) => api<AdminKpis>('/admin/kpis', { token }),
+
+  altas: (token: string, query?: { search?: string; estado?: string }) =>
+    api<AdminAlta[]>(`/admin/altas${construirQuery(query ?? {})}`, { token }),
+
+  aprobarAlta: (token: string, idComercio: string) =>
+    api<AdminUsuario & { notificacion: AdminNotificacion }>(
+      `/admin/altas/${encodeURIComponent(idComercio)}/aprobar`,
+      { method: 'PATCH', token },
+    ),
+
+  rechazarAlta: (token: string, idComercio: string, motivo: string) =>
+    api<AdminUsuario & { notificacion: AdminNotificacion }>(
+      `/admin/altas/${encodeURIComponent(idComercio)}/rechazar`,
+      { method: 'PATCH', body: { motivo }, token },
+    ),
+
+  bajas: (token: string, query?: { estado?: string }) =>
+    api<AdminBaja[]>(`/admin/bajas${construirQuery(query ?? {})}`, { token }),
+
+  aprobarBaja: (token: string, id: string) =>
+    api<{ message: string }>(
+      `/admin/bajas/${encodeURIComponent(id)}/aprobar`,
+      { method: 'PATCH', token },
+    ),
+
+  rechazarBaja: (token: string, id: string, observaciones?: string) =>
+    api<{ message: string }>(
+      `/admin/bajas/${encodeURIComponent(id)}/rechazar`,
+      {
+        method: 'PATCH',
+        body: observaciones ? { observaciones } : {},
+        token,
+      },
+    ),
+
+  denuncias: (token: string, query?: { search?: string; estado?: string }) =>
+    api<AdminDenuncia[]>(`/admin/denuncias${construirQuery(query ?? {})}`, { token }),
+
+  toggleInvestigacion: (token: string, id: number) =>
+    api<Pick<AdminDenuncia, 'id_reporte' | 'estado_reporte'>>(
+      `/admin/denuncias/${id}/investigacion`,
+      { method: 'PATCH', token },
+    ),
+
+  resolverDenuncia: (token: string, id: number) =>
+    api<{ success: true }>(`/admin/denuncias/${id}/resolver`, {
+      method: 'PATCH',
+      token,
+    }),
+
+  sancionarDenuncia: (token: string, id: number) =>
+    api<{
+      reporte: Pick<AdminDenuncia, 'id_reporte' | 'estado_reporte'>;
+      usuario: AdminUsuario;
+      notificacion: AdminNotificacion;
+    }>(`/admin/denuncias/${id}/sancionar`, { method: 'PATCH', token }),
+};

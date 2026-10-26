@@ -5,7 +5,6 @@ import { Notifications } from '@mantine/notifications';
 import { BrowserRouter } from 'react-router-dom';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
-import 'leaflet/dist/leaflet.css';
 import './index.css';
 import App from './App';
 import { AuthProvider } from './auth/AuthProvider';

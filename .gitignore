@@ -1,5 +1,9 @@
 .env
+<<<<<<< HEAD
 /docs/
+=======
+docs/
+>>>>>>> develop
 opencode.jsonc
 /.agents
 /skills-lock.json

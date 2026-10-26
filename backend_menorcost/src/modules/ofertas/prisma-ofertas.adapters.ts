@@ -3,18 +3,67 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { CreateOfferDto } from './dto/create-offer.dto.js';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import type { CreateOfferDto } from './dto/create-oferta.dto.js';
+import type { UpdateOfferDto } from './dto/update-oferta.dto.js';
 import type {
   OfferAccess,
   OfferCategories,
+  OfferDetails,
   OfferRecord,
   OfferRepository,
 } from './ofertas-creation.ports.js';
-import { PrismaService } from '../../prisma/prisma.service.js';
+
+const offerDetailsSelect = {
+  idProducto: true,
+  comercioId: true,
+  categoriaId: true,
+  tipo: true,
+  titulo: true,
+  descripcion: true,
+  fechaVencimiento: true,
+  stock: true,
+  precioLista: true,
+  precioMenorcost: true,
+  imagen: true,
+  estado: true,
+} as const;
+
+type OfferProjection = {
+  idProducto: string;
+  comercioId: string;
+  categoriaId: string;
+  tipo: OfferDetails['tipo'];
+  titulo: string;
+  descripcion: string;
+  fechaVencimiento: Date;
+  stock: number;
+  precioLista: { toString(): string };
+  precioMenorcost: { toString(): string };
+  imagen: string;
+  estado: OfferDetails['estado'];
+};
+
+function toOfferDetails(producto: OfferProjection): OfferDetails {
+  return {
+    id: producto.idProducto,
+    comercioId: producto.comercioId,
+    categoriaId: producto.categoriaId,
+    tipo: producto.tipo,
+    titulo: producto.titulo,
+    descripcion: producto.descripcion,
+    fechaVencimiento: producto.fechaVencimiento.toISOString().slice(0, 10),
+    stock: producto.stock,
+    precioLista: producto.precioLista.toString(),
+    precioMenorcost: producto.precioMenorcost.toString(),
+    imagen: producto.imagen,
+    estado: producto.estado,
+  };
+}
 
 @Injectable()
 export class PrismaOfferAccessAdapter implements OfferAccess {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async assertCanPublish(userId: string, comercioId: string): Promise<void> {
     const usuario = await this.prisma.usuario.findFirst({
@@ -72,7 +121,7 @@ export class PrismaOfferAccessAdapter implements OfferAccess {
 
 @Injectable()
 export class PrismaOfferCategoriesAdapter implements OfferCategories {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async assertExists(categoriaId: string): Promise<void> {
     const categoria = await this.prisma.categoria.findUnique({
@@ -91,7 +140,7 @@ export class PrismaOfferCategoriesAdapter implements OfferCategories {
 
 @Injectable()
 export class PrismaOfferRepositoryAdapter implements OfferRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async create(
     data: CreateOfferDto & {
@@ -126,5 +175,73 @@ export class PrismaOfferRepositoryAdapter implements OfferRepository {
       imagen: producto.imagen,
       estado: 'ACTIVO',
     };
+  }
+
+  async listByOwner(userId: string): Promise<OfferDetails[]> {
+    const productos = await this.prisma.producto.findMany({
+      where: {
+        comercio: {
+          is: { userId },
+        },
+      },
+      select: offerDetailsSelect,
+      orderBy: { titulo: 'asc' },
+    });
+
+    return productos.map(toOfferDetails);
+  }
+
+  async findByIdForOwner(
+    userId: string,
+    offerId: string,
+  ): Promise<OfferDetails | null> {
+    const producto = await this.prisma.producto.findFirst({
+      where: {
+        idProducto: offerId,
+        comercio: {
+          is: { userId },
+        },
+      },
+      select: offerDetailsSelect,
+    });
+
+    return producto ? toOfferDetails(producto) : null;
+  }
+
+  async updateForOwner(
+    userId: string,
+    offerId: string,
+    data: UpdateOfferDto & { imagen?: string },
+  ): Promise<OfferDetails | null> {
+    const updateData = {
+      ...(data.precioLista !== undefined
+        ? { precioLista: data.precioLista }
+        : {}),
+      ...(data.precioMenorcost !== undefined
+        ? { precioMenorcost: data.precioMenorcost }
+        : {}),
+      ...(data.stock !== undefined ? { stock: data.stock } : {}),
+      ...(data.imagen !== undefined ? { imagen: data.imagen } : {}),
+    };
+
+    if (Object.keys(updateData).length === 0) {
+      return this.findByIdForOwner(userId, offerId);
+    }
+
+    const result = await this.prisma.producto.updateMany({
+      where: {
+        idProducto: offerId,
+        comercio: {
+          is: { userId },
+        },
+      },
+      data: updateData,
+    });
+
+    if (result.count === 0) {
+      return null;
+    }
+
+    return this.findByIdForOwner(userId, offerId);
   }
 }
