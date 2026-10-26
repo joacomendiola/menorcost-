@@ -55,7 +55,7 @@ model Producto {
 }
 
 model Comercio {
-<<<<<<< HEAD
+
   idComercio            String          @id @default(uuid()) @map("id_comercio") @db.Uuid
     userId                String          @unique @map("usuario_id")
     mercadoPagoVinculado  Boolean         @default(false) @map("mercado_pago_vinculado")
@@ -78,7 +78,7 @@ model Comercio {
     logoUrl               String          @map("logo_url") @db.VarChar(500)
     portadaUrl            String?         @map("portada_url") @db.VarChar(500)
     abierto               Boolean         @default(false)
-    estado                EstadoComercio  @default(PENDIENTE_VERIFICATION)
+    estado                EstadoComercio  @default(PENDIENTE_VERIFICACION)
     createdAt             DateTime        @default(now()) @map("created_at")
     updatedAt             DateTime        @updatedAt @map("updated_at")
 
@@ -87,7 +87,6 @@ model Comercio {
     pedidos   Pedido[]
     horarios  HorarioAtencion[]
     franjas   FranjaRetiro[]
->>>>>>> origin/develop
 
   @@index([localidad])
   @@index([estado])
