@@ -13,6 +13,7 @@ import { ApiError } from '../api';
 import { useAuth } from '../auth/contexto';
 import { Logo } from '../components/Logo';
 import { PageShell } from '../components/PageShell';
+import { rutaInicio } from '../auth/rutaInicio';
 
 export function Login() {
   const { iniciarSesion } = useAuth();
@@ -35,9 +36,9 @@ export function Login() {
 
     setEnviando(true);
     try {
-      await iniciarSesion(email.trim(), password);
+      const usuario = await iniciarSesion(email.trim(), password);
       notifications.show({ message: '¡Bienvenido de nuevo!' });
-      navigate('/perfil', { replace: true });
+      navigate(rutaInicio(usuario.rol), { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === 'CUENTA_PENDIENTE_VERIFICACION') {
