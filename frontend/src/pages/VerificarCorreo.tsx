@@ -14,8 +14,12 @@ export function VerificarCorreo() {
   const { registrarSesion } = useAuth();
   const otpRef = useRef<HTMLInputElement>(null);
 
-  const estado = location.state as { email?: string } | null;
+  const estado = location.state as {
+    email?: string;
+    continuarComercio?: boolean;
+  } | null;
   const email = estado?.email ?? params.get('email') ?? '';
+  const continuarComercio = estado?.continuarComercio ?? false;
 
   const [codigo, setCodigo] = useState('');
   const [error, setError] = useState('');
@@ -40,8 +44,14 @@ export function VerificarCorreo() {
     try {
       const data = await authApi.verificarCuenta(email, codigo);
       registrarSesion(data.accessToken, data.usuario);
-      notifications.show({ message: 'Cuenta verificada. ¡Bienvenido!' });
-      navigate('/perfil', { replace: true });
+      notifications.show({
+        message: continuarComercio
+          ? 'Cuenta verificada. Completemos los datos de tu comercio.'
+          : 'Cuenta verificada. ¡Bienvenido!',
+      });
+      navigate(continuarComercio ? '/comercios/registro' : '/perfil', {
+        replace: true,
+      });
     } catch (err) {
       setError(
         err instanceof ApiError
