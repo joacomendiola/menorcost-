@@ -19,18 +19,26 @@ type Offer = {
 
 class OfferRequestError extends Error {
   readonly status: number;
+  readonly minimumStock?: number;
 
-  constructor(
-    message: string,
-    status: number,
-  ) {
+  constructor(message: string, status: number, minimumStock?: number) {
     super(message);
     this.name = 'OfferRequestError';
     this.status = status;
+    this.minimumStock = minimumStock;
   }
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+function priceToCents(value: FormDataEntryValue | null): bigint | null {
+  if (typeof value !== 'string' || !/^\d+(\.\d{1,2})?$/.test(value)) {
+    return null;
+  }
+
+  const [whole, fraction = ''] = value.split('.');
+  return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'));
+}
 
 async function requestOffers<T>(
   path: string,
@@ -76,7 +84,17 @@ async function requestOffers<T>(
       }
     }
 
-    throw new OfferRequestError(message, response.status);
+    const minimumStock =
+      typeof payload === 'object' &&
+      payload !== null &&
+      'minimumStock' in payload &&
+      typeof payload.minimumStock === 'number' &&
+      Number.isInteger(payload.minimumStock) &&
+      payload.minimumStock >= 0
+        ? payload.minimumStock
+        : undefined;
+
+    throw new OfferRequestError(message, response.status, minimumStock);
   }
 
   return payload as T;
@@ -91,8 +109,8 @@ export function MisOfertasPage() {
   const [saveError, setSaveError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [reloadCount, setReloadCount] = useState(0);
-  const missingSession =
-  usuario?.rol === 'COMERCIANTE' && !token;
+
+  const missingSession = usuario?.rol === 'COMERCIANTE' && !token;
 
   useEffect(() => {
     if (usuario?.rol !== 'COMERCIANTE' || !token) return;
@@ -136,10 +154,41 @@ export function MisOfertasPage() {
 
     const form = event.currentTarget;
     const formData = new FormData(form);
+    const precioLista = priceToCents(formData.get('precioLista'));
+    const precioMenorcost = priceToCents(formData.get('precioMenorcost'));
+
+    if (precioLista === null || precioMenorcost === null) {
+      setSaveError('Ingresá precios válidos con hasta dos decimales.');
+      return;
+    }
+
+    if (precioLista <= 0n || precioMenorcost <= 0n) {
+      setSaveError('Los precios deben ser mayores que cero.');
+      return;
+    }
+
+    if (precioMenorcost >= precioLista) {
+      setSaveError('El precio promocional debe ser menor que el precio de lista.');
+      return;
+    }
+
     const image = formData.get('imagen');
 
     if (image instanceof File && image.size === 0) {
       formData.delete('imagen');
+    } else if (image instanceof File) {
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      const maxSize = 5 * 1024 * 1024;
+
+      if (!allowedTypes.includes(image.type)) {
+        setSaveError('Elegí una imagen JPEG, PNG o WebP.');
+        return;
+      }
+
+      if (image.size > maxSize) {
+        setSaveError('La imagen no puede superar los 5 MB.');
+        return;
+      }
     }
 
     setSavingId(offer.id);
@@ -161,11 +210,15 @@ export function MisOfertasPage() {
       );
       setSuccessMessage('Oferta actualizada correctamente.');
     } catch (error: unknown) {
-      if (error instanceof OfferRequestError && error.status === 503) {
+      if (error instanceof OfferRequestError) {
         const stockInput = form.elements.namedItem('stock');
 
         if (stockInput instanceof HTMLInputElement) {
-          stockInput.value = String(offer.stock);
+          if (error.status === 400 && error.minimumStock !== undefined) {
+            stockInput.value = String(error.minimumStock);
+          } else if (error.status === 503) {
+            stockInput.value = String(offer.stock);
+          }
         }
       }
 
@@ -208,15 +261,19 @@ export function MisOfertasPage() {
       {loadingError && <p role="alert">{loadingError}</p>}
       {saveError && <p role="alert">{saveError}</p>}
       {successMessage && <p role="status">{successMessage}</p>}
-      
-        {loadingError && !loading && (
+
+      {token && loadingError && !loading && (
         <button
-        type="button"
-        onClick={() => setReloadCount((count) => count + 1)}
+          type="button"
+          onClick={() => {
+            setLoading(true);
+            setLoadingError('');
+            setReloadCount((count) => count + 1);
+          }}
         >
-        Reintentar
+          Reintentar
         </button>
-        )}
+      )}
 
       {!loading && !loadingError && offers.length === 0 && (
         <p>Todavía no publicaste ofertas.</p>
@@ -228,13 +285,14 @@ export function MisOfertasPage() {
             <h2>{offer.titulo}</h2>
             <p>{offer.descripcion}</p>
             <p>Estado: {offer.estado}</p>
+
             <img
-                src={new URL(offer.imagen, API_URL).toString()}
-                alt={`Imagen de ${offer.titulo}`}
-                loading="lazy"
-                width={240}
-                height={180}
-                style={{ objectFit: 'contain' }}
+              src={new URL(offer.imagen, API_URL).toString()}
+              alt={`Imagen de ${offer.titulo}`}
+              loading="lazy"
+              width={240}
+              height={180}
+              style={{ objectFit: 'contain' }}
             />
 
             <form

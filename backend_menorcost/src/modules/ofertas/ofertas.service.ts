@@ -7,9 +7,11 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import {
+  OFFER_RESERVATIONS,
   OFFER_ACCESS,
   OFFER_CATEGORIES,
   OFFER_REPOSITORY,
+  type OfferReservations,
   type OfferAccess,
   type OfferCategories,
   type OfferDetails,
@@ -34,6 +36,8 @@ export class OffersService {
     @Inject(OFFER_REPOSITORY)
     private readonly repository: OfferRepository,
     private readonly imageStorage: ImageStorageService,
+    @Inject(OFFER_RESERVATIONS)
+    private readonly reservations: OfferReservations,
   ) {}
 
   async create(
@@ -105,12 +109,17 @@ export class OffersService {
     this.validatePrices(precioLista, precioMenorcost);
 
     if (dto.stock !== undefined && dto.stock < current.stock) {
-      // TODO CU 2.02: permitir la reducción cuando el modelo de pedidos
-      // permita contar reservas PENDIENTE_RETIRO por producto. Hasta entonces
-      // se bloquea para no dejar reservas activas sin stock.
-      throw new ServiceUnavailableException(
-        'La reducción de stock estará disponible cuando se integre la consulta de reservas activas',
+      const reservedUnits = await this.reservations.getReservedUnitsForOffer(
+        offerId,
       );
+
+      if (dto.stock < reservedUnits) {
+        throw new BadRequestException({
+          message:
+            'El stock no puede ser inferior a las unidades que ya fueron reservadas por los clientes',
+          minimumStock: reservedUnits,
+        });
+      }
     }
 
     const newImageUrl = image

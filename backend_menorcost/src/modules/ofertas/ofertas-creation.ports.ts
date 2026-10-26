@@ -4,6 +4,7 @@ import type { UpdateOfferDto } from './dto/update-oferta.dto.js';
 export const OFFER_ACCESS = Symbol('OFFER_ACCESS');
 export const OFFER_CATEGORIES = Symbol('OFFER_CATEGORIES');
 export const OFFER_REPOSITORY = Symbol('OFFER_REPOSITORY');
+export const OFFER_RESERVATIONS = Symbol('OFFER_RESERVATIONS');
 
 export interface OfferAccess {
   assertCanPublish(userId: string, comercioId: string): Promise<void>;
@@ -11,6 +12,10 @@ export interface OfferAccess {
     userId: string,
     comercioId: string,
   ): Promise<void>;
+}
+
+export interface OfferReservations {
+  getReservedUnitsForOffer(offerId: string): Promise<number>;
 }
 
 export interface OfferCategories {
