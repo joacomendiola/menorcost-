@@ -47,8 +47,24 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
     usuarioId: string,
     mercadoPagoVinculado: boolean,
   ) {
+    const identificador = crypto.randomUUID();
     const comercio = await prisma.comercio.create({
-      data: { usuarioId, mercadoPagoVinculado },
+      data: {
+        userId: usuarioId,
+        mercadoPagoVinculado,
+        nombreFantasia: `Comercio ${identificador}`,
+        razonSocial: `Comercio de prueba ${identificador}`,
+        cuit: `20${identificador.replace(/\D/g, '').padEnd(9, '0').slice(0, 9)}`,
+        telefono: '2901123456',
+        calle: 'San Martín',
+        numero: '123',
+        localidad: 'Ushuaia',
+        provincia: 'Tierra del Fuego',
+        latitud: '-54.8019',
+        longitud: '-68.3030',
+        googlePlaceId: `test-${identificador}`,
+        logoUrl: '',
+      },
     });
     comercioIds.push(comercio.idComercio);
     return comercio;
@@ -187,8 +203,12 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
       comercioHabilitadoId = comercioHabilitado.idComercio;
 
       // 4. Categoría y producto
+      const categoriaSlug = `categoria-test-${crypto.randomUUID()}`;
       const categoria = await prisma.categoria.create({
-        data: { idCategoria: crypto.randomUUID() },
+        data: {
+          nombre: `Categoría de prueba ${categoriaSlug}`,
+          slug: categoriaSlug,
+        },
       });
       categoriaIds.push(categoria.idCategoria);
       await prisma.producto.create({
