@@ -13,11 +13,19 @@ export function TopBar() {
 
       {!cargando &&
         (usuario ? (
-          <Link to="/perfil" className="pill">
-            <span aria-hidden="true">👤</span>
-            {usuario.nombre}
-            <span aria-hidden="true">⌄</span>
-          </Link>
+          <nav aria-label="Navegación principal">
+            {usuario.rol === 'COMERCIANTE' && (
+              <Link to="/ofertas/mias" className="pill">
+                Mis Ofertas
+              </Link>
+            )}
+
+            <Link to="/perfil" className="pill">
+              <span aria-hidden="true">👤</span>
+              {usuario.nombre}
+              <span aria-hidden="true">⌄</span>
+            </Link>
+          </nav>
         ) : (
           <Link to="/login" className="pill">
             <span aria-hidden="true">👤</span>
