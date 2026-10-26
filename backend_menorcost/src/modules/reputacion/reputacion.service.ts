@@ -86,7 +86,7 @@ export class ReputacionService {
     query?: ListarResenasQueryDto,
   ) {
     const comercio = await this.prisma.comercio.findUnique({
-      where: { usuarioId: idUsuario },
+      where: { userId: idUsuario },
     });
 
     if (!comercio) {

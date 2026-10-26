@@ -129,7 +129,7 @@ export class BackofficeService {
     // Escritura atómica condicionada a que siga en PENDIENTE_VERIFICACION
     const resultado = await this.prisma.usuario.updateMany({
       where: {
-        id: comercio.usuarioId,
+        id: comercio.userId,
         estado: 'PENDIENTE_VERIFICACION',
         deletedAt: null,
       },
@@ -143,7 +143,7 @@ export class BackofficeService {
     }
 
     const actualizado = await this.prisma.usuario.findUniqueOrThrow({
-      where: { id: comercio.usuarioId },
+      where: { id: comercio.userId },
       select: USUARIO_PUBLICO_SELECT,
     });
 
@@ -181,7 +181,7 @@ export class BackofficeService {
     // Escritura atómica condicionada a que siga en PENDIENTE_VERIFICACION
     const resultado = await this.prisma.usuario.updateMany({
       where: {
-        id: comercio.usuarioId,
+        id: comercio.userId,
         estado: 'PENDIENTE_VERIFICACION',
         deletedAt: null,
       },
@@ -195,7 +195,7 @@ export class BackofficeService {
     }
 
     const actualizado = await this.prisma.usuario.findUniqueOrThrow({
-      where: { id: comercio.usuarioId },
+      where: { id: comercio.userId },
       select: USUARIO_PUBLICO_SELECT,
     });
 
