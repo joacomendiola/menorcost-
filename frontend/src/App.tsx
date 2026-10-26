@@ -12,6 +12,7 @@ import { Registro } from './pages/Registro';
 import { Restablecer } from './pages/Restablecer';
 import { VerificarCorreo } from './pages/VerificarCorreo';
 import { NuevaOfertaPage } from './ofertas/NewOfertaPage';
+import { MisOfertasPage } from './ofertas/MisOfertasPage';
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/comercios/registro" element={<RegistroComercioPage />} />
           <Route path="/comercios/perfil" element={<PerfilComercioPage />} />
           <Route path="/comercios/horarios" element={<HorariosComercioPage />} />
+          <Route path="/ofertas/mias" element={<MisOfertasPage />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/perfil" replace />} />

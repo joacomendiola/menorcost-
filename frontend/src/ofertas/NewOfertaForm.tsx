@@ -28,7 +28,6 @@ export function NewOfferForm({ token, comercios, categorias }: Props) {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [imageError, setImageError] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
@@ -81,7 +80,7 @@ export function NewOfferForm({ token, comercios, categorias }: Props) {
 
       setMessage('Oferta publicada correctamente.')
       form.reset()
-      setSelectedImage(null)
+      setPreviewUrl(null)
       setImageError('')
     } catch (submitError) {
       setError(
@@ -95,22 +94,18 @@ export function NewOfferForm({ token, comercios, categorias }: Props) {
   }
 
   useEffect(() => {
-    if (!selectedImage) {
-      setPreviewUrl(null)
-      return
+  return () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl)
     }
-
-    const url = URL.createObjectURL(selectedImage)
-    setPreviewUrl(url)
-
-    return () => URL.revokeObjectURL(url)
-  }, [selectedImage])
+  }
+  }, [previewUrl])
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0] ?? null
 
     setImageError('')
-    setSelectedImage(null)
+    setPreviewUrl(null)
 
     if (!file) return
 
@@ -128,8 +123,7 @@ export function NewOfferForm({ token, comercios, categorias }: Props) {
       event.currentTarget.value = ''
       return
     }
-
-    setSelectedImage(file)
+    setPreviewUrl(URL.createObjectURL(file))
   }
 
   return (
