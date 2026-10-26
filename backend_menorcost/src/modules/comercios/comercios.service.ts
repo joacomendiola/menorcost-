@@ -185,7 +185,7 @@ export class ComerciosService {
     imagen: { buffer: Buffer; mimetype: string },
   ) {
     const comercio = await this.prisma.comercio.findUnique({
-      where: { usuarioId },
+      where: { userId: usuarioId },
       select: {
         idComercio: true,
         logoUrl: true,
@@ -208,7 +208,7 @@ export class ComerciosService {
 
     try {
       actualizado = await this.prisma.comercio.update({
-        where: { usuarioId },
+        where: { userId: usuarioId },
         data:
           tipo === 'logo'
             ? { logoUrl: imagenUrl }
@@ -233,7 +233,7 @@ export class ComerciosService {
 
   async obtenerMio(usuarioId: string) {
     const comercio = await this.prisma.comercio.findUnique({
-      where: { usuarioId },
+      where: { userId: usuarioId },
       select: SELECT_COMERCIO,
     });
 
@@ -252,7 +252,7 @@ export class ComerciosService {
     try {
       const comercio = await this.prisma.comercio.create({
         data: {
-          usuarioId,
+          userId: usuarioId,
           nombreFantasia: dto.nombreFantasia,
           razonSocial: dto.razonSocial,
           cuit: dto.cuit,
@@ -267,7 +267,7 @@ export class ComerciosService {
           latitud: dto.latitud,
           longitud: dto.longitud,
           googlePlaceId: dto.googlePlaceId,
-          logoUrl: dto.logoUrl,
+          logoUrl: dto.logoUrl ?? '',
           portadaUrl: dto.portadaUrl,
         },
         select: SELECT_COMERCIO,
@@ -295,7 +295,7 @@ export class ComerciosService {
 
     try {
       const comercio = await this.prisma.comercio.update({
-        where: { usuarioId },
+        where: { userId: usuarioId },
         data: {
           nombreFantasia: dto.nombreFantasia,
           razonSocial: dto.razonSocial,
@@ -331,7 +331,7 @@ export class ComerciosService {
     await this.obtenerIdComercio(usuarioId);
 
     const comercio = await this.prisma.comercio.update({
-      where: { usuarioId },
+      where: { userId: usuarioId },
       data: { abierto: dto.abierto },
       select: { idComercio: true, abierto: true },
     });
@@ -527,7 +527,7 @@ export class ComerciosService {
 
   private async obtenerIdComercio(usuarioId: string): Promise<string> {
     const comercio = await this.prisma.comercio.findUnique({
-      where: { usuarioId },
+      where: { userId: usuarioId },
       select: { idComercio: true },
     });
 
