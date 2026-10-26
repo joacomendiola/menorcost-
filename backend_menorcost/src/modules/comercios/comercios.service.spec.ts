@@ -195,7 +195,7 @@ describe('ComerciosService.subirImagen', () => {
       'image/png',
     );
     expect(prismaMock.comercio.update).toHaveBeenCalledWith({
-      where: { usuarioId: 'u1' },
+      where: { userId: 'u1' },
       data: { logoUrl: '/uploads/nuevo.png' },
       select: expect.any(Object),
     });
@@ -273,7 +273,7 @@ describe('ComerciosService.obtenerMio', () => {
     const resultado = await service.obtenerMio('u1');
 
     expect(prismaMock.comercio.findUnique).toHaveBeenCalledWith({
-      where: { usuarioId: 'u1' },
+      where: { userId: 'u1' },
       select: expect.any(Object),
     });
     expect(resultado).toMatchObject({
@@ -299,11 +299,22 @@ describe('ComerciosService.crear', () => {
     const resultado = await service.crear('u1', dto);
 
     expect(prismaMock.comercio.create).toHaveBeenCalledWith({
-      data: { usuarioId: 'u1', ...dto },
+      data: { userId: 'u1', ...dto },
       select: expect.any(Object),
     });
     expect(resultado).toMatchObject({ id: 'c1' });
     expect(resultado).not.toHaveProperty('idComercio');
+  });
+
+  it('guarda un logo vacío cuando todavía no se proporcionó una imagen', async () => {
+    prismaMock.comercio.create.mockResolvedValue(comercioBase);
+
+    await service.crear('u1', { ...dto, logoUrl: undefined });
+
+    expect(prismaMock.comercio.create).toHaveBeenCalledWith({
+      data: { userId: 'u1', ...dto, logoUrl: '' },
+      select: expect.any(Object),
+    });
   });
 
   it.each([
@@ -361,7 +372,7 @@ describe('ComerciosService.actualizarMio', () => {
     });
 
     expect(prismaMock.comercio.update).toHaveBeenCalledWith({
-      where: { usuarioId: 'u1' },
+      where: { userId: 'u1' },
       data: expect.objectContaining({ telefono: '2901999999' }),
       select: expect.any(Object),
     });
@@ -401,7 +412,7 @@ describe('ComerciosService.actualizarApertura', () => {
     ).resolves.toEqual({ id: 'c1', abierto: true });
 
     expect(prismaMock.comercio.update).toHaveBeenCalledWith({
-      where: { usuarioId: 'u1' },
+      where: { userId: 'u1' },
       data: { abierto: true },
       select: { idComercio: true, abierto: true },
     });
