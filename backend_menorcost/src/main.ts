@@ -14,6 +14,18 @@ async function bootstrap() {
     }),
   );
 
+  const origenes = (
+    process.env.CORS_ORIGIN ?? 'http://localhost:5173,http://127.0.0.1:5173'
+  )
+    .split(',')
+    .map((origen) => origen.trim())
+    .filter(Boolean);
+
+  app.enableCors({
+    origin: origenes,
+    credentials: true,
+  });
+
   app.useStaticAssets(resolve(process.env.UPLOAD_DIR ?? 'uploads'), {
     prefix: '/uploads/',
   });

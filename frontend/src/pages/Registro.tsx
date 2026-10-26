@@ -188,7 +188,10 @@ export function Registro() {
         message: 'Cuenta creada con éxito. Revisá tu correo electrónico.',
       });
       navigate('/verificar-correo', {
-        state: { email: form.email.trim().toLowerCase() },
+        state: {
+          email: form.email.trim().toLowerCase(),
+          continuarComercio: tipo === 'comerciante',
+        },
       });
     } catch (err) {
       setError(
@@ -232,10 +235,9 @@ export function Registro() {
 
         {tipo === 'comerciante' && (
           <div className="panel panel--warn" style={{ marginBottom: 18 }}>
-            El alta comercial (CUIT, rubro y georreferenciación del local) se
-            completa en el <strong>Módulo 2</strong>. Por ahora podés crear tu
-            cuenta como cliente y continuar el registro del comercio más
-            adelante.
+            Creá tu cuenta y, al verificar tu correo, te llevamos directamente
+            al alta del comercio para cargar CUIT, ubicación, horarios y franjas
+            de retiro.
           </div>
         )}
 
