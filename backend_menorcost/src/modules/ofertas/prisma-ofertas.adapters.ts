@@ -63,7 +63,7 @@ function toOfferDetails(producto: OfferProjection): OfferDetails {
 
 @Injectable()
 export class PrismaOfferAccessAdapter implements OfferAccess {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async assertCanPublish(userId: string, comercioId: string): Promise<void> {
     const usuario = await this.prisma.usuario.findFirst({
@@ -121,7 +121,7 @@ export class PrismaOfferAccessAdapter implements OfferAccess {
 
 @Injectable()
 export class PrismaOfferCategoriesAdapter implements OfferCategories {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async assertExists(categoriaId: string): Promise<void> {
     const categoria = await this.prisma.categoria.findUnique({
@@ -140,7 +140,7 @@ export class PrismaOfferCategoriesAdapter implements OfferCategories {
 
 @Injectable()
 export class PrismaOfferRepositoryAdapter implements OfferRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async create(
     data: CreateOfferDto & {
@@ -181,7 +181,7 @@ export class PrismaOfferRepositoryAdapter implements OfferRepository {
     const productos = await this.prisma.producto.findMany({
       where: {
         comercio: {
-          is: { usuarioId: userId },
+          is: { userId },
         },
       },
       select: offerDetailsSelect,
@@ -199,7 +199,7 @@ export class PrismaOfferRepositoryAdapter implements OfferRepository {
       where: {
         idProducto: offerId,
         comercio: {
-          is: { usuarioId: userId },
+          is: { userId },
         },
       },
       select: offerDetailsSelect,
@@ -232,7 +232,7 @@ export class PrismaOfferRepositoryAdapter implements OfferRepository {
       where: {
         idProducto: offerId,
         comercio: {
-          is: { usuarioId: userId },
+          is: { userId },
         },
       },
       data: updateData,

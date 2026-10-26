@@ -1,3 +1,5 @@
 .env
 docs/
 opencode.jsonc
+/.agents
+/skills-lock.json
