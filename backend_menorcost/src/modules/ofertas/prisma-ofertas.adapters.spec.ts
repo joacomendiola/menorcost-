@@ -5,7 +5,7 @@ import {
 import { Test } from '@nestjs/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { CreateOfferDto } from './dto/create-offer.dto.js';
+import { CreateOfferDto } from './dto/create-oferta.dto.js';
 import {
   PrismaOfferAccessAdapter,
   PrismaOfferCategoriesAdapter,
@@ -29,6 +29,21 @@ describe('Adaptadores Prisma de ofertas', () => {
     precioMenorcost: '75.00',
   };
 
+  const productoProyectado = {
+    idProducto: '33333333-3333-4333-8333-333333333333',
+    comercioId,
+    categoriaId,
+    tipo: 'INDIVIDUAL' as const,
+    titulo: 'Yogur',
+    descripcion: 'Pack de yogures',
+    fechaVencimiento: new Date('2099-12-31T00:00:00.000Z'),
+    stock: 5,
+    precioLista: '100.00',
+    precioMenorcost: '75.00',
+    imagen: '/uploads/yogur.webp',
+    estado: 'ACTIVO' as const,
+  };
+
   const prismaMock = {
     usuario: {
       findFirst: vi.fn(),
@@ -41,6 +56,9 @@ describe('Adaptadores Prisma de ofertas', () => {
     },
     producto: {
       create: vi.fn(),
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      updateMany: vi.fn(),
     },
   };
 
@@ -66,6 +84,9 @@ describe('Adaptadores Prisma de ofertas', () => {
       idProducto: '33333333-3333-4333-8333-333333333333',
       imagen: '/uploads/yogur.png',
     });
+    prismaMock.producto.findMany.mockResolvedValue([productoProyectado]);
+    prismaMock.producto.findFirst.mockResolvedValue(productoProyectado);
+    prismaMock.producto.updateMany.mockResolvedValue({ count: 1 });
 
     moduleRef = await Test.createTestingModule({
       providers: [
@@ -209,5 +230,83 @@ describe('Adaptadores Prisma de ofertas', () => {
         imagen: true,
       },
     });
+  });
+
+  it('lista ofertas filtrando por el propietario del comercio', async () => {
+    await expect(repository.listByOwner(userId)).resolves.toEqual([
+      {
+        id: productoProyectado.idProducto,
+        comercioId,
+        categoriaId,
+        tipo: 'INDIVIDUAL',
+        titulo: 'Yogur',
+        descripcion: 'Pack de yogures',
+        fechaVencimiento: '2099-12-31',
+        stock: 5,
+        precioLista: '100.00',
+        precioMenorcost: '75.00',
+        imagen: '/uploads/yogur.webp',
+        estado: 'ACTIVO',
+      },
+    ]);
+
+    expect(prismaMock.producto.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { comercio: { is: { usuarioId: userId } } },
+      }),
+    );
+  });
+
+  it('busca una oferta filtrando por ID y propietario', async () => {
+    await expect(
+      repository.findByIdForOwner(userId, productoProyectado.idProducto),
+    ).resolves.toMatchObject({
+      id: productoProyectado.idProducto,
+      titulo: 'Yogur',
+    });
+
+    expect(prismaMock.producto.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          idProducto: productoProyectado.idProducto,
+          comercio: { is: { usuarioId: userId } },
+        },
+      }),
+    );
+  });
+
+  it('actualiza una oferta propia usando una actualización parcial', async () => {
+    await expect(
+      repository.updateForOwner(
+        userId,
+        productoProyectado.idProducto,
+        { precioMenorcost: '70.00' },
+      ),
+    ).resolves.toMatchObject({
+      id: productoProyectado.idProducto,
+      precioMenorcost: '75.00',
+    });
+
+    expect(prismaMock.producto.updateMany).toHaveBeenCalledWith({
+      where: {
+        idProducto: productoProyectado.idProducto,
+        comercio: { is: { usuarioId: userId } },
+      },
+      data: { precioMenorcost: '70.00' },
+    });
+  });
+
+  it('no actualiza una oferta que no pertenece al usuario', async () => {
+    prismaMock.producto.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      repository.updateForOwner(
+        userId,
+        productoProyectado.idProducto,
+        { stock: 8 },
+      ),
+    ).resolves.toBeNull();
+
+    expect(prismaMock.producto.findFirst).not.toHaveBeenCalled();
   });
 });

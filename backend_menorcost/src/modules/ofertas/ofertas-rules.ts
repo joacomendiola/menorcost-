@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import type { CreateOfferDto } from './dto/create-offer.dto.js';
+import type { CreateOfferDto } from './dto/create-oferta.dto.js';
 
 export function validateOfferRules(
   offer: Pick<
