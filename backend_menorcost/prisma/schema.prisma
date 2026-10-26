@@ -5,9 +5,173 @@
 
 generator client {
   provider = "prisma-client"
-  output   = "../generated/prisma"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+// Modelo de Producto
+
+enum TipoProducto {
+  INDIVIDUAL
+  COMBO
+}
+
+enum EstadoProducto {
+  ACTIVO
+  PAUSADO
+  VENCIDO_ELIMINADO
+  ELIMINADO
+}
+
+model Producto {
+  idProducto       String         @id @default(uuid()) @map("id_producto") @db.Uuid
+  comercioId       String         @map("id_comercio") @db.Uuid
+  categoriaId      String         @map("id_categoria") @db.Uuid
+  tipo             TipoProducto   @default(INDIVIDUAL)
+  titulo           String         @db.VarChar(120)
+  descripcion      String         @db.Text
+  fechaVencimiento DateTime       @map("fecha_vencimiento") @db.Date
+  stock            Int
+  precioLista      Decimal        @map("precio_lista") @db.Decimal(10, 2)
+  precioMenorcost  Decimal        @map("precio_menorcost") @db.Decimal(10, 2)
+  imagen           String         @db.VarChar(500)
+  estado           EstadoProducto @default(ACTIVO)
+
+  comercio         Comercio       @relation(fields: [comercioId], references: [idComercio])
+  categoria        Categoria      @relation(fields: [categoriaId], references: [idCategoria])
+
+  @@map("producto")
+}
+
+// CLASES MINIMAS PARA LA COMPILACION DE LA RELACIONES DEL MODEL PRODUCTO (ELIMINAR EN CUANTO SE HAGA EL PR QUE CONTENGA LOS MODEL COMPLETOS)
+model Comercio {
+  idComercio String     @id @default(uuid()) @map("id_comercio") @db.Uuid
+  usuarioId String     @unique @map("usuario_id")
+  mercadoPagoVinculado Boolean @default(false) @map("mercado_pago_vinculado")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+  productos   Producto[]
+
+  @@map("comercio")
+}
+
+model Categoria {
+  idCategoria String     @id @default(uuid()) @map("id_categoria") @db.Uuid
+  productos    Producto[]
+
+  @@map("categoria")
+}
+enum Rol {
+  CLIENTE
+  COMERCIANTE
+  ADMINISTRADOR
+}
+
+enum EstadoUsuario {
+  HABILITADO
+  PENDIENTE_VERIFICACION
+  SUSPENDIDO
+  SOLICITUD_BAJA_PENDIENTE
+  BAJO_INVESTIGACION
+  DOCUMENTACION_RECHAZADA
+}
+
+enum TipoCodigo {
+  VERIFICACION_EMAIL
+  RECUPERACION_PASSWORD
+}
+
+enum EstadoSolicitudBaja {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+}
+
+model Usuario {
+  id             String        @id @default(uuid())
+  dni            String        @unique
+  nombre         String
+  apellido       String
+  email          String        @unique
+  telefono       String
+  fechaNacimiento DateTime
+  passwordHash   String
+  rol            Rol           @default(CLIENTE)
+  estado         EstadoUsuario @default(PENDIENTE_VERIFICACION)
+  tokenVersion   Int           @default(0)
+  deletedAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  direcciones Direccion[]
+  codigos     CodigoSeguridad[]
+
+  // TODO integración: adaptar si el modelo real permite varios comercios
+  // por usuario o define esta relación desde el módulo de comercios.
+  comercio Comercio?
+
+  solicitudesBaja SolicitudBaja[] @relation("BajaSolicitada")
+  bajasResueltas  SolicitudBaja[] @relation("BajaResuelta")
+
+  @@map("usuarios")
+}
+
+model Direccion {
+  id              String   @id @default(uuid())
+  usuarioId       String
+  etiqueta        String
+  calle           String
+  numero          String
+  piso            String?
+  localidad       String
+  descripcion     String?
+  latitud         Decimal  @db.Decimal(9, 6)
+  longitud        Decimal  @db.Decimal(9, 6)
+  esPredeterminada Boolean @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("direcciones")
+}
+
+model CodigoSeguridad {
+  id         String     @id @default(uuid())
+  usuarioId  String
+  tipo       TipoCodigo
+  codigoHash String
+  expiraEn   DateTime
+  usadoEn    DateTime?
+  createdAt  DateTime   @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, tipo])
+  @@index([codigoHash])
+  @@map("codigos_seguridad")
+}
+
+model SolicitudBaja {
+  id            String               @id @default(uuid())
+  usuarioId     String
+  motivo        String
+  estado        EstadoSolicitudBaja  @default(PENDIENTE)
+  observaciones String?
+  resueltoPorId String?
+  resueltoEn    DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  usuario     Usuario  @relation("BajaSolicitada", fields: [usuarioId], references: [id], onDelete: Cascade)
+  resueltoPor Usuario? @relation("BajaResuelta", fields: [resueltoPorId], references: [id])
+
+  @@index([usuarioId])
+  @@index([estado])
+  @@map("solicitudes_baja")
 }
