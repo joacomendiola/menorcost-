@@ -1,28 +1,32 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   Logger,
   NotFoundException,
-  ServiceUnavailableException,
 } from '@nestjs/common';
 import {
-  OFFER_RESERVATIONS,
   OFFER_ACCESS,
   OFFER_CATEGORIES,
   OFFER_REPOSITORY,
-  type OfferReservations,
+  OFFER_RESERVATIONS,
+  type ManageableOfferStatus,
   type OfferAccess,
   type OfferCategories,
   type OfferDetails,
   type OfferImage,
   type OfferRecord,
   type OfferRepository,
+  type OfferReservations,
 } from './ofertas-creation.ports.js';
 import { CreateOfferDto } from './dto/create-oferta.dto.js';
 import type { UpdateOfferDto } from './dto/update-oferta.dto.js';
 import { ImageStorageService } from './image-store.service.js';
 import { validateOfferRules } from './ofertas-rules.js';
+
+const OFFER_HAS_PENDING_RESERVATIONS =
+  'Esta oferta no puede eliminarse porque existen reservas pendientes de entrega. Debe completar o gestionar los retiros antes de darla de baja.';
 
 @Injectable()
 export class OffersService {
@@ -159,6 +163,66 @@ export class OffersService {
           error,
         );
       }
+    }
+
+    return updated;
+  }
+
+  async updateStatus(
+    userId: string,
+    offerId: string,
+    estado: ManageableOfferStatus,
+  ): Promise<OfferDetails> {
+    const current = await this.getByIdForOwner(userId, offerId);
+
+    if (
+      current.estado === 'ELIMINADO' ||
+      current.estado === 'VENCIDO_ELIMINADO'
+    ) {
+      throw new ConflictException(
+        'No se puede cambiar el estado de una oferta eliminada',
+      );
+    }
+
+    if (current.estado === estado) {
+      return current;
+    }
+
+    if (estado === 'ACTIVO' && current.estado !== 'PAUSADO') {
+      throw new ConflictException(
+        'Solo se puede reactivar una oferta pausada',
+      );
+    }
+
+    if (estado === 'ELIMINADO') {
+      const reservedUnits =
+        await this.reservations.getReservedUnitsForOffer(offerId);
+
+      if (reservedUnits > 0) {
+        if (current.estado !== 'PAUSADO') {
+          const paused = await this.repository.updateStatusForOwner(
+            userId,
+            offerId,
+            'PAUSADO',
+          );
+
+          if (!paused) {
+            throw new NotFoundException('Oferta no encontrada');
+          }
+        }
+
+        throw new ConflictException(OFFER_HAS_PENDING_RESERVATIONS);
+      }
+    }
+
+    const updated = await this.repository.updateStatusForOwner(
+      userId,
+      offerId,
+      estado,
+    );
+
+    if (!updated) {
+      throw new NotFoundException('Oferta no encontrada');
     }
 
     return updated;

@@ -7,6 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import type { CreateOfferDto } from './dto/create-oferta.dto.js';
 import type { UpdateOfferDto } from './dto/update-oferta.dto.js';
 import type {
+  ManageableOfferStatus,
   OfferAccess,
   OfferCategories,
   OfferDetails,
@@ -236,6 +237,28 @@ export class PrismaOfferRepositoryAdapter implements OfferRepository {
         },
       },
       data: updateData,
+    });
+
+    if (result.count === 0) {
+      return null;
+    }
+
+    return this.findByIdForOwner(userId, offerId);
+  }
+
+  async updateStatusForOwner(
+    userId: string,
+    offerId: string,
+    estado: ManageableOfferStatus,
+  ): Promise<OfferDetails | null> {
+    const result = await this.prisma.producto.updateMany({
+      where: {
+        idProducto: offerId,
+        comercio: {
+          is: { usuarioId: userId },
+        },
+      },
+      data: { estado },
     });
 
     if (result.count === 0) {
