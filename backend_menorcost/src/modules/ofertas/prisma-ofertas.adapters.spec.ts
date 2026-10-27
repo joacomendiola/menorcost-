@@ -309,4 +309,43 @@ describe('Adaptadores Prisma de ofertas', () => {
 
     expect(prismaMock.producto.findFirst).not.toHaveBeenCalled();
   });
+    it('actualiza el estado de una oferta propia', async () => {
+    prismaMock.producto.findFirst.mockResolvedValueOnce({
+      ...productoProyectado,
+      estado: 'PAUSADO',
+    });
+
+    await expect(
+      repository.updateStatusForOwner(
+        userId,
+        productoProyectado.idProducto,
+        'PAUSADO',
+      ),
+    ).resolves.toMatchObject({
+      id: productoProyectado.idProducto,
+      estado: 'PAUSADO',
+    });
+
+    expect(prismaMock.producto.updateMany).toHaveBeenCalledWith({
+      where: {
+        idProducto: productoProyectado.idProducto,
+        comercio: { is: { usuarioId: userId } },
+      },
+      data: { estado: 'PAUSADO' },
+    });
+  });
+
+  it('no cambia el estado de una oferta que no pertenece al comerciante', async () => {
+    prismaMock.producto.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      repository.updateStatusForOwner(
+        userId,
+        productoProyectado.idProducto,
+        'ELIMINADO',
+      ),
+    ).resolves.toBeNull();
+
+    expect(prismaMock.producto.findFirst).not.toHaveBeenCalled();
+  });
 });

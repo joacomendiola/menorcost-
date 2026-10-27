@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface.js';
 import { CreateOfferDto } from './dto/create-oferta.dto.js';
 import { UpdateOfferDto } from './dto/update-oferta.dto.js';
+import { UpdateOfertaStatusDto } from './dto/update-oferta-status.dto.js';
 import type {
   OfferDetails,
   OfferRecord,
@@ -16,6 +17,7 @@ describe('OffersController', () => {
   let listOffers: ReturnType<typeof vi.fn>;
   let getOffer: ReturnType<typeof vi.fn>;
   let updateOffer: ReturnType<typeof vi.fn>;
+  let updateStatusOffer: ReturnType<typeof vi.fn>;
 
   const dto: CreateOfferDto = {
     tipo: 'INDIVIDUAL',
@@ -67,6 +69,10 @@ describe('OffersController', () => {
     listOffers = vi.fn().mockResolvedValue([offerDetails]);
     getOffer = vi.fn().mockResolvedValue(offerDetails);
     updateOffer = vi.fn().mockResolvedValue(offerDetails);
+    updateStatusOffer = vi.fn().mockResolvedValue({
+      ...offerDetails,
+      estado: 'PAUSADO',
+    });
 
     const moduleRef = await Test.createTestingModule({
       controllers: [OffersController],
@@ -78,6 +84,7 @@ describe('OffersController', () => {
             listByOwner: listOffers,
             getByIdForOwner: getOffer,
             update: updateOffer,
+            updateStatus: updateStatusOffer,
           },
         },
       ],
@@ -145,6 +152,23 @@ describe('OffersController', () => {
       offerId,
       updateDto,
       undefined,
+    );
+  });
+
+  it('envía el estado solicitado y el usuario autenticado al servicio', async () => {
+    const offerId = offerDetails.id;
+    const statusDto: UpdateOfertaStatusDto = { estado: 'PAUSADO' };
+    const pausedOffer = { ...offerDetails, estado: 'PAUSADO' as const };
+    updateStatusOffer.mockResolvedValueOnce(pausedOffer);
+
+    await expect(
+      controller.updateStatus(usuario, offerId, statusDto),
+    ).resolves.toEqual(pausedOffer);
+
+    expect(updateStatusOffer).toHaveBeenCalledWith(
+      'user-1',
+      offerId,
+      'PAUSADO',
     );
   });
 });

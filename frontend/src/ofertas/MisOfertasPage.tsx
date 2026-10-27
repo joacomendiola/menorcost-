@@ -2,6 +2,12 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/contexto';
 
+type OfferStatus =
+  | 'ACTIVO'
+  | 'PAUSADO'
+  | 'VENCIDO_ELIMINADO'
+  | 'ELIMINADO';
+
 type Offer = {
   id: string;
   comercioId: string;
@@ -14,8 +20,10 @@ type Offer = {
   precioLista: string;
   precioMenorcost: string;
   imagen: string;
-  estado: 'ACTIVO' | 'PAUSADO' | 'VENCIDO_ELIMINADO' | 'ELIMINADO';
+  estado: OfferStatus;
 };
+
+type ManageableOfferStatus = 'ACTIVO' | 'PAUSADO' | 'ELIMINADO';
 
 class OfferRequestError extends Error {
   readonly status: number;
@@ -99,7 +107,6 @@ async function requestOffers<T>(
 
   return payload as T;
 }
-
 export function MisOfertasPage() {
   const { usuario, token } = useAuth();
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -168,7 +175,9 @@ export function MisOfertasPage() {
     }
 
     if (precioMenorcost >= precioLista) {
-      setSaveError('El precio promocional debe ser menor que el precio de lista.');
+      setSaveError(
+        'El precio promocional debe ser menor que el precio de lista.',
+      );
       return;
     }
 
@@ -232,6 +241,82 @@ export function MisOfertasPage() {
     }
   }
 
+  async function handleStatusChange(
+    offer: Offer,
+    estado: ManageableOfferStatus,
+  ) {
+    setSaveError('');
+    setSuccessMessage('');
+
+    if (!token) {
+      setSaveError('Iniciá sesión para cambiar el estado de una oferta.');
+      return;
+    }
+
+    if (estado === 'ELIMINADO') {
+      const confirmed = window.confirm(
+        `¿Confirmás la baja de "${offer.titulo}"? La oferta se marcará como eliminada. Si tiene reservas pendientes, el sistema la pausará y no permitirá darla de baja.`,
+      );
+
+      if (!confirmed) return;
+    }
+
+    setSavingId(offer.id);
+
+    try {
+      const updatedOffer = await requestOffers<Offer>(
+        `/offers/${offer.id}/status`,
+        token,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ estado }),
+        },
+      );
+
+      setOffers((currentOffers) =>
+        currentOffers.map((currentOffer) =>
+          currentOffer.id === offer.id ? updatedOffer : currentOffer,
+        ),
+      );
+
+      const messages: Record<ManageableOfferStatus, string> = {
+        ACTIVO: 'Oferta reactivada correctamente.',
+        PAUSADO: 'Oferta pausada correctamente.',
+        ELIMINADO: 'Oferta dada de baja correctamente.',
+      };
+      setSuccessMessage(messages[estado]);
+    } catch (error: unknown) {
+      let message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudo cambiar el estado de la oferta.';
+
+      if (
+        estado === 'ELIMINADO' &&
+        error instanceof OfferRequestError &&
+        error.status === 409
+      ) {
+        try {
+          const refreshedOffers = await requestOffers<Offer[]>('/offers', token);
+          setOffers(refreshedOffers);
+        } catch (refreshError: unknown) {
+          const refreshMessage =
+            refreshError instanceof Error
+              ? refreshError.message
+              : 'Error desconocido al actualizar el listado.';
+          message = `${message} No se pudo actualizar el listado: ${refreshMessage}`;
+        }
+      }
+
+      setSaveError(message);
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   if (usuario?.rol !== 'COMERCIANTE') {
     return (
       <main>
@@ -280,76 +365,127 @@ export function MisOfertasPage() {
       )}
 
       <section aria-label="Listado de mis ofertas">
-        {offers.map((offer) => (
-          <article key={offer.id}>
-            <h2>{offer.titulo}</h2>
-            <p>{offer.descripcion}</p>
-            <p>Estado: {offer.estado}</p>
+        {offers.map((offer) => {
+          const isEditable =
+            offer.estado === 'ACTIVO' || offer.estado === 'PAUSADO';
+          const isSaving = savingId === offer.id;
 
-            <img
-              src={new URL(offer.imagen, API_URL).toString()}
-              alt={`Imagen de ${offer.titulo}`}
-              loading="lazy"
-              width={240}
-              height={180}
-              style={{ objectFit: 'contain' }}
-            />
+          return (
+            <article key={offer.id}>
+              <h2>{offer.titulo}</h2>
+              <p>{offer.descripcion}</p>
+              <p>Estado: {offer.estado}</p>
 
-            <form
-              key={`${offer.id}-${offer.precioLista}-${offer.precioMenorcost}-${offer.stock}-${offer.imagen}`}
-              onSubmit={(event) => void handleUpdate(event, offer)}
-            >
-              <label>
-                Precio de lista
-                <input
-                  name="precioLista"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  defaultValue={offer.precioLista}
-                  required
-                />
-              </label>
+              <img
+                src={new URL(offer.imagen, API_URL).toString()}
+                alt={`Imagen de ${offer.titulo}`}
+                loading="lazy"
+                width={240}
+                height={180}
+                style={{ objectFit: 'contain' }}
+              />
 
-              <label>
-                Precio promocional
-                <input
-                  name="precioMenorcost"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  defaultValue={offer.precioMenorcost}
-                  required
-                />
-              </label>
+              {isEditable && (
+                <div aria-label={`Acciones de estado para ${offer.titulo}`}>
+                  {offer.estado === 'ACTIVO' && (
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() =>
+                        void handleStatusChange(offer, 'PAUSADO')
+                      }
+                    >
+                      {isSaving ? 'Procesando…' : 'Pausar oferta'}
+                    </button>
+                  )}
 
-              <label>
-                Stock
-                <input
-                  name="stock"
-                  type="number"
-                  min="0"
-                  step="1"
-                  defaultValue={offer.stock}
-                  required
-                />
-              </label>
+                  {offer.estado === 'PAUSADO' && (
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() =>
+                        void handleStatusChange(offer, 'ACTIVO')
+                      }
+                    >
+                      {isSaving ? 'Procesando…' : 'Reactivar oferta'}
+                    </button>
+                  )}
 
-              <label>
-                Cambiar imagen (opcional)
-                <input
-                  name="imagen"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                />
-              </label>
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() =>
+                      void handleStatusChange(offer, 'ELIMINADO')
+                    }
+                  >
+                    {isSaving ? 'Procesando…' : 'Dar de baja'}
+                  </button>
+                </div>
+              )}
 
-              <button type="submit" disabled={savingId === offer.id}>
-                {savingId === offer.id ? 'Guardando…' : 'Guardar cambios'}
-              </button>
-            </form>
-          </article>
-        ))}
+              {isEditable ? (
+                <form
+                  key={`${offer.id}-${offer.precioLista}-${offer.precioMenorcost}-${offer.stock}-${offer.imagen}`}
+                  onSubmit={(event) => void handleUpdate(event, offer)}
+                >
+                  <label>
+                    Precio de lista
+                    <input
+                      name="precioLista"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      defaultValue={offer.precioLista}
+                      required
+                    />
+                  </label>
+
+                  <label>
+                    Precio promocional
+                    <input
+                      name="precioMenorcost"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      defaultValue={offer.precioMenorcost}
+                      required
+                    />
+                  </label>
+
+                  <label>
+                    Stock
+                    <input
+                      name="stock"
+                      type="number"
+                      min="0"
+                      step="1"
+                      defaultValue={offer.stock}
+                      required
+                    />
+                  </label>
+
+                  <label>
+                    Cambiar imagen (opcional)
+                    <input
+                      name="imagen"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                    />
+                  </label>
+
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                  >
+                    {isSaving ? 'Guardando…' : 'Guardar cambios'}
+                  </button>
+                </form>
+              ) : (
+                <p>Esta oferta ya no puede modificarse.</p>
+              )}
+            </article>
+          );
+        })}
       </section>
     </main>
   );
