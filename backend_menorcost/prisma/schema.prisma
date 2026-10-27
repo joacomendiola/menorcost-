@@ -120,6 +120,7 @@ model FranjaRetiro {
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   comercio Comercio @relation(fields: [comercioId], references: [idComercio], onDelete: Cascade)
+  pedidos  Pedido[]
 
   @@index([comercioId, diaSemana])
   @@map("franja_retiro")
@@ -338,6 +339,7 @@ model Pedido {
 
   usuario         Usuario        @relation(fields: [usuarioId], references: [id])
   comercio        Comercio       @relation(fields: [comercioId], references: [idComercio])
+  franjaHoraria   FranjaRetiro?  @relation(fields: [franjaHorarioId], references: [id], onDelete: Restrict)
   calificacion    Calificacion?
   reportes        Reporte[]
   items           PedidoItem[]
@@ -406,8 +408,6 @@ model ConfigComision {
   activa            Boolean  @default(true)
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
-
-  pedidos Pedido[]
 
   @@index([activa])
   @@map("config_comision")
