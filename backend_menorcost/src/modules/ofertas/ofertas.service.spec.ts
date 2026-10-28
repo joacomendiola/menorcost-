@@ -266,16 +266,15 @@ describe('OffersService', () => {
     expect(imageStorage.save).not.toHaveBeenCalled();
   });
 
-  it('bloquea la reducción mientras no esté integrada la consulta de reservas', async () => {
+  it('no modifica el stock si falla la consulta de reservas', async () => {
+    const reservationsError = new Error('Consulta de reservas no disponible');
     vi.mocked(reservations.getReservedUnitsForOffer).mockRejectedValueOnce(
-      new ServiceUnavailableException(
-        'La consulta de reservas PENDIENTE_RETIRO todavía no está integrada',
-      ),
+      reservationsError,
     );
 
     await expect(
       service.update('user-1', offerDetails.id, { stock: 4 }),
-    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    ).rejects.toBe(reservationsError);
 
     expect(reservations.getReservedUnitsForOffer).toHaveBeenCalledWith(
       offerDetails.id,
@@ -393,7 +392,7 @@ describe('OffersService', () => {
     if (error instanceof ConflictException) {
       expect(error.getResponse()).toMatchObject({
         message: pendingReservationsMessage,
-        });
+      });
     }
 
     expect(repository.updateStatusForOwner).toHaveBeenCalledTimes(1);
@@ -416,14 +415,14 @@ describe('OffersService', () => {
     expect(repository.updateStatusForOwner).not.toHaveBeenCalled();
   });
 
-  it('no permite reactivar una oferta que ya está activa', async () => {
-  await expect(
-    service.updateStatus('user-1', offerDetails.id, 'ACTIVO'),
-  ).resolves.toEqual(offerDetails);
+  it('no escribe si se solicita activar una oferta que ya está activa', async () => {
+    await expect(
+      service.updateStatus('user-1', offerDetails.id, 'ACTIVO'),
+    ).resolves.toEqual(offerDetails);
 
-  expect(repository.updateStatusForOwner).not.toHaveBeenCalled();
-  expect(reservations.getReservedUnitsForOffer).not.toHaveBeenCalled();
-});
+    expect(repository.updateStatusForOwner).not.toHaveBeenCalled();
+    expect(reservations.getReservedUnitsForOffer).not.toHaveBeenCalled();
+  });
 
   it('devuelve la oferta sin escribir si se solicita el mismo estado', async () => {
     await expect(
