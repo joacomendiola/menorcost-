@@ -6,6 +6,9 @@ export const OFFER_CATEGORIES = Symbol('OFFER_CATEGORIES');
 export const OFFER_REPOSITORY = Symbol('OFFER_REPOSITORY');
 export const OFFER_RESERVATIONS = Symbol('OFFER_RESERVATIONS');
 
+export type OfferStatus = 'ACTIVO' | 'PAUSADO' | 'VENCIDO_ELIMINADO' | 'ELIMINADO';
+export type ManageableOfferStatus = 'ACTIVO' | 'PAUSADO' | 'ELIMINADO';
+
 export interface OfferAccess {
   assertCanPublish(userId: string, comercioId: string): Promise<void>;
   assertMercadoPagoLinked(
@@ -45,7 +48,7 @@ export interface OfferDetails {
   precioLista: string;
   precioMenorcost: string;
   imagen: string;
-  estado: 'ACTIVO' | 'PAUSADO' | 'VENCIDO_ELIMINADO' | 'ELIMINADO';
+  estado: OfferStatus;
 }
 
 export interface OfferRepository {
@@ -67,5 +70,11 @@ export interface OfferRepository {
     userId: string,
     offerId: string,
     data: UpdateOfferDto & { imagen?: string },
+  ): Promise<OfferDetails | null>;
+
+  updateStatusForOwner(
+    userId: string,
+    offerId: string,
+    estado: ManageableOfferStatus,
   ): Promise<OfferDetails | null>;
 }

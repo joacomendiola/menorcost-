@@ -7,11 +7,13 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import type { CreateOfferDto } from './dto/create-oferta.dto.js';
 import type { UpdateOfferDto } from './dto/update-oferta.dto.js';
 import type {
+  ManageableOfferStatus,
   OfferAccess,
   OfferCategories,
   OfferDetails,
   OfferRecord,
   OfferRepository,
+  OfferReservations,
 } from './ofertas-creation.ports.js';
 
 const offerDetailsSelect = {
@@ -84,7 +86,7 @@ export class PrismaOfferAccessAdapter implements OfferAccess {
     const comercio = await this.prisma.comercio.findFirst({
       where: {
         idComercio: comercioId,
-        usuarioId: userId,
+        userId,
       },
       select: { idComercio: true },
     });
@@ -103,7 +105,7 @@ export class PrismaOfferAccessAdapter implements OfferAccess {
     const comercio = await this.prisma.comercio.findFirst({
       where: {
         idComercio: comercioId,
-        usuarioId: userId,
+        userId,
       },
       select: { mercadoPagoVinculado: true },
     });
@@ -155,9 +157,7 @@ export class PrismaOfferRepositoryAdapter implements OfferRepository {
         categoriaId: data.categoriaId,
         titulo: data.titulo,
         descripcion: data.descripcion,
-        fechaVencimiento: new Date(
-          `${data.fechaVencimiento}T00:00:00.000Z`,
-        ),
+        fechaVencimiento: new Date(`${data.fechaVencimiento}T00:00:00.000Z`),
         stock: data.stock,
         precioLista: data.precioLista,
         precioMenorcost: data.precioMenorcost,
@@ -243,5 +243,46 @@ export class PrismaOfferRepositoryAdapter implements OfferRepository {
     }
 
     return this.findByIdForOwner(userId, offerId);
+  }
+
+  async updateStatusForOwner(
+    userId: string,
+    offerId: string,
+    estado: ManageableOfferStatus,
+  ): Promise<OfferDetails | null> {
+    const result = await this.prisma.producto.updateMany({
+      where: {
+        idProducto: offerId,
+        comercio: {
+          is: { userId },
+        },
+      },
+      data: { estado },
+    });
+
+    if (result.count === 0) {
+      return null;
+    }
+
+    return this.findByIdForOwner(userId, offerId);
+  }
+}
+
+@Injectable()
+export class PrismaOfferReservationsAdapter implements OfferReservations {
+  constructor(private readonly prisma: PrismaService) { }
+
+  async getReservedUnitsForOffer(offerId: string): Promise<number> {
+    const result = await this.prisma.pedidoItem.aggregate({
+      where: {
+        productoId: offerId,
+        pedido: {
+          is: { estado: 'PENDIENTE_DE_RETIRO' },
+        },
+      },
+      _sum: { cantidad: true },
+    });
+
+    return result._sum.cantidad ?? 0;
   }
 }

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
   ServiceUnavailableException,
@@ -65,6 +66,9 @@ describe('OffersService', () => {
     estado: 'ACTIVO',
   };
 
+  const pendingReservationsMessage =
+    'Esta oferta no puede eliminarse porque existen reservas pendientes de entrega. Debe completar o gestionar los retiros antes de darla de baja.';
+
   beforeEach(() => {
     access = {
       assertCanPublish: vi.fn().mockResolvedValue(undefined),
@@ -80,6 +84,7 @@ describe('OffersService', () => {
       listByOwner: vi.fn().mockResolvedValue([offerDetails]),
       findByIdForOwner: vi.fn().mockResolvedValue(offerDetails),
       updateForOwner: vi.fn().mockResolvedValue(offerDetails),
+      updateStatusForOwner: vi.fn().mockResolvedValue(offerDetails),
     };
 
     imageStorage = new ImageStorageService();
@@ -261,16 +266,15 @@ describe('OffersService', () => {
     expect(imageStorage.save).not.toHaveBeenCalled();
   });
 
-  it('bloquea la reducción mientras no esté integrada la consulta de reservas', async () => {
+  it('no modifica el stock si falla la consulta de reservas', async () => {
+    const reservationsError = new Error('Consulta de reservas no disponible');
     vi.mocked(reservations.getReservedUnitsForOffer).mockRejectedValueOnce(
-      new ServiceUnavailableException(
-        'La consulta de reservas PENDIENTE_RETIRO todavía no está integrada',
-      ),
+      reservationsError,
     );
 
     await expect(
       service.update('user-1', offerDetails.id, { stock: 4 }),
-    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    ).rejects.toBe(reservationsError);
 
     expect(reservations.getReservedUnitsForOffer).toHaveBeenCalledWith(
       offerDetails.id,
@@ -313,6 +317,131 @@ describe('OffersService', () => {
     }
 
     expect(repository.updateForOwner).not.toHaveBeenCalled();
+  });
+
+  it('pausa una oferta activa sin consultar reservas ni alterarlas', async () => {
+    const pausedOffer = { ...offerDetails, estado: 'PAUSADO' as const };
+    vi.mocked(repository.updateStatusForOwner).mockResolvedValueOnce(
+      pausedOffer,
+    );
+
+    await expect(
+      service.updateStatus('user-1', offerDetails.id, 'PAUSADO'),
+    ).resolves.toEqual(pausedOffer);
+
+    expect(repository.updateStatusForOwner).toHaveBeenCalledWith(
+      'user-1',
+      offerDetails.id,
+      'PAUSADO',
+    );
+    expect(reservations.getReservedUnitsForOffer).not.toHaveBeenCalled();
+  });
+
+  it('reactiva una oferta pausada', async () => {
+    const pausedOffer = { ...offerDetails, estado: 'PAUSADO' as const };
+    const activeOffer = { ...offerDetails, estado: 'ACTIVO' as const };
+
+    vi.mocked(repository.findByIdForOwner).mockResolvedValueOnce(pausedOffer);
+    vi.mocked(repository.updateStatusForOwner).mockResolvedValueOnce(activeOffer);
+
+    await expect(
+      service.updateStatus('user-1', offerDetails.id, 'ACTIVO'),
+    ).resolves.toEqual(activeOffer);
+
+    expect(repository.updateStatusForOwner).toHaveBeenCalledWith(
+      'user-1',
+      offerDetails.id,
+      'ACTIVO',
+    );
+    expect(reservations.getReservedUnitsForOffer).not.toHaveBeenCalled();
+  });
+
+  it('marca como eliminada una oferta sin reservas pendientes', async () => {
+    const deletedOffer = { ...offerDetails, estado: 'ELIMINADO' as const };
+    vi.mocked(repository.updateStatusForOwner).mockResolvedValueOnce(
+      deletedOffer,
+    );
+
+    await expect(
+      service.updateStatus('user-1', offerDetails.id, 'ELIMINADO'),
+    ).resolves.toEqual(deletedOffer);
+
+    expect(reservations.getReservedUnitsForOffer).toHaveBeenCalledWith(
+      offerDetails.id,
+    );
+    expect(repository.updateStatusForOwner).toHaveBeenCalledWith(
+      'user-1',
+      offerDetails.id,
+      'ELIMINADO',
+    );
+  });
+
+  it('pausa la oferta y rechaza la baja si existen reservas pendientes', async () => {
+    const pausedOffer = { ...offerDetails, estado: 'PAUSADO' as const };
+    vi.mocked(reservations.getReservedUnitsForOffer).mockResolvedValueOnce(2);
+    vi.mocked(repository.updateStatusForOwner).mockResolvedValueOnce(
+      pausedOffer,
+    );
+
+    const error = await service
+      .updateStatus('user-1', offerDetails.id, 'ELIMINADO')
+      .catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(ConflictException);
+
+    if (error instanceof ConflictException) {
+      expect(error.getResponse()).toMatchObject({
+        message: pendingReservationsMessage,
+      });
+    }
+
+    expect(repository.updateStatusForOwner).toHaveBeenCalledTimes(1);
+    expect(repository.updateStatusForOwner).toHaveBeenCalledWith(
+      'user-1',
+      offerDetails.id,
+      'PAUSADO',
+    );
+  });
+
+  it('no cambia el estado si falla la consulta de reservas al eliminar', async () => {
+    vi.mocked(reservations.getReservedUnitsForOffer).mockRejectedValueOnce(
+      new ServiceUnavailableException('Consulta de reservas no disponible'),
+    );
+
+    await expect(
+      service.updateStatus('user-1', offerDetails.id, 'ELIMINADO'),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+
+    expect(repository.updateStatusForOwner).not.toHaveBeenCalled();
+  });
+
+  it('no escribe si se solicita activar una oferta que ya está activa', async () => {
+    await expect(
+      service.updateStatus('user-1', offerDetails.id, 'ACTIVO'),
+    ).resolves.toEqual(offerDetails);
+
+    expect(repository.updateStatusForOwner).not.toHaveBeenCalled();
+    expect(reservations.getReservedUnitsForOffer).not.toHaveBeenCalled();
+  });
+
+  it('devuelve la oferta sin escribir si se solicita el mismo estado', async () => {
+    await expect(
+      service.updateStatus('user-1', offerDetails.id, 'ACTIVO'),
+    ).resolves.toEqual(offerDetails);
+
+    expect(repository.updateStatusForOwner).not.toHaveBeenCalled();
+    expect(reservations.getReservedUnitsForOffer).not.toHaveBeenCalled();
+  });
+
+  it('no permite cambiar el estado de una oferta ya eliminada', async () => {
+    const deletedOffer = { ...offerDetails, estado: 'ELIMINADO' as const };
+    vi.mocked(repository.findByIdForOwner).mockResolvedValueOnce(deletedOffer);
+
+    await expect(
+      service.updateStatus('user-1', offerDetails.id, 'PAUSADO'),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(repository.updateStatusForOwner).not.toHaveBeenCalled();
   });
 
   it('reemplaza la imagen solo después de guardar la nueva referencia', async () => {
