@@ -15,7 +15,7 @@ import type { SimulacionPrecioResultado } from './simulador-precios.types.js';
 
 @Injectable()
 export class SimuladorPreciosService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async calcular(dto: SimularPrecioDto): Promise<SimulacionPrecioResultado> {
     const config = await this.prisma.configComision.findFirst({

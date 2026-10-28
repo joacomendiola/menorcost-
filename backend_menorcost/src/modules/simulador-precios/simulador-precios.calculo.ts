@@ -28,7 +28,9 @@ function parseDecimal(valor: string, campo: string): Prisma.Decimal {
     }
     return decimal;
   } catch {
-    throw new PrecioInvalidoError(`El campo ${campo} debe ser un número válido`);
+    throw new PrecioInvalidoError(
+      `El campo ${campo} debe ser un número válido`,
+    );
   }
 }
 
@@ -54,10 +56,7 @@ export function calcularPrecios(
     input.comisionMenorcostTasa,
     'comisionMenorcostTasa',
   );
-  const tasaMpEstimada = parseDecimal(
-    input.tasaMpEstimada,
-    'tasaMpEstimada',
-  );
+  const tasaMpEstimada = parseDecimal(input.tasaMpEstimada, 'tasaMpEstimada');
 
   if (!precioBaseNeto.gt(0)) {
     throw new PrecioInvalidoError(
