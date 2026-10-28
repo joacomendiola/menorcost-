@@ -169,6 +169,15 @@ describe('ComerciosService.obtenerPublico', () => {
     });
     expect(resultado).not.toHaveProperty('idComercio');
     expect(resultado.productos[0]).not.toHaveProperty('idProducto');
+    expect(prismaMock.comercio.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          productos: expect.objectContaining({
+            where: { estado: 'ACTIVO' },
+          }),
+        }),
+      }),
+    );
   });
 });
 

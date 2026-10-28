@@ -10,6 +10,7 @@ import {
   PrismaOfferAccessAdapter,
   PrismaOfferCategoriesAdapter,
   PrismaOfferRepositoryAdapter,
+  PrismaOfferReservationsAdapter,
 } from './prisma-ofertas.adapters.js';
 
 describe('Adaptadores Prisma de ofertas', () => {
@@ -60,11 +61,15 @@ describe('Adaptadores Prisma de ofertas', () => {
       findFirst: vi.fn(),
       updateMany: vi.fn(),
     },
+    pedidoItem: {
+      aggregate: vi.fn(),
+    },
   };
 
   let access: PrismaOfferAccessAdapter;
   let categories: PrismaOfferCategoriesAdapter;
   let repository: PrismaOfferRepositoryAdapter;
+  let reservations: PrismaOfferReservationsAdapter;
   let moduleRef: Awaited<
     ReturnType<ReturnType<typeof Test.createTestingModule>['compile']>
   >;
@@ -87,12 +92,16 @@ describe('Adaptadores Prisma de ofertas', () => {
     prismaMock.producto.findMany.mockResolvedValue([productoProyectado]);
     prismaMock.producto.findFirst.mockResolvedValue(productoProyectado);
     prismaMock.producto.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.pedidoItem.aggregate.mockResolvedValue({
+      _sum: { cantidad: 0 },
+    });
 
     moduleRef = await Test.createTestingModule({
       providers: [
         PrismaOfferAccessAdapter,
         PrismaOfferCategoriesAdapter,
         PrismaOfferRepositoryAdapter,
+        PrismaOfferReservationsAdapter,
         {
           provide: PrismaService,
           useValue: prismaMock,
@@ -103,6 +112,7 @@ describe('Adaptadores Prisma de ofertas', () => {
     access = moduleRef.get(PrismaOfferAccessAdapter);
     categories = moduleRef.get(PrismaOfferCategoriesAdapter);
     repository = moduleRef.get(PrismaOfferRepositoryAdapter);
+    reservations = moduleRef.get(PrismaOfferReservationsAdapter);
   });
 
   afterEach(async () => {
@@ -120,7 +130,7 @@ describe('Adaptadores Prisma de ofertas', () => {
     });
 
     expect(prismaMock.comercio.findFirst).toHaveBeenCalledWith({
-      where: { idComercio: comercioId, usuarioId: userId },
+      where: { idComercio: comercioId, userId },
       select: { idComercio: true },
     });
   });
@@ -252,7 +262,7 @@ describe('Adaptadores Prisma de ofertas', () => {
 
     expect(prismaMock.producto.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { comercio: { is: { usuarioId: userId } } },
+        where: { comercio: { is: { userId } } },
       }),
     );
   });
@@ -269,7 +279,7 @@ describe('Adaptadores Prisma de ofertas', () => {
       expect.objectContaining({
         where: {
           idProducto: productoProyectado.idProducto,
-          comercio: { is: { usuarioId: userId } },
+          comercio: { is: { userId } },
         },
       }),
     );
@@ -290,7 +300,7 @@ describe('Adaptadores Prisma de ofertas', () => {
     expect(prismaMock.producto.updateMany).toHaveBeenCalledWith({
       where: {
         idProducto: productoProyectado.idProducto,
-        comercio: { is: { usuarioId: userId } },
+        comercio: { is: { userId } },
       },
       data: { precioMenorcost: '70.00' },
     });
@@ -308,5 +318,84 @@ describe('Adaptadores Prisma de ofertas', () => {
     ).resolves.toBeNull();
 
     expect(prismaMock.producto.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('actualiza el estado de una oferta propia', async () => {
+    prismaMock.producto.findFirst.mockResolvedValueOnce({
+      ...productoProyectado,
+      estado: 'PAUSADO',
+    });
+
+    await expect(
+      repository.updateStatusForOwner(
+        userId,
+        productoProyectado.idProducto,
+        'PAUSADO',
+      ),
+    ).resolves.toMatchObject({
+      id: productoProyectado.idProducto,
+      estado: 'PAUSADO',
+    });
+
+    expect(prismaMock.producto.updateMany).toHaveBeenCalledWith({
+      where: {
+        idProducto: productoProyectado.idProducto,
+        comercio: { is: { userId } },
+      },
+      data: { estado: 'PAUSADO' },
+    });
+  });
+
+  it('no cambia el estado de una oferta que no pertenece al comerciante', async () => {
+    prismaMock.producto.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      repository.updateStatusForOwner(
+        userId,
+        productoProyectado.idProducto,
+        'ELIMINADO',
+      ),
+    ).resolves.toBeNull();
+
+    expect(prismaMock.producto.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('suma las unidades de reservas pendientes de retiro de una oferta', async () => {
+    prismaMock.pedidoItem.aggregate.mockResolvedValueOnce({
+      _sum: { cantidad: 4 },
+    });
+
+    await expect(
+      reservations.getReservedUnitsForOffer(productoProyectado.idProducto),
+    ).resolves.toBe(4);
+
+    expect(prismaMock.pedidoItem.aggregate).toHaveBeenCalledWith({
+      where: {
+        productoId: productoProyectado.idProducto,
+        pedido: {
+          is: { estado: 'PENDIENTE_DE_RETIRO' },
+        },
+      },
+      _sum: { cantidad: true },
+    });
+  });
+
+  it('devuelve cero cuando no hay unidades reservadas', async () => {
+    prismaMock.pedidoItem.aggregate.mockResolvedValueOnce({
+      _sum: { cantidad: null },
+    });
+
+    await expect(
+      reservations.getReservedUnitsForOffer(productoProyectado.idProducto),
+    ).resolves.toBe(0);
+  });
+
+  it('propaga el error si falla la consulta de reservas', async () => {
+    const databaseError = new Error('Fallo al consultar reservas');
+    prismaMock.pedidoItem.aggregate.mockRejectedValueOnce(databaseError);
+
+    await expect(
+      reservations.getReservedUnitsForOffer(productoProyectado.idProducto),
+    ).rejects.toBe(databaseError);
   });
 });

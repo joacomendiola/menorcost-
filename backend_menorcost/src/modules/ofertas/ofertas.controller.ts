@@ -20,6 +20,7 @@ import { Roles } from '../auth/decorators/roles.decorator.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface.js';
+import { UpdateOfertaStatusDto } from './dto/update-oferta-status.dto.js';
 import { CreateOfferDto } from './dto/create-oferta.dto.js';
 import { UpdateOfferDto } from './dto/update-oferta.dto.js';
 import type {
@@ -96,7 +97,6 @@ export class OffersController {
     @Body() dto: UpdateOfferDto,
     @UploadedFile(
       new ParseFilePipe({
-        // En una edición, la imagen es opcional; los validadores se aplican si se envía.
         fileIsRequired: false,
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
@@ -118,6 +118,19 @@ export class OffersController {
             mimetype: image.mimetype,
           }
         : undefined,
+    );
+  }
+
+  @Patch(':offerId/status')
+  updateStatus(
+    @CurrentUser() usuario: AuthenticatedUser,
+    @Param('offerId', ParseUUIDPipe) offerId: string,
+    @Body() dto: UpdateOfertaStatusDto,
+  ): Promise<OfferDetails> {
+    return this.offersService.updateStatus(
+      usuario.id,
+      offerId,
+      dto.estado,
     );
   }
 }
