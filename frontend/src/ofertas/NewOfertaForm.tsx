@@ -1,4 +1,6 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
+import { SimuladorPreciosPanel } from './simulador/SimuladorPreciosPanel'
+import { useSimuladorPrecios } from './simulador/useSimuladorPrecios'
 
 type Option = {
   id: string
@@ -30,6 +32,13 @@ export function NewOfferForm({ token, comercios, categorias }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [imageError, setImageError] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [precioLista, setPrecioLista] = useState('')
+  const [precioBaseNeto, setPrecioBaseNeto] = useState('')
+  const {
+    resultado: simulacion,
+    error: simulacionError,
+    cargando: simulando,
+  } = useSimuladorPrecios(token, precioLista, precioBaseNeto)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -43,15 +52,29 @@ export function NewOfferForm({ token, comercios, categorias }: Props) {
 
     const form = event.currentTarget
     const data = new FormData(form)
-    const precioLista = Number(data.get('precioLista'))
-    const precioMenorcost = Number(data.get('precioMenorcost'))
 
-    if (precioMenorcost >= precioLista) {
+    if (simulando) {
+      setError('Esperá a que termine la simulación de precios.')
+      return
+    }
+
+    if (!simulacion) {
+      setError(
+        simulacionError ||
+          'Ingresá un precio de lista y un precio base neto válidos para simular.',
+      )
+      return
+    }
+
+    if (Number(simulacion.precioPublico) >= Number(precioLista)) {
       setError(
         'El precio promocional debe ofrecer un descuento real respecto al precio de lista original.',
       )
       return
     }
+
+    data.set('precioLista', precioLista)
+    data.set('precioMenorcost', simulacion.precioPublico)
 
     setSubmitting(true)
 
@@ -80,6 +103,8 @@ export function NewOfferForm({ token, comercios, categorias }: Props) {
 
       setMessage('Oferta publicada correctamente.')
       form.reset()
+      setPrecioLista('')
+      setPrecioBaseNeto('')
       setPreviewUrl(null)
       setImageError('')
     } catch (submitError) {
@@ -193,24 +218,28 @@ export function NewOfferForm({ token, comercios, categorias }: Props) {
       </label>
 
       <label>
-        Precio de lista
+        Precio de lista original
         <input
-          name="precioLista"
           type="number"
           min="0.01"
           step="0.01"
+          inputMode="decimal"
           required
+          value={precioLista}
+          onChange={(event) => setPrecioLista(event.currentTarget.value)}
         />
       </label>
 
       <label>
-        Precio promocional
+        Precio base neto a cobrar
         <input
-          name="precioMenorcost"
           type="number"
           min="0.01"
           step="0.01"
+          inputMode="decimal"
           required
+          value={precioBaseNeto}
+          onChange={(event) => setPrecioBaseNeto(event.currentTarget.value)}
         />
       </label>
 
@@ -236,6 +265,12 @@ export function NewOfferForm({ token, comercios, categorias }: Props) {
           style={{ objectFit: 'contain' }}
         />
       )}
+
+      <SimuladorPreciosPanel
+        resultado={simulacion}
+        error={simulacionError}
+        cargando={simulando}
+      />
 
       <button type="submit" disabled={submitting}>
         {submitting ? 'Publicando...' : 'Publicar oferta'}

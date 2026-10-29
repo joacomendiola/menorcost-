@@ -1,3 +1,8 @@
+import type {
+  SimularPrecioPayload,
+  SimulacionPrecio,
+} from './ofertas/simulador/simulador.types';
+
 const API_URL =
   (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000';
 
@@ -192,6 +197,15 @@ export const authApi = {
     api<{ message: string }>('/auth/restablecer-password', {
       method: 'POST',
       body: { token, password },
+    }),
+};
+
+export const simuladorPreciosApi = {
+  calcular: (token: string, data: SimularPrecioPayload) =>
+    api<SimulacionPrecio>('/simulador-precios/calcular', {
+      method: 'POST',
+      body: data,
+      token,
     }),
 };
 

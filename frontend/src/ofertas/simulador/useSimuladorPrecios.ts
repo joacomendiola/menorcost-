@@ -8,37 +8,45 @@ import type {
 const MONTO_REGEX = /^(0|[1-9]\d{0,9})(\.\d{1,2})?$/;
 const ESPERA_DEBOUNCE_MS = 350;
 
+type EstadoSolicitud = {
+  clave: string;
+  resultado: SimulacionPrecio | null;
+  error: string;
+  cargando: boolean;
+};
+
+const ESTADO_INICIAL: EstadoSolicitud = {
+  clave: '',
+  resultado: null,
+  error: '',
+  cargando: false,
+};
+
 export function useSimuladorPrecios(
   token: string,
   precioLista: string,
   precioBaseNeto: string,
 ): EstadoSimuladorPrecios {
-  const [resultado, setResultado] = useState<SimulacionPrecio | null>(null);
-  const [error, setError] = useState('');
-  const [cargando, setCargando] = useState(false);
+  const [estado, setEstado] = useState<EstadoSolicitud>(ESTADO_INICIAL);
+
+  const lista = precioLista.trim();
+  const base = precioBaseNeto.trim();
+  const clave = `${token}|${lista}|${base}`;
+  const montosValidos =
+    Boolean(token) &&
+    MONTO_REGEX.test(lista) &&
+    MONTO_REGEX.test(base) &&
+    Number(lista) > 0 &&
+    Number(base) > 0;
 
   useEffect(() => {
-    const lista = precioLista.trim();
-    const base = precioBaseNeto.trim();
+    if (!montosValidos) return;
+
     let activo = true;
 
-    setResultado(null);
-    setError('');
-    setCargando(false);
-
-    if (
-      !token ||
-      !MONTO_REGEX.test(lista) ||
-      !MONTO_REGEX.test(base) ||
-      Number(lista) <= 0 ||
-      Number(base) <= 0
-    ) {
-      return;
-    }
-
-    setCargando(true);
-
     const temporizador = window.setTimeout(() => {
+      setEstado({ clave, resultado: null, error: '', cargando: true });
+
       void simuladorPreciosApi
         .calcular(token, {
           precioBaseNeto: base,
@@ -46,18 +54,24 @@ export function useSimuladorPrecios(
         })
         .then((respuesta) => {
           if (!activo) return;
-          setResultado(respuesta);
+          setEstado({
+            clave,
+            resultado: respuesta,
+            error: '',
+            cargando: false,
+          });
         })
         .catch((errorSimulacion: unknown) => {
           if (!activo) return;
-          setError(
-            errorSimulacion instanceof Error
-              ? errorSimulacion.message
-              : 'No se pudo calcular el precio. Intentá nuevamente.',
-          );
-        })
-        .finally(() => {
-          if (activo) setCargando(false);
+          setEstado({
+            clave,
+            resultado: null,
+            error:
+              errorSimulacion instanceof Error
+                ? errorSimulacion.message
+                : 'No se pudo calcular el precio. Intentá nuevamente.',
+            cargando: false,
+          });
         });
     }, ESPERA_DEBOUNCE_MS);
 
@@ -65,7 +79,19 @@ export function useSimuladorPrecios(
       activo = false;
       window.clearTimeout(temporizador);
     };
-  }, [precioBaseNeto, precioLista, token]);
+  }, [base, clave, lista, montosValidos, token]);
 
-  return { resultado, error, cargando };
+  if (!montosValidos) {
+    return { resultado: null, error: '', cargando: false };
+  }
+
+  if (estado.clave !== clave) {
+    return { resultado: null, error: '', cargando: true };
+  }
+
+  return {
+    resultado: estado.resultado,
+    error: estado.error,
+    cargando: estado.cargando,
+  };
 }
