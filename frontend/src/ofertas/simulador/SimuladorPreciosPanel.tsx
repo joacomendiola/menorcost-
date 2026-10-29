@@ -53,9 +53,18 @@ function Fila({
 
 export function SimuladorPreciosPanel({ resultado, error, cargando }: Props) {
   return (
-    <Paper bg="#F3F5F8" p="md" radius="md" aria-live="polite">
+    <Paper bg="#F3F5F8" p="lg" radius="md" aria-live="polite">
       <Stack gap="sm">
-        <Text fw={800}>Simulador de precios</Text>
+        <Text fw={700} size="md">
+          Simulador de precios
+        </Text>
+
+        {!cargando && !error && !resultado && (
+          <Text size="sm" c="dimmed">
+            Ingresá el precio de lista y el precio base neto para ver la
+            simulación.
+          </Text>
+        )}
 
         {cargando && (
           <Group gap="sm" role="status">
