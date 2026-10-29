@@ -3,7 +3,6 @@ import {
   Injectable,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import {
   calcularPrecios,
@@ -31,25 +30,12 @@ export class SimuladorPreciosService {
     }
 
     try {
-      const resultado = calcularPrecios({
+      return calcularPrecios({
         precioBaseNeto: dto.precioBaseNeto,
         precioLista: dto.precioLista,
         comisionMenorcostTasa: config.comisionMenorcost.toString(),
         tasaMpEstimada: MP_FEE_ESTIMADA,
       });
-
-      if (dto.precioLista !== undefined) {
-        const precioPublico = new Prisma.Decimal(resultado.precioPublico);
-        const precioLista = new Prisma.Decimal(dto.precioLista);
-
-        if (!precioPublico.lt(precioLista)) {
-          throw new BadRequestException(
-            'El precio promocional debe ofrecer un descuento real respecto del precio de lista original',
-          );
-        }
-      }
-
-      return resultado;
     } catch (error) {
       if (error instanceof PrecioInvalidoError) {
         throw new BadRequestException(error.message);

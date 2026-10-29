@@ -44,19 +44,17 @@ describe('SimuladorPreciosService', () => {
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
-  it('rechaza un precio promocional que no ofrece ahorro real', async () => {
+  it('devuelve el cálculo aunque el precio público no ofrezca descuento', async () => {
     const servicio = crearServicio(configActiva);
 
-    await expect(
-      servicio.calcular({
-        precioBaseNeto: '100.00',
-        precioLista: '100.00',
-      }),
-    ).rejects.toMatchObject({
-      constructor: BadRequestException,
-      message:
-        'El precio promocional debe ofrecer un descuento real respecto del precio de lista original',
+    const resultado = await servicio.calcular({
+      precioBaseNeto: '100.00',
+      precioLista: '100.00',
     });
+
+    expect(resultado.precioPublico).toBe('117.65');
+    expect(resultado.netoEstimadoComerciante).toBe('100.00');
+    expect(resultado.ahorroPorcentaje).toBe('-17.65');
   });
 
   it('traduce los errores de cálculo a BadRequestException', async () => {
