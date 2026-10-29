@@ -45,6 +45,50 @@ function localDateString() {
   return localDate.toISOString().slice(0, 10);
 }
 
+function fechaIsoAMostrar(fechaIso: string) {
+  const [anio, mes, dia] = fechaIso.split('-');
+  return `${dia}/${mes}/${anio}`;
+}
+
+function formatearFechaInput(valor: string) {
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(valor.trim());
+
+  if (iso) {
+    return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  }
+
+  const digitos = valor.replace(/\D/g, '').slice(0, 8);
+  const dia = digitos.slice(0, 2);
+  const mes = digitos.slice(2, 4);
+  const anio = digitos.slice(4, 8);
+
+  return [dia, mes, anio].filter(Boolean).join('/');
+}
+
+function parseFechaMostrada(valor: string): string | null {
+  const coincidencia = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(valor.trim());
+
+  if (!coincidencia) return null;
+
+  const dia = Number(coincidencia[1]);
+  const mes = Number(coincidencia[2]);
+  const anio = Number(coincidencia[3]);
+
+  if (anio < 1900) return null;
+
+  const fecha = new Date(Date.UTC(anio, mes - 1, dia));
+
+  if (
+    fecha.getUTCFullYear() !== anio ||
+    fecha.getUTCMonth() !== mes - 1 ||
+    fecha.getUTCDate() !== dia
+  ) {
+    return null;
+  }
+
+  return `${coincidencia[3]}-${coincidencia[2]}-${coincidencia[1]}`;
+}
+
 function mensajeDeError(payload: unknown, status: number): string {
   if (payload && typeof payload === 'object' && 'message' in payload) {
     const message = (payload as { message?: unknown }).message;
@@ -70,7 +114,9 @@ export function NewOfferForm({ token, comercioId, categorias }: Props) {
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
-  const [fechaVencimiento, setFechaVencimiento] = useState(localDateString());
+  const [fechaVencimientoTexto, setFechaVencimientoTexto] = useState(() =>
+    fechaIsoAMostrar(localDateString()),
+  );
   const [stock, setStock] = useState('');
   const [precioLista, setPrecioLista] = useState('');
   const [precioBaseNeto, setPrecioBaseNeto] = useState('');
@@ -143,7 +189,14 @@ export function NewOfferForm({ token, comercioId, categorias }: Props) {
       return;
     }
 
-    if (!fechaVencimiento || fechaVencimiento <= localDateString()) {
+    const fechaVencimiento = parseFechaMostrada(fechaVencimientoTexto);
+
+    if (!fechaVencimiento) {
+      setError('Ingresá una fecha válida con formato día/mes/año.');
+      return;
+    }
+
+    if (fechaVencimiento <= localDateString()) {
       setError('La fecha de vencimiento debe ser posterior a hoy.');
       return;
     }
@@ -175,7 +228,7 @@ export function NewOfferForm({ token, comercioId, categorias }: Props) {
 
     if (Number(simulacion.precioPublico) >= Number(precioLista)) {
       setError(
-        'El precio promocional debe ofrecer un descuento real respecto al precio de lista original.',
+        'El precio final al público supera el precio de lista. Bajá el precio base neto para ofrecer un descuento real.',
       );
       return;
     }
@@ -215,7 +268,7 @@ export function NewOfferForm({ token, comercioId, categorias }: Props) {
       setCategoriaId(null);
       setTitulo('');
       setDescripcion('');
-      setFechaVencimiento(localDateString());
+      setFechaVencimientoTexto(fechaIsoAMostrar(localDateString()));
       setStock('');
       setPrecioLista('');
       setPrecioBaseNeto('');
@@ -292,10 +345,14 @@ export function NewOfferForm({ token, comercioId, categorias }: Props) {
 
           <TextInput
             label="Fecha de vencimiento"
-            type="date"
-            min={localDateString()}
-            value={fechaVencimiento}
-            onChange={(event) => setFechaVencimiento(event.currentTarget.value)}
+            placeholder="dd/mm/aaaa"
+            inputMode="numeric"
+            maxLength={10}
+            value={fechaVencimientoTexto}
+            onChange={(event) =>
+              setFechaVencimientoTexto(formatearFechaInput(event.currentTarget.value))
+            }
+            description="Formato día/mes/año."
             required
           />
 
@@ -420,6 +477,7 @@ export function NewOfferForm({ token, comercioId, categorias }: Props) {
           resultado={simulacion}
           error={simulacionError}
           cargando={simulando}
+          precioLista={precioLista}
         />
 
         {error && (

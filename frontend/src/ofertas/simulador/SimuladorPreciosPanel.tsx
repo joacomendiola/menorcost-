@@ -12,6 +12,7 @@ type Props = {
   resultado: SimulacionPrecio | null;
   error: string;
   cargando: boolean;
+  precioLista?: string;
 };
 
 const formatoMoneda = new Intl.NumberFormat('es-AR', {
@@ -51,7 +52,18 @@ function Fila({
   );
 }
 
-export function SimuladorPreciosPanel({ resultado, error, cargando }: Props) {
+export function SimuladorPreciosPanel({
+  resultado,
+  error,
+  cargando,
+  precioLista,
+}: Props) {
+  const sinDescuento =
+    resultado !== null &&
+    precioLista !== undefined &&
+    precioLista.trim() !== '' &&
+    Number(resultado.precioPublico) >= Number(precioLista);
+
   return (
     <Paper bg="#F3F5F8" p="lg" radius="md" aria-live="polite">
       <Stack gap="sm">
@@ -99,13 +111,23 @@ export function SimuladorPreciosPanel({ resultado, error, cargando }: Props) {
             <Fila
               etiqueta="Descuento visible al cliente"
               valor={
-                resultado.ahorroPorcentaje !== undefined
-                  ? `${resultado.ahorroPorcentaje}% OFF`
-                  : '—'
+                sinDescuento
+                  ? 'Sin descuento'
+                  : resultado.ahorroPorcentaje !== undefined
+                    ? `${resultado.ahorroPorcentaje}% OFF`
+                    : '—'
               }
             />
 
             <Divider />
+
+            {sinDescuento && (
+              <Text size="xs" c="red" fw={600}>
+                Con estas comisiones el precio final (
+                {formatearMonto(resultado.precioPublico)}) supera el precio de
+                lista. Bajá el precio base neto para ofrecer un descuento real.
+              </Text>
+            )}
 
             <Text size="xs" c="dimmed">
               {resultado.advertenciaNeto}
