@@ -398,4 +398,48 @@ describe('Adaptadores Prisma de ofertas', () => {
       reservations.getReservedUnitsForOffer(productoProyectado.idProducto),
     ).rejects.toBe(databaseError);
   });
+  it('suma las unidades pendientes de retiro de todas las ofertas del comerciante', async () => {
+  prismaMock.pedidoItem.aggregate.mockResolvedValueOnce({
+    _sum: { cantidad: 7 },
+  });
+
+  await expect(
+    reservations.getReservedUnitsForOwner(userId),
+  ).resolves.toBe(7);
+
+  expect(prismaMock.pedidoItem.aggregate).toHaveBeenCalledWith({
+    where: {
+      producto: {
+        is: {
+          comercio: {
+            is: { userId },
+          },
+        },
+      },
+      pedido: {
+        is: { estado: 'PENDIENTE_DE_RETIRO' },
+      },
+    },
+    _sum: { cantidad: true },
+    });
+    });
+
+    it('devuelve cero si el comerciante no tiene unidades reservadas', async () => {
+    prismaMock.pedidoItem.aggregate.mockResolvedValueOnce({
+        _sum: { cantidad: null },
+    });
+
+    await expect(
+        reservations.getReservedUnitsForOwner(userId),
+    ).resolves.toBe(0);
+    });
+
+    it('propaga el error si falla la consulta agregada del comerciante', async () => {
+    const databaseError = new Error('Fallo al consultar reservas');
+    prismaMock.pedidoItem.aggregate.mockRejectedValueOnce(databaseError);
+
+    await expect(
+        reservations.getReservedUnitsForOwner(userId),
+    ).rejects.toBe(databaseError);
+    });
 });

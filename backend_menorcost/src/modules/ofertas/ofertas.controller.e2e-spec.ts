@@ -81,6 +81,15 @@ describe('Endpoints HTTP de ofertas', () => {
   const listOffers = vi.fn().mockResolvedValue([offerDetails]);
   const getOffer = vi.fn().mockResolvedValue(offerDetails);
   const updateOffer = vi.fn().mockResolvedValue(offerDetails);
+  const getDashboardSummary = vi.fn().mockResolvedValue({
+  total: 6,
+  activas: 3,
+  pausadas: 1,
+  proximasAVencer: 2,
+  vencidas: 1,
+  sinStock: 5,
+  unidadesReservadas: 12,
+  });
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -94,6 +103,7 @@ describe('Endpoints HTTP de ofertas', () => {
             listByOwner: listOffers,
             getByIdForOwner: getOffer,
             update: updateOffer,
+            getDashboardSummary: getDashboardSummary,
           },
         },
       ],
@@ -120,6 +130,7 @@ describe('Endpoints HTTP de ofertas', () => {
     listOffers.mockClear();
     getOffer.mockClear();
     updateOffer.mockClear();
+    getDashboardSummary.mockClear();
   });
 
   afterAll(async () => {
@@ -272,6 +283,30 @@ describe('Endpoints HTTP de ofertas', () => {
       .expect([offerDetails]);
 
     expect(listOffers).toHaveBeenCalledWith('user-test');
+  });
+  it('obtiene el resumen del comerciante autenticado', async () => {
+  await request(app.getHttpServer())
+    .get('/offers/dashboard-summary')
+    .set('Authorization', TEST_AUTHORIZATION)
+    .expect(200)
+    .expect({
+      total: 6,
+      activas: 3,
+      pausadas: 1,
+      proximasAVencer: 2,
+      vencidas: 1,
+      sinStock: 5,
+      unidadesReservadas: 12,
+    });
+
+  expect(getDashboardSummary).toHaveBeenCalledWith('user-test');
+  });
+  it('requiere autenticación para consultar el resumen', async () => {
+  await request(app.getHttpServer())
+    .get('/offers/dashboard-summary')
+    .expect(401);
+
+  expect(getDashboardSummary).not.toHaveBeenCalled();
   });
 
   it('consulta una oferta por UUID para el comerciante autenticado', async () => {

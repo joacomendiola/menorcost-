@@ -19,6 +19,7 @@ export interface OfferAccess {
 
 export interface OfferReservations {
   getReservedUnitsForOffer(offerId: string): Promise<number>;
+  getReservedUnitsForOwner(userId: string): Promise<number>;
 }
 
 export interface OfferCategories {
@@ -50,7 +51,15 @@ export interface OfferDetails {
   imagen: string;
   estado: OfferStatus;
 }
-
+export interface OfferDashboardSummary {
+  total: number;
+  activas: number;
+  pausadas: number;
+  proximasAVencer: number;
+  vencidas: number;
+  sinStock: number;
+  unidadesReservadas: number;
+}
 export interface OfferRepository {
   create(
     data: CreateOfferDto & {

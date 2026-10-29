@@ -19,11 +19,12 @@ import {
   type OfferRecord,
   type OfferRepository,
   type OfferReservations,
+  type OfferDashboardSummary,
 } from './ofertas-creation.ports.js';
 import { CreateOfferDto } from './dto/create-oferta.dto.js';
 import type { UpdateOfferDto } from './dto/update-oferta.dto.js';
 import { ImageStorageService } from './image-store.service.js';
-import { validateOfferRules } from './ofertas-rules.js';
+import { validateOfferRules,todayInArgentina } from './ofertas-rules.js';
 
 const OFFER_HAS_PENDING_RESERVATIONS =
   'Esta oferta no puede eliminarse porque existen reservas pendientes de entrega. Debe completar o gestionar los retiros antes de darla de baja.';
@@ -74,6 +75,41 @@ export class OffersService {
 
   async listByOwner(userId: string): Promise<OfferDetails[]> {
     return this.repository.listByOwner(userId);
+  }
+  async getDashboardSummary(
+  userId: string,
+  ): Promise<OfferDashboardSummary> {
+    const [offers, unidadesReservadas] = await Promise.all([
+      this.repository.listByOwner(userId),
+      this.reservations.getReservedUnitsForOwner(userId),
+    ]);
+
+    const hoy = todayInArgentina(new Date());
+    const [year, month, day] = hoy.split('-').map(Number);
+    const limiteVencimiento = new Date(
+      Date.UTC(year, month - 1, day + 7),
+    )
+      .toISOString()
+      .slice(0, 10);
+
+    return {
+      total: offers.length,
+      activas: offers.filter((offer) => offer.estado === 'ACTIVO').length,
+      pausadas: offers.filter((offer) => offer.estado === 'PAUSADO').length,
+      proximasAVencer: offers.filter(
+        (offer) =>
+          (offer.estado === 'ACTIVO' || offer.estado === 'PAUSADO') &&
+          offer.fechaVencimiento >= hoy &&
+          offer.fechaVencimiento <= limiteVencimiento,
+      ).length,
+      vencidas: offers.filter(
+        (offer) => offer.estado === 'VENCIDO_ELIMINADO',
+      ).length,
+      sinStock: offers.filter(
+        (offer) => offer.stock === 0 && offer.estado !== 'ELIMINADO',
+      ).length,
+      unidadesReservadas,
+    };
   }
 
   async getByIdForOwner(
