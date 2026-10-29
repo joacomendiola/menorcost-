@@ -1,6 +1,4 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { BajaModule } from './modules/bajas/baja.module.js';
 import { ComerciosModule } from './modules/comercios/comercios.module.js';
@@ -13,6 +11,7 @@ import { OffersModule } from './modules/ofertas/ofertas.module.js';
 import { ReputacionModule } from './modules/reputacion/reputacion.module.js';
 import { BackofficeModule } from './modules/backoffice/backoffice.module.js';
 import { ReportesModule } from './modules/reportes/reportes.module.js';
+import { SimuladorPreciosModule } from './modules/simulador-precios/simulador-precios.module.js';
 @Module({
   imports: [
     PrismaModule,
@@ -27,8 +26,7 @@ import { ReportesModule } from './modules/reportes/reportes.module.js';
     ReportesModule,
     ConfigModule.forRoot({ isGlobal: true }),
     OffersModule,
+    SimuladorPreciosModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

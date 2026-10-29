@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  Alert,
+  Button,
+  Container,
+  Group,
+  Loader,
+  Paper,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core';
 import { ApiError, api } from '../api';
 import { useAuth } from '../auth/contexto';
 import { NewOfferForm } from './NewOfertaForm';
@@ -75,65 +86,105 @@ export function NuevaOfertaPage() {
     };
   }, [token, usuario?.rol, reloadCount]);
 
-  if (usuario?.rol !== 'COMERCIANTE') {
-    return (
-      <main>
-        <h1>Publicar oferta</h1>
-        <p role="alert">
-          Esta sección está disponible para cuentas de comerciante.
-        </p>
-      </main>
-    );
-  }
+  const comercio = comercios[0];
 
   return (
-    <main>
-      <h1>Publicar oferta</h1>
-
-      {missingSession && (
-        <p role="alert">
-          No se encontró una sesión válida. Iniciá sesión nuevamente.
-        </p>
-      )}
-
-      {loading && !missingSession && (
-        <p role="status">Cargando comercios y categorías…</p>
-      )}
-
-      {loadError && <p role="alert">{loadError}</p>}
-
-      {loadError.includes('comercio registrado') && (
-        <p>
-          <Link to="/comercios/registro">Registrar mi comercio</Link>
-        </p>
-      )}
-
-      {token && loadError && !loading && (
-        <button
-          type="button"
-          onClick={() => {
-            setLoading(true);
-            setLoadError('');
-            setReloadCount((count) => count + 1);
-          }}
+    <Container component="main" size={820} px="md" py={{ base: 28, md: 48 }}>
+      <Stack gap="lg">
+        <Button
+          component={Link}
+          to="/ofertas/mias"
+          variant="default"
+          radius="xl"
+          size="compact-sm"
+          w="fit-content"
+          leftSection="←"
         >
-          Reintentar
-        </button>
-      )}
+          Mis productos
+        </Button>
 
-      {!loading && !loadError && categorias.length === 0 && (
-        <p role="alert">
-          No hay categorías disponibles para publicar una oferta.
-        </p>
-      )}
+        <Title order={1} fz={{ base: 26, sm: 28 }} lh={1.15}>
+          Nueva oferta
+        </Title>
 
-      {!loading && !loadError && comercios.length > 0 && categorias.length > 0 && (
-        <NewOfferForm
-          token={token ?? ''}
-          comercios={comercios}
-          categorias={categorias}
-        />
-      )}
-    </main>
+        {usuario?.rol !== 'COMERCIANTE' && (
+          <Alert color="red" variant="light" title="Sección para comerciantes">
+            Esta sección está disponible para cuentas de comerciante.
+          </Alert>
+        )}
+
+        {missingSession && (
+          <Alert color="red" variant="light">
+            No se encontró una sesión válida. Iniciá sesión nuevamente.
+          </Alert>
+        )}
+
+        {loading && !missingSession && usuario?.rol === 'COMERCIANTE' && (
+          <Paper withBorder radius="lg" p="xl" shadow="xs">
+            <Group gap="sm">
+              <Loader size="sm" />
+              <Text size="sm" c="dimmed">
+                Cargando comercio y categorías…
+              </Text>
+            </Group>
+          </Paper>
+        )}
+
+        {loadError && (
+          <Alert color="red" variant="light" title="No pudimos cargar los datos">
+            <Stack gap="sm" align="flex-start">
+              <Text size="sm">{loadError}</Text>
+
+              {loadError.includes('comercio registrado') && (
+                <Button
+                  component={Link}
+                  to="/comercios/registro"
+                  variant="light"
+                  size="sm"
+                >
+                  Registrar mi comercio
+                </Button>
+              )}
+            </Stack>
+          </Alert>
+        )}
+
+        {token && loadError && !loading && (
+          <Button
+            type="button"
+            variant="default"
+            w="fit-content"
+            onClick={() => {
+              setLoading(true);
+              setLoadError('');
+              setReloadCount((count) => count + 1);
+            }}
+          >
+            Reintentar
+          </Button>
+        )}
+
+        {!loading &&
+          !loadError &&
+          usuario?.rol === 'COMERCIANTE' &&
+          categorias.length === 0 && (
+            <Alert color="gray" variant="light">
+              No hay categorías disponibles para publicar una oferta.
+            </Alert>
+          )}
+
+        {!loading &&
+          !loadError &&
+          usuario?.rol === 'COMERCIANTE' &&
+          comercio &&
+          categorias.length > 0 && (
+            <NewOfferForm
+              token={token ?? ''}
+              comercioId={comercio.id}
+              categorias={categorias}
+            />
+          )}
+      </Stack>
+    </Container>
   );
 }

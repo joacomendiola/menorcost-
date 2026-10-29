@@ -82,11 +82,12 @@ model Comercio {
     createdAt             DateTime        @default(now()) @map("created_at")
     updatedAt             DateTime        @updatedAt @map("updated_at")
 
-    usuario   Usuario   @relation(fields: [userId], references: [id])
-    productos Producto[]
-    pedidos   Pedido[]
-    horarios  HorarioAtencion[]
-    franjas   FranjaRetiro[]
+    usuario      Usuario        @relation(fields: [userId], references: [id])
+    productos    Producto[]
+    pedidos      Pedido[]
+    credencialMp CredencialMp?
+    horarios     HorarioAtencion[]
+    franjas      FranjaRetiro[]
 
   @@index([localidad])
   @@index([estado])
@@ -119,6 +120,7 @@ model FranjaRetiro {
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   comercio Comercio @relation(fields: [comercioId], references: [idComercio], onDelete: Cascade)
+  pedidos  Pedido[]
 
   @@index([comercioId, diaSemana])
   @@map("franja_retiro")
@@ -309,28 +311,43 @@ model Reporte {
   @@map("reporte")
 }
 
-//Modelo Pedido completo del DEV4(en caso de reemplazar o modificar tener cuidado)
+
 model Pedido {
   id_pedido       String         @id @default(uuid()) @map("id_pedido") @db.Uuid
+  nroPedido       String         @unique @map("nro_pedido") @db.VarChar(30)
   usuarioId       String         @map("usuario_id")
   comercioId      String         @map("id_comercio") @db.Uuid
-  estado          EstadoPedido   @default(PENDIENTE_DE_RETIRO)
+  estado          EstadoPedido   @default(PENDIENTE_PAGO)
   codigoQR        String         @unique @map("codigo_qr") @db.VarChar(100)
   codigoAlfanumerico String      @unique @map("codigo_alfanumerico") @db.VarChar(20)
   fecha_pedido    DateTime       @default(now()) @map("fecha_pedido") @db.Timestamp(0)
+  fechaExpiracionPago DateTime?  @map("fecha_expiracion_pago")
   franjaHorarioId String?        @map("franja_horario_id") @db.Uuid
   subtotal        Decimal        @db.Decimal(10, 2)
+
+  // Monto de la comisión de Menorcost congelado al crear el pedido.
   tarifa_servicio Decimal        @map("tarifa_servicio") @db.Decimal(10, 2)
+  // Tasa de comisión de Menorcost aplicada (fracción, ej. 0.1000).
+  comisionMenorcostTasa Decimal  @map("comision_menorcost_tasa") @db.Decimal(6, 4)
+  // Tasa estimada de Mercado Pago usada en el cálculo (constante de código).
+  tasaMpEstimada  Decimal        @map("tasa_mp_estimada") @db.Decimal(6, 4)
   total           Decimal        @db.Decimal(10, 2)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
+  // Configuración de comisión utilizada para congelar los valores del pedido.
+
   usuario         Usuario        @relation(fields: [usuarioId], references: [id])
   comercio        Comercio       @relation(fields: [comercioId], references: [idComercio])
+  franjaHoraria   FranjaRetiro?  @relation(fields: [franjaHorarioId], references: [id], onDelete: Restrict)
   calificacion    Calificacion?
   reportes        Reporte[]
   items           PedidoItem[]
+  pagos           Pago[]
 
+  @@index([usuarioId])
+  @@index([comercioId])
+  @@index([estado])
   @@map("pedido")
 }
 
@@ -338,19 +355,116 @@ model PedidoItem {
   id_pedido_item String   @id @default(uuid()) @map("id_pedido_item") @db.Uuid
   pedidoId       String   @map("id_pedido") @db.Uuid
   productoId     String   @map("id_producto") @db.Uuid
+  nroLinea       Int      @map("nro_linea")
   cantidad       Int
+  // Precio público final (precioMenorcost calculado) congelado al comprar.
   precio_unitario Decimal  @map("precio_unitario") @db.Decimal(10, 2)
+  // Precio base neto deseado por el comerciante, usado para el cálculo.
+  precioBaseNetoAplicado Decimal @map("precio_base_neto_aplicado") @db.Decimal(10, 2)
+  // Comisión de Menorcost correspondiente a esta línea.
+  comisionMenorcostMonto Decimal @map("comision_menorcost_monto") @db.Decimal(10, 2)
   subtotal       Decimal  @db.Decimal(10, 2)
+  nombreHistorico String  @map("nombre_historico") @db.VarChar(120)
+  fechaVencimientoHistorica DateTime @map("fecha_vencimiento_historica") @db.Date
 
   pedido         Pedido   @relation(fields: [pedidoId], references: [id_pedido])
   producto       Producto @relation(fields: [productoId], references: [idProducto])
 
+  @@unique([pedidoId, nroLinea])
+  @@index([productoId])
   @@map("pedido_item")
 }
 
 enum EstadoPedido {
+  PENDIENTE_PAGO
   PENDIENTE_DE_RETIRO
   ENTREGADO
   CANCELADO
   CANCELADO_POR_FALTA_RETIRO
+}
+
+enum EstadoPago {
+  PENDIENTE
+  PAGADO
+  RECHAZADO
+  REEMBOLSADO
+}
+
+enum TipoSplit {
+  COMERCIO
+  MARKETPLACE
+}
+
+enum EstadoCredencialMp {
+  ACTIVA
+  REVOCADA
+  EXPIRADA
+}
+
+model ConfigComision {
+  idComision        String   @id @default(uuid()) @map("id_comision") @db.Uuid
+  // Tasa fraccionaria: 0.1000 = 10 %.
+  comisionMenorcost Decimal  @map("comision_menorcost") @db.Decimal(6, 4)
+  activa            Boolean  @default(true)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([activa])
+  @@map("config_comision")
+}
+
+model CredencialMp {
+  idCredencial         String   @id @default(uuid()) @map("id_credencial") @db.Uuid
+  mpUserId             String   @unique @map("mp_user_id") @db.VarChar(64)
+  comercioId           String   @unique @map("id_comercio") @db.Uuid
+  email                String?  @db.VarChar(255)
+  accessToken          String   @map("access_token") @db.Text
+  refreshToken         String   @map("refresh_token") @db.Text
+  fechaTokenExpiration DateTime @map("fecha_token_expiration")
+  fechaVinculacion     DateTime @default(now()) @map("fecha_vinculacion")
+  estado               EstadoCredencialMp @default(ACTIVA)
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  comercio Comercio @relation(fields: [comercioId], references: [idComercio], onDelete: Cascade)
+
+  @@map("credenciales_mp")
+}
+
+model Pago {
+  idPago           String     @id @default(uuid()) @map("id_pago") @db.Uuid
+  pedidoId         String     @map("id_pedido") @db.Uuid
+  mpPaymentId      String?    @unique @map("mp_payment_id") @db.VarChar(64)
+  nroComprobante   String?    @map("nro_comprobante") @db.VarChar(64)
+  montoTransaccion Decimal    @map("monto_transaccion") @db.Decimal(10, 2)
+  comisionMp       Decimal    @default(0) @map("comision_mp") @db.Decimal(10, 2)
+  paymentDate      DateTime?  @map("payment_date")
+  estado           EstadoPago @default(PENDIENTE)
+  moneda           String     @default("ARS") @db.VarChar(3)
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  pedido Pedido      @relation(fields: [pedidoId], references: [id_pedido], onDelete: Restrict)
+  splits SplitPago[]
+
+  @@index([pedidoId])
+  @@index([estado])
+  @@map("pagos")
+}
+
+model SplitPago {
+  idSplit           String    @id @default(uuid()) @map("id_split") @db.Uuid
+  pagoId            String    @map("id_pago") @db.Uuid
+  recipientType     TipoSplit @map("recipient_type")
+  // Para COMERCIO se guarda el id del comercio; para MARKETPLACE puede quedar null.
+  destinatarioId    String?   @map("destinatario_id") @db.Uuid
+  monto             Decimal   @db.Decimal(10, 2)
+  moneda            String    @default("ARS") @db.VarChar(3)
+  fechaHoraRegistro DateTime  @default(now()) @map("fecha_hora_registro")
+
+  pago Pago @relation(fields: [pagoId], references: [idPago], onDelete: Cascade)
+
+  @@unique([pagoId, recipientType])
+  @@index([pagoId])
+  @@map("splits_pagos")
 }

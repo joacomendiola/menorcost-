@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { hash } from 'bcryptjs';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 
@@ -11,6 +12,9 @@ const categorias = [
   { nombre: 'Panadería', slug: 'panaderia', orden: 6 },
   { nombre: 'Limpieza', slug: 'limpieza', orden: 7 },
 ];
+
+const CONFIG_COMISION_INICIAL_ID = '00000000-0000-4000-8000-000000000001';
+const COMISION_MENORCOST_INICIAL = '0.1000'; // 10 %
 
 async function main(): Promise<void> {
   const connectionString = process.env.DATABASE_URL;
@@ -46,6 +50,63 @@ async function main(): Promise<void> {
         slug: categoria.slug,
         orden: categoria.orden,
       })),
+    );
+
+    const clienteDemo = await prisma.usuario.upsert({
+      where: {
+        email: 'cliente@test.com',
+      },
+      update: {
+        dni: '20123457',
+        nombre: 'Cliente',
+        apellido: 'Demo',
+        telefono: '+54 2901 555556',
+        fechaNacimiento: new Date('1995-05-20T00:00:00.000Z'),
+        passwordHash: await hash('Password123', 10),
+        rol: 'CLIENTE',
+        estado: 'HABILITADO',
+        deletedAt: null,
+      },
+      create: {
+        id: '00000000-0000-4000-8000-000000000120',
+        dni: '20123457',
+        nombre: 'Cliente',
+        apellido: 'Demo',
+        email: 'cliente@test.com',
+        telefono: '+54 2901 555556',
+        fechaNacimiento: new Date('1995-05-20T00:00:00.000Z'),
+        passwordHash: await hash('Password123', 10),
+        rol: 'CLIENTE',
+        estado: 'HABILITADO',
+      },
+    });
+
+    console.log(`Cliente demo sincronizado: ${clienteDemo.email}`);
+
+    // Garantiza una única configuración activa y carga la tasa inicial (10 %).
+    await prisma.configComision.updateMany({
+      where: {
+        activa: true,
+        NOT: { idComision: CONFIG_COMISION_INICIAL_ID },
+      },
+      data: { activa: false },
+    });
+
+    const configComision = await prisma.configComision.upsert({
+      where: { idComision: CONFIG_COMISION_INICIAL_ID },
+      update: {
+        comisionMenorcost: COMISION_MENORCOST_INICIAL,
+        activa: true,
+      },
+      create: {
+        idComision: CONFIG_COMISION_INICIAL_ID,
+        comisionMenorcost: COMISION_MENORCOST_INICIAL,
+        activa: true,
+      },
+    });
+
+    console.log(
+      `Comisión Menorcost activa: ${configComision.comisionMenorcost.toString()}`,
     );
   } finally {
     await prisma.$disconnect();
