@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { hash } from 'bcryptjs';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 
@@ -50,6 +51,37 @@ async function main(): Promise<void> {
         orden: categoria.orden,
       })),
     );
+
+    const clienteDemo = await prisma.usuario.upsert({
+      where: {
+        email: 'cliente@test.com',
+      },
+      update: {
+        dni: '20123457',
+        nombre: 'Cliente',
+        apellido: 'Demo',
+        telefono: '+54 2901 555556',
+        fechaNacimiento: new Date('1995-05-20T00:00:00.000Z'),
+        passwordHash: await hash('Password123', 10),
+        rol: 'CLIENTE',
+        estado: 'HABILITADO',
+        deletedAt: null,
+      },
+      create: {
+        id: '00000000-0000-4000-8000-000000000120',
+        dni: '20123457',
+        nombre: 'Cliente',
+        apellido: 'Demo',
+        email: 'cliente@test.com',
+        telefono: '+54 2901 555556',
+        fechaNacimiento: new Date('1995-05-20T00:00:00.000Z'),
+        passwordHash: await hash('Password123', 10),
+        rol: 'CLIENTE',
+        estado: 'HABILITADO',
+      },
+    });
+
+    console.log(`Cliente demo sincronizado: ${clienteDemo.email}`);
 
     // Garantiza una única configuración activa y carga la tasa inicial (10 %).
     await prisma.configComision.updateMany({
