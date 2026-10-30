@@ -7,6 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { compare } from 'bcryptjs';
+import type { EstadoUsuario } from '../../generated/prisma/enums.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import {
   BAJA_BLOQUEOS_PORT,
@@ -51,7 +52,11 @@ export class BajaService {
 
     await this.prisma.$transaction([
       this.prisma.solicitudBaja.create({
-        data: { usuarioId, motivo: dto.motivo },
+        data: {
+          usuarioId,
+          motivo: dto.motivo,
+          estadoPrevioUsuario: usuario.estado,
+        },
       }),
       this.prisma.usuario.update({
         where: { id: usuarioId },
@@ -70,7 +75,7 @@ export class BajaService {
   }
 
   async listarSolicitudes(estado?: string) {
-    return this.prisma.solicitudBaja.findMany({
+    const solicitudes = await this.prisma.solicitudBaja.findMany({
       where: estado ? { estado: estado as never } : undefined,
       orderBy: { createdAt: 'desc' },
       include: {
@@ -81,12 +86,33 @@ export class BajaService {
             nombre: true,
             apellido: true,
             email: true,
+            telefono: true,
             rol: true,
             estado: true,
+            createdAt: true,
+            comercio: {
+              select: {
+                cuit: true,
+                razonSocial: true,
+                nombreFantasia: true,
+              },
+            },
           },
         },
       },
     });
+
+    const resumenes = await this.bloqueos.obtenerResumenesCuentas(
+      solicitudes.map((s) => s.usuarioId),
+    );
+
+    return solicitudes.map((s) => ({
+      ...s,
+      ...(resumenes.get(s.usuarioId) ?? {
+        pedidosCompletados: 0,
+        saldoTarifas: 0,
+      }),
+    }));
   }
 
   async aprobar(
@@ -97,23 +123,40 @@ export class BajaService {
 
     await this.asegurarSinBloqueos(solicitud.usuarioId);
 
-    await this.prisma.$transaction([
-      this.prisma.usuario.update({
-        where: { id: solicitud.usuarioId },
-        data: {
-          deletedAt: new Date(),
-          tokenVersion: { increment: 1 },
-        },
-      }),
-      this.prisma.solicitudBaja.update({
-        where: { id: solicitudId },
+    await this.prisma.$transaction(async (tx) => {
+      // Reclamo atómico: solo un administrador puede resolver la solicitud.
+      const reclamo = await tx.solicitudBaja.updateMany({
+        where: { id: solicitudId, estado: 'PENDIENTE' },
         data: {
           estado: 'APROBADA',
           resueltoPorId: adminId,
           resueltoEn: new Date(),
         },
-      }),
-    ]);
+      });
+
+      if (reclamo.count !== 1) {
+        throw new ConflictException(
+          'La solicitud ya fue resuelta por otro administrador',
+        );
+      }
+
+      await tx.usuario.update({
+        where: { id: solicitud.usuarioId },
+        data: {
+          deletedAt: new Date(),
+          tokenVersion: { increment: 1 },
+        },
+      });
+
+      // Si el usuario tiene comercio, se marca como eliminado (no una sanción).
+      await tx.comercio.updateMany({
+        where: { userId: solicitud.usuarioId, estado: { not: 'ELIMINADO' } },
+        data: { estado: 'ELIMINADO' },
+      });
+    });
+
+    // Las ofertas ya se pausaron al solicitar la baja; se reafirma por integridad.
+    await this.bloqueos.pausarOfertas(solicitud.usuarioId);
 
     return {
       message:
@@ -127,22 +170,33 @@ export class BajaService {
     dto: RechazarBajaDto,
   ): Promise<{ message: string }> {
     const solicitud = await this.obtenerPendiente(solicitudId);
+    // Restaura el estado que tenía la cuenta al momento de solicitar la baja.
+    const estadoRestaurado: EstadoUsuario =
+      solicitud.estadoPrevioUsuario ?? 'HABILITADO';
 
-    await this.prisma.$transaction([
-      this.prisma.solicitudBaja.update({
-        where: { id: solicitudId },
+    await this.prisma.$transaction(async (tx) => {
+      // Reclamo atómico: solo un administrador puede resolver la solicitud.
+      const reclamo = await tx.solicitudBaja.updateMany({
+        where: { id: solicitudId, estado: 'PENDIENTE' },
         data: {
           estado: 'RECHAZADA',
           observaciones: dto.observaciones,
           resueltoPorId: adminId,
           resueltoEn: new Date(),
         },
-      }),
-      this.prisma.usuario.update({
+      });
+
+      if (reclamo.count !== 1) {
+        throw new ConflictException(
+          'La solicitud ya fue resuelta por otro administrador',
+        );
+      }
+
+      await tx.usuario.update({
         where: { id: solicitud.usuarioId },
-        data: { estado: 'HABILITADO' },
-      }),
-    ]);
+        data: { estado: estadoRestaurado },
+      });
+    });
 
     await this.bloqueos.reactivarOfertas(solicitud.usuarioId);
 
