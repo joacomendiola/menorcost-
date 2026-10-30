@@ -112,7 +112,9 @@ export function AltasTab() {
           {items.map((alta, idx) => {
             const u = alta.usuario;
             const pendiente = u.estado === 'PENDIENTE_VERIFICACION';
-            const dir = u.direcciones.find((d) => d.esPredeterminada) ?? u.direcciones[0];
+            const tieneGeo =
+              Number.isFinite(Number(alta.latitud)) && Number.isFinite(Number(alta.longitud));
+            const direccionLocal = `${alta.calle} ${alta.numero}${alta.piso ? `, piso ${alta.piso}` : ''}, ${alta.localidad}, ${alta.provincia}`;
             const estadoBadge = ESTADO_BADGE[u.estado];
             const ocupado = procesando === alta.idComercio;
 
@@ -125,36 +127,37 @@ export function AltasTab() {
                 badges={
                   <>
                     {estadoBadge && <Badge tone={estadoBadge.tone}>{estadoBadge.label}</Badge>}
-                    <Badge tone={dir ? 'neutro' : 'pend'}>
-                      {dir ? 'Georref. completa' : 'Sin ubicación'}
+                    <Badge tone={tieneGeo ? 'neutro' : 'pend'}>
+                      {tieneGeo ? 'Georref. completa' : 'Sin ubicación'}
                     </Badge>
                     <Badge tone={alta.mercadoPagoVinculado ? 'blue' : 'neutro'}>
                       {alta.mercadoPagoVinculado ? 'Mercado Pago vinculado' : 'Mercado Pago sin vincular'}
                     </Badge>
                   </>
                 }
-                subtitulo={`DNI ${u.dni} · Solicitado ${formatFechaCorta(u.createdAt)}`}
+                subtitulo={`CUIT ${alta.cuit} · DNI ${u.dni} · Solicitado ${formatFechaCorta(u.createdAt)}`}
                 detalle={
                   <AdminRows
                     rows={[
+                      { label: 'Razón social', value: alta.razonSocial },
+                      { label: 'Nombre de fantasía', value: alta.nombreFantasia },
                       {
-                        label: 'Dirección del local',
-                        value: dir
-                          ? `${dir.calle} ${dir.numero}${dir.piso ? `, piso ${dir.piso}` : ''}, ${dir.localidad}`
-                          : 'Sin dirección cargada',
+                        label: 'CUIT',
+                        value: <span className="admin-mono">{alta.cuit}</span>,
                       },
+                      { label: 'Dirección del local', value: direccionLocal },
                       {
                         label: 'Georreferenciación',
-                        value: dir ? (
+                        value: tieneGeo ? (
                           <span className="admin-mono">
-                            {Number(dir.latitud).toFixed(5)}, {Number(dir.longitud).toFixed(5)}
+                            {Number(alta.latitud).toFixed(5)}, {Number(alta.longitud).toFixed(5)}
                           </span>
                         ) : (
                           '—'
                         ),
                       },
                       { label: 'Correo (para la documentación)', value: u.email },
-                      { label: 'Contacto', value: u.telefono ?? '—' },
+                      { label: 'Contacto', value: alta.telefono || u.telefono || '—' },
                       {
                         label: 'Reputación',
                         value:

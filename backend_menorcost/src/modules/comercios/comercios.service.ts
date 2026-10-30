@@ -90,6 +90,8 @@ const SELECT_TIENDA_PUBLICA = {
   latitud: true,
   longitud: true,
   abierto: true,
+  reputacionPromedio: true,
+  totalCalificaciones: true,
   horarios: {
     select: SELECT_HORARIO,
     orderBy: ORDEN_HORARIOS,
@@ -166,12 +168,18 @@ export class ComerciosService {
       throw new NotFoundException(COMERCIO_PUBLICO_NO_ENCONTRADO);
     }
 
-    const { idComercio: id, productos, ...tienda } = comercio;
+    const {
+      idComercio: id,
+      productos,
+      reputacionPromedio,
+      totalCalificaciones,
+      ...tienda
+    } = comercio;
 
     return {
       id,
       ...tienda,
-      reputacion: null,
+      reputacion: totalCalificaciones > 0 ? reputacionPromedio : null,
       productos: productos.map(({ idProducto, ...producto }) => ({
         id: idProducto,
         ...producto,

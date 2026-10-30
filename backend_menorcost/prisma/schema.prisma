@@ -31,6 +31,7 @@ enum EstadoComercio {
   HABILITADO
   DOCUMENTACION_RECHAZADA
   SUSPENDIDO
+  ELIMINADO
 }
 
 model Producto {
@@ -46,6 +47,7 @@ model Producto {
   precioMenorcost  Decimal        @map("precio_menorcost") @db.Decimal(10, 2)
   imagen           String         @db.VarChar(500)
   estado           EstadoProducto @default(ACTIVO)
+  pausadoPorBaja   Boolean        @default(false) @map("pausado_por_baja")
 
   comercio         Comercio       @relation(fields: [comercioId], references: [idComercio])
   categoria        Categoria      @relation(fields: [categoriaId], references: [idCategoria])
@@ -242,6 +244,7 @@ model SolicitudBaja {
   usuarioId     String
   motivo        String
   estado        EstadoSolicitudBaja  @default(PENDIENTE)
+  estadoPrevioUsuario EstadoUsuario?
   observaciones String?
   resueltoPorId String?
   resueltoEn    DateTime?
@@ -332,6 +335,7 @@ model Pedido {
   // Tasa estimada de Mercado Pago usada en el cálculo (constante de código).
   tasaMpEstimada  Decimal        @map("tasa_mp_estimada") @db.Decimal(6, 4)
   total           Decimal        @db.Decimal(10, 2)
+  formaPago       String         @default("MERCADO_PAGO") @map("forma_pago") @db.VarChar(30)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 

@@ -66,7 +66,9 @@ const dto = {
 
 const comercioBase = {
   idComercio: 'c1',
-  nombreFantasia: 'Almacén Don José',
+  nombreFantasia: dto.nombreFantasia,
+  reputacionPromedio: 0,
+  totalCalificaciones: 0,
   horarios: [],
   franjas: [],
 };
@@ -178,6 +180,21 @@ describe('ComerciosService.obtenerPublico', () => {
         }),
       }),
     );
+  });
+
+  it('expone el promedio de reputación cuando el comercio tiene calificaciones', async () => {
+    prismaMock.comercio.findFirst.mockResolvedValue({
+      ...comercioBase,
+      reputacionPromedio: 4.5,
+      totalCalificaciones: 2,
+      productos: [],
+    });
+
+    const resultado = await service.obtenerPublico('c1');
+
+    expect(resultado.reputacion).toBe(4.5);
+    expect(resultado).not.toHaveProperty('reputacionPromedio');
+    expect(resultado).not.toHaveProperty('totalCalificaciones');
   });
 });
 

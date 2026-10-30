@@ -32,6 +32,14 @@ export class ReportesService {
       throw new NotFoundException('Comercio asociado al pedido no encontrado');
     }
 
+    // No se puede reportar un pedido cancelado.
+    if (
+      pedido.estado === 'CANCELADO' ||
+      pedido.estado === 'CANCELADO_POR_FALTA_RETIRO'
+    ) {
+      throw new BadRequestException('No se puede reportar un pedido cancelado');
+    }
+
     // 2. Validar permisos según rol y determinar denunciado
     let idDenunciado: string;
     let tipoDestinoEsperado: TipoDestinoReporte;
@@ -57,16 +65,20 @@ export class ReportesService {
       throw new BadRequestException('El tipo de destino no corresponde a tu rol');
     }
 
-    // 4. Validar que no exista reporte previo del mismo usuario para este pedido
+    // 4. Validar que no exista un reporte ABIERTO previo del mismo usuario.
+    //    Si el anterior fue DESESTIMADO o RESUELTO, se permite volver a reportar.
     const reporteExistente = await this.prisma.reporte.findFirst({
       where: {
         id_pedido: dto.idPedido,
         id_emisor: idUsuario,
+        estado_reporte: { in: ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'] },
       },
     });
 
     if (reporteExistente) {
-      throw new ConflictException('Ya existe un reporte en revisión emitido por ti para este pedido');
+      throw new ConflictException(
+        'Ya existe un reporte en revisión emitido por ti para este pedido',
+      );
     }
 
     // 5. Validar descripción obligatoria si motivo es "Otro motivo"
@@ -102,14 +114,18 @@ export class ReportesService {
   }
 
   private async verificarUmbralReportes(tx: any, idDenunciado: string) {
-    const reportesAbiertos = await tx.reporte.count({
+    // El umbral se evalúa sobre emisores distintos (>= 3), no sobre reportes sueltos:
+    // así un único usuario no puede hacer caer a otro con reportes repetidos.
+    const emisores = await tx.reporte.findMany({
       where: {
         id_denunciado: idDenunciado,
         estado_reporte: { in: ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'] },
       },
+      distinct: ['id_emisor'],
+      select: { id_emisor: true },
     });
 
-    if (reportesAbiertos >= 3) {
+    if (emisores.length >= 3) {
       await tx.usuario.updateMany({
         where: { id: idDenunciado, estado: 'HABILITADO' },
         data: { estado: 'BAJO_INVESTIGACION' },

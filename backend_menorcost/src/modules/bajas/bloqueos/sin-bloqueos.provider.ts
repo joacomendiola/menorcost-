@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import type { BajaBloqueosPort, BloqueoBaja } from './baja-bloqueos.port.js';
+import type {
+  BajaBloqueosPort,
+  BloqueoBaja,
+  ResumenCuentaBaja,
+} from './baja-bloqueos.port.js';
 
 /**
  * Implementación por defecto: no bloquea y no pausa ofertas.
@@ -12,6 +16,12 @@ import type { BajaBloqueosPort, BloqueoBaja } from './baja-bloqueos.port.js';
 export class SinBloqueosProvider implements BajaBloqueosPort {
   obtenerBloqueos(_usuarioId: string): Promise<BloqueoBaja[]> {
     return Promise.resolve([]);
+  }
+
+  obtenerResumenesCuentas(
+    _usuarioIds: string[],
+  ): Promise<Map<string, ResumenCuentaBaja>> {
+    return Promise.resolve(new Map());
   }
 
   pausarOfertas(_usuarioId: string): Promise<void> {
