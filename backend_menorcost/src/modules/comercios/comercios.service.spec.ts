@@ -66,7 +66,7 @@ const dto = {
 
 const comercioBase = {
   idComercio: 'c1',
-  nombreFantasia: 'Almacen Don Jose',
+  nombreFantasia: dto.nombreFantasia,
   reputacionPromedio: 0,
   totalCalificaciones: 0,
   horarios: [],
