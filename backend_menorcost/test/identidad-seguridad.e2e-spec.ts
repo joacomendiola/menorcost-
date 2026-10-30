@@ -381,6 +381,10 @@ describe('Identidad y seguridad (e2e)', () => {
         (s: { usuario: { id: string } }) => s.usuario.id === usuario.id,
       );
       expect(solicitud).toBeDefined();
+      expect(solicitud).toMatchObject({
+        pedidosCompletados: 0,
+        saldoTarifas: 0,
+      });
 
       await request(server())
         .patch(`/admin/bajas/${solicitud.id}/aprobar`)

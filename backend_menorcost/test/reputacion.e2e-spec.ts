@@ -74,6 +74,7 @@ describe('Reputación CU-5.01 (e2e)', () => {
   ) {
     const pedido = await prisma.pedido.create({
       data: {
+        nroPedido: `NP-${crypto.randomUUID().slice(0, 20)}`,
         usuarioId,
         comercioId,
         estado,
@@ -81,6 +82,8 @@ describe('Reputación CU-5.01 (e2e)', () => {
         codigoAlfanumerico: `REP-${crypto.randomUUID().slice(0, 8)}`,
         subtotal: 1000,
         tarifa_servicio: 100,
+        comisionMenorcostTasa: '0.1000',
+        tasaMpEstimada: '0.0650',
         total: 1100,
       },
     });

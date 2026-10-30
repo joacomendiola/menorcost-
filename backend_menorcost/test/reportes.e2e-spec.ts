@@ -80,13 +80,16 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
   ) {
     const pedido = await prisma.pedido.create({
       data: {
+        nroPedido: `NP-${crypto.randomUUID().slice(0, 20)}`,
         usuarioId,
         comercioId,
         estado: EstadoPedido.ENTREGADO,
         codigoQR: `QR-${crypto.randomUUID()}`,
-        codigoAlfanumerico: `${codigo}-${crypto.randomUUID().slice(0, 8)}`,
+        codigoAlfanumerico: `${codigo.slice(0, 10)}-${crypto.randomUUID().slice(0, 8)}`,
         subtotal: 1000,
         tarifa_servicio: 100,
+        comisionMenorcostTasa: '0.1000',
+        tasaMpEstimada: '0.0650',
         total: 1100,
       },
     });
@@ -309,6 +312,53 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
             tipo_destino: TipoDestinoReporte.COMERCIO,
           })
           .expect(409);
+      });
+
+      it('permite volver a reportar si el reporte anterior fue desestimado', async () => {
+        const pedidoRe = await crearPedido(cliente.id, comercioId, 'RETRY');
+
+        const primero = await request(server())
+          .post('/reports')
+          .set(auth(clienteToken))
+          .send({
+            idPedido: pedidoRe.id_pedido,
+            motivo: 'El local estaba cerrado',
+            tipo_destino: TipoDestinoReporte.COMERCIO,
+          })
+          .expect(201);
+
+        await prisma.reporte.update({
+          where: { id_reporte: primero.body.id_reporte },
+          data: { estado_reporte: 'DESESTIMADO' },
+        });
+
+        await request(server())
+          .post('/reports')
+          .set(auth(clienteToken))
+          .send({
+            idPedido: pedidoRe.id_pedido,
+            motivo: 'El local estaba cerrado',
+            tipo_destino: TipoDestinoReporte.COMERCIO,
+          })
+          .expect(201);
+      });
+
+      it('rechaza reportar un pedido cancelado', async () => {
+        const cancelado = await crearPedido(cliente.id, comercioId, 'CANCEL');
+        await prisma.pedido.update({
+          where: { id_pedido: cancelado.id_pedido },
+          data: { estado: EstadoPedido.CANCELADO },
+        });
+
+        await request(server())
+          .post('/reports')
+          .set(auth(clienteToken))
+          .send({
+            idPedido: cancelado.id_pedido,
+            motivo: 'El local estaba cerrado',
+            tipo_destino: TipoDestinoReporte.COMERCIO,
+          })
+          .expect(400);
       });
 
       it('rechaza si motivo "Otro" sin descripción (ext 3a)', async () => {
@@ -568,6 +618,50 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           where: { id: usuarioObjetivo.id },
         });
         expect(clienteActualizado?.estado).toBe('BAJO_INVESTIGACION');
+      });
+
+      it('NO activa el umbral si los 3 reportes son del mismo emisor', async () => {
+        const usuarioObjetivo = await crearUsuario({
+          email: 'cliente-umbral-repetido@test.com',
+          dni: '50000201',
+          rol: 'CLIENTE',
+        });
+        const comerciante = await crearUsuario({
+          email: 'comerciante-umbral-repetido@test.com',
+          dni: '50000202',
+          rol: 'COMERCIANTE',
+        });
+        const comercio = await crearComercio(comerciante.id);
+
+        const pedidos: string[] = [];
+        for (let i = 0; i < 3; i++) {
+          const p = await crearPedido(
+            usuarioObjetivo.id,
+            comercio.idComercio,
+            `UMBRAL-REP-${i}`,
+          );
+          pedidos.push(p.id_pedido);
+        }
+
+        const token = (await login(comerciante.email).expect(200)).body
+          .accessToken;
+        for (const idPedido of pedidos) {
+          await request(server())
+            .post('/reports')
+            .set(auth(token))
+            .send({
+              idPedido,
+              motivo: 'El cliente no se presentó a retirar el producto',
+              tipo_destino: TipoDestinoReporte.CLIENTE,
+            })
+            .expect(201);
+        }
+
+        // Un único emisor no alcanza el umbral de emisores distintos
+        const clienteActualizado = await prisma.usuario.findUnique({
+          where: { id: usuarioObjetivo.id },
+        });
+        expect(clienteActualizado?.estado).toBe('HABILITADO');
       });
     });
   });
