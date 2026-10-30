@@ -9,9 +9,20 @@ const STAR_FILLED = '★';
 const STAR_COLOR = '#F59E0B';
 const STAR_EMPTY_COLOR = '#CBD5E1';
 
+function formatearPuntaje(valor: number): string {
+  return valor.toLocaleString('es-AR', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+}
+
 function StarsDisplay({ puntaje, size = 20 }: { puntaje: number; size?: number }) {
   return (
-    <span style={{ display: 'inline-flex', gap: '2px', lineHeight: 1 }}>
+    <span
+      role="img"
+      aria-label={`${puntaje} de 5 estrellas`}
+      style={{ display: 'inline-flex', gap: '2px', lineHeight: 1 }}
+    >
       {[1, 2, 3, 4, 5].map(n => (
         <span
           key={n}
@@ -38,7 +49,9 @@ function ResenaItem({ resena }: { resena: Calificacion }) {
       </div>
       <StarsDisplay puntaje={resena.puntaje} size={18} />
       {resena.comentario && (
-        <Text mt="8px" size="sm" style={{ color: 'var(--tx)' }}>{resena.comentario}</Text>
+        <Text mt="8px" size="sm" style={{ color: 'var(--tx)', whiteSpace: 'pre-line' }}>
+          {resena.comentario}
+        </Text>
       )}
     </article>
   );
@@ -184,13 +197,17 @@ export function Reviews() {
                 )}
               </div>
 
+              {error && (
+                <Text c="red" size="sm" mb="8px">
+                  {error}
+                </Text>
+              )}
               {resenas.length === 0 ? (
                 <Center py="xl">
                   <Text c="dimmed">Este comercio aún no tiene reseñas.</Text>
                 </Center>
               ) : (
-                <Stack gap="12px" style={{ maxHeight: '500px', overflowY: 'auto' }}>
-                  {error && <Text c="red" size="sm">{error}</Text>}
+                <Stack gap="12px">
                   {resenas.map(r => (
                     <ResenaItem key={r.id} resena={r} />
                   ))}
@@ -205,12 +222,12 @@ export function Reviews() {
               <Title order={3} size="md" style={{ marginBottom: '16px' }}>Reputación</Title>
 
               <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-                <div style={{ fontSize: '48px', fontWeight: 800, color: 'var(--tx)', lineHeight: 1 }}>
-                  ★ {promedio.toFixed(1)}
+                <div style={{ fontSize: '30px', fontWeight: 800, color: 'var(--tx)', lineHeight: 1 }}>
+                  ★ {formatearPuntaje(promedio)}
                 </div>
-                <Text c="dimmed" size="sm" mt="4px">
-                  {totalResenas} reseña{totalResenas !== 1 ? 's' : ''} verificada{totalResenas !== 1 ? 's' : ''}
-                  <br /> (solo pedidos ENTREGADOS)
+                <Text c="dimmed" size="sm" mt="6px">
+                  {totalResenas} reseña{totalResenas !== 1 ? 's' : ''} verificada
+                  {totalResenas !== 1 ? 's' : ''} (solo pedidos ENTREGADOS)
                 </Text>
               </div>
 
