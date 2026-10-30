@@ -25,10 +25,10 @@ const TODOS = { value: 'todos', label: 'Estado: todos' };
 const TABS: TabDef[] = [
   {
     id: 'altas',
-    label: 'Solicitudes de Alta',
+    label: 'Solicitudes de alta',
     href: '/admin/altas',
     kpi: 'altasPendientes',
-    placeholder: 'Buscar por nombre, DNI o correo',
+    placeholder: 'Buscar por nombre, CUIT',
     defaultEstado: 'PENDIENTE_VERIFICACION',
     estados: [
       TODOS,
@@ -42,7 +42,7 @@ const TABS: TabDef[] = [
     label: 'Bajas de cuentas',
     href: '/admin/bajas',
     kpi: 'bajasSolicitadas',
-    placeholder: 'Buscar por nombre, DNI o correo',
+    placeholder: 'Buscar por nombre, CUIT',
     defaultEstado: 'PENDIENTE',
     estados: [
       TODOS,
@@ -56,14 +56,14 @@ const TABS: TabDef[] = [
     label: 'Denuncias y moderación',
     href: '/admin/denuncias',
     kpi: 'denunciasAbiertas',
-    placeholder: 'Buscar por motivo o denunciado',
+    placeholder: 'Buscar por nombre, CUIT',
     defaultEstado: ESTADO_ABIERTAS,
     estados: [
       TODOS,
       { value: ESTADO_ABIERTAS, label: 'Abiertas (en revisión o investigación)' },
       { value: 'PENDIENTE_REVISION', label: 'En revisión' },
       { value: 'BAJO_INVESTIGACION', label: 'Bajo investigación' },
-      { value: 'RESUELTO', label: 'Sancionadas' },
+      { value: 'RESUELTO', label: 'Resueltas' },
       { value: 'DESESTIMADO', label: 'Desestimadas' },
     ],
   },
