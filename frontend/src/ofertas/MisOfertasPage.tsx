@@ -25,6 +25,23 @@ type Offer = {
 
 type ManageableOfferStatus = 'ACTIVO' | 'PAUSADO' | 'ELIMINADO';
 
+type OfferDashboardSummary = {
+  total: number;
+  activas: number;
+  pausadas: number;
+  proximasAVencer: number;
+  vencidas: number;
+  sinStock: number;
+  unidadesReservadas: number;
+};
+
+type OfferFilter =
+  | 'TODAS'
+  | 'ACTIVO'
+  | 'PAUSADO'
+  | 'VENCIDO_ELIMINADO'
+  | 'ELIMINADO';
+
 class OfferRequestError extends Error {
   readonly status: number;
   readonly minimumStock?: number;
@@ -39,6 +56,28 @@ class OfferRequestError extends Error {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
+const statusLabels: Record<OfferStatus, string> = {
+  ACTIVO: 'Activa',
+  PAUSADO: 'Pausada',
+  VENCIDO_ELIMINADO: 'Vencida',
+  ELIMINADO: 'Dada de baja',
+};
+
+const statusClasses: Record<OfferStatus, string> = {
+  ACTIVO: 'badge badge--ok',
+  PAUSADO: 'badge badge--pend',
+  VENCIDO_ELIMINADO: 'badge badge--bad',
+  ELIMINADO: 'badge',
+};
+
+const offerFilters: { value: OfferFilter; label: string }[] = [
+  { value: 'TODAS', label: 'Todas' },
+  { value: 'ACTIVO', label: 'Activas' },
+  { value: 'PAUSADO', label: 'Pausadas' },
+  { value: 'VENCIDO_ELIMINADO', label: 'Vencidas' },
+  { value: 'ELIMINADO', label: 'Dadas de baja' },
+];
+
 function priceToCents(value: FormDataEntryValue | null): bigint | null {
   if (typeof value !== 'string' || !/^\d+(\.\d{1,2})?$/.test(value)) {
     return null;
@@ -46,6 +85,16 @@ function priceToCents(value: FormDataEntryValue | null): bigint | null {
 
   const [whole, fraction = ''] = value.split('.');
   return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'));
+}
+
+function formatDate(date: string): string {
+  const parts = date.split('-');
+
+  if (parts.length !== 3) {
+    return date;
+  }
+
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
 async function requestOffers<T>(
@@ -116,17 +165,30 @@ export function MisOfertasPage() {
   const [saveError, setSaveError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [reloadCount, setReloadCount] = useState(0);
-
+  const [summary, setSummary] = useState<OfferDashboardSummary | null>(null);
+  const [summaryError, setSummaryError] = useState('');
+  const [filter, setFilter] = useState<OfferFilter>('TODAS');
   const missingSession = usuario?.rol === 'COMERCIANTE' && !token;
 
+    function reloadOffers() {
+    setLoading(true);
+    setLoadingError('');
+    setSummary(null);
+    setSummaryError('');
+    setReloadCount((count) => count + 1);
+    }
   useEffect(() => {
-    if (usuario?.rol !== 'COMERCIANTE' || !token) return;
+    if (usuario?.rol !== 'COMERCIANTE' || !token) {
+      return;
+    }
 
     let active = true;
 
     void requestOffers<Offer[]>('/offers', token)
       .then((result) => {
-        if (active) setOffers(result);
+        if (active) {
+          setOffers(result);
+        }
       })
       .catch((error: unknown) => {
         if (active) {
@@ -138,7 +200,28 @@ export function MisOfertasPage() {
         }
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
+      });
+
+    void requestOffers<OfferDashboardSummary>(
+      '/offers/dashboard-summary',
+      token,
+    )
+      .then((result) => {
+        if (active) {
+          setSummary(result);
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setSummaryError(
+            error instanceof Error
+              ? error.message
+              : 'No se pudieron cargar las métricas del inventario.',
+          );
+        }
       });
 
     return () => {
@@ -203,21 +286,13 @@ export function MisOfertasPage() {
     setSavingId(offer.id);
 
     try {
-      const updatedOffer = await requestOffers<Offer>(
-        `/offers/${offer.id}`,
-        token,
-        {
-          method: 'PATCH',
-          body: formData,
-        },
-      );
+      await requestOffers<Offer>(`/offers/${offer.id}`, token, {
+        method: 'PATCH',
+        body: formData,
+      });
 
-      setOffers((currentOffers) =>
-        currentOffers.map((currentOffer) =>
-          currentOffer.id === offer.id ? updatedOffer : currentOffer,
-        ),
-      );
       setSuccessMessage('Oferta actualizada correctamente.');
+      reloadOffers();
     } catch (error: unknown) {
       if (error instanceof OfferRequestError) {
         const stockInput = form.elements.namedItem('stock');
@@ -258,29 +333,21 @@ export function MisOfertasPage() {
         `¿Confirmás la baja de "${offer.titulo}"? La oferta se marcará como eliminada. Si tiene reservas pendientes, el sistema la pausará y no permitirá darla de baja.`,
       );
 
-      if (!confirmed) return;
+      if (!confirmed) {
+        return;
+      }
     }
 
     setSavingId(offer.id);
 
     try {
-      const updatedOffer = await requestOffers<Offer>(
-        `/offers/${offer.id}/status`,
-        token,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ estado }),
+      await requestOffers<Offer>(`/offers/${offer.id}/status`, token, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      );
-
-      setOffers((currentOffers) =>
-        currentOffers.map((currentOffer) =>
-          currentOffer.id === offer.id ? updatedOffer : currentOffer,
-        ),
-      );
+        body: JSON.stringify({ estado }),
+      });
 
       const messages: Record<ManageableOfferStatus, string> = {
         ACTIVO: 'Oferta reactivada correctamente.',
@@ -288,8 +355,9 @@ export function MisOfertasPage() {
         ELIMINADO: 'Oferta dada de baja correctamente.',
       };
       setSuccessMessage(messages[estado]);
+      reloadOffers();
     } catch (error: unknown) {
-      let message =
+      const message =
         error instanceof Error
           ? error.message
           : 'No se pudo cambiar el estado de la oferta.';
@@ -299,16 +367,7 @@ export function MisOfertasPage() {
         error instanceof OfferRequestError &&
         error.status === 409
       ) {
-        try {
-          const refreshedOffers = await requestOffers<Offer[]>('/offers', token);
-          setOffers(refreshedOffers);
-        } catch (refreshError: unknown) {
-          const refreshMessage =
-            refreshError instanceof Error
-              ? refreshError.message
-              : 'Error desconocido al actualizar el listado.';
-          message = `${message} No se pudo actualizar el listado: ${refreshMessage}`;
-        }
+        reloadOffers();
       }
 
       setSaveError(message);
@@ -317,9 +376,32 @@ export function MisOfertasPage() {
     }
   }
 
+  const filteredOffers =
+    filter === 'TODAS'
+      ? offers
+      : offers.filter((offer) => offer.estado === filter);
+
+  function countForFilter(value: OfferFilter): number {
+    return value === 'TODAS'
+      ? offers.length
+      : offers.filter((offer) => offer.estado === value).length;
+  }
+
+  const summaryMetrics = summary
+    ? [
+        { label: 'Total de ofertas', value: summary.total },
+        { label: 'Activas', value: summary.activas },
+        { label: 'Pausadas', value: summary.pausadas },
+        { label: 'Vencen en 7 días', value: summary.proximasAVencer },
+        { label: 'Vencidas', value: summary.vencidas },
+        { label: 'Sin stock', value: summary.sinStock },
+        { label: 'Unidades reservadas', value: summary.unidadesReservadas },
+      ]
+    : [];
+
   if (usuario?.rol !== 'COMERCIANTE') {
     return (
-      <main>
+      <main className="offers-page">
         <h1>Mis Ofertas</h1>
         <p role="alert">Esta sección está disponible para comerciantes.</p>
       </main>
@@ -327,165 +409,299 @@ export function MisOfertasPage() {
   }
 
   return (
-    <main>
-      <h1>Mis Ofertas</h1>
-      <p>
-        <Link to="/ofertas/nueva">Publicar una oferta</Link>
-      </p>
+    <main className="offers-page">
+      <header className="offers-hero">
+        <div>
+          <h1>Panel de control</h1>
+          <p>Gestioná tus publicaciones, precios y stock.</p>
+        </div>
 
-      {loading && !missingSession && (
-        <p role="status">Cargando tus ofertas…</p>
-      )}
+        <div className="offers-hero__actions">
+          <Link className="offers-hero__create" to="/ofertas/nueva">
+            + Crear oferta
+          </Link>
+        </div>
+      </header>
 
       {missingSession && (
-        <p role="alert">
+        <p className="offers-feedback" role="alert">
           No se encontró una sesión válida. Iniciá sesión nuevamente.
         </p>
       )}
 
-      {loadingError && <p role="alert">{loadingError}</p>}
-      {saveError && <p role="alert">{saveError}</p>}
-      {successMessage && <p role="status">{successMessage}</p>}
-
-      {token && loadingError && !loading && (
-        <button
-          type="button"
-          onClick={() => {
-            setLoading(true);
-            setLoadingError('');
-            setReloadCount((count) => count + 1);
-          }}
-        >
-          Reintentar
-        </button>
+      {loadingError && (
+        <div className="offers-feedback" role="alert">
+          <p>{loadingError}</p>
+          {token && (
+            <button
+              className="chip"
+              type="button"
+              onClick={() => reloadOffers()}
+            >
+              Reintentar
+            </button>
+          )}
+        </div>
       )}
 
-      {!loading && !loadingError && offers.length === 0 && (
-        <p>Todavía no publicaste ofertas.</p>
+      {saveError && (
+        <p className="offers-feedback" role="alert">
+          {saveError}
+        </p>
       )}
+
+      {successMessage && (
+        <p className="offers-feedback" role="status">
+          {successMessage}
+        </p>
+      )}
+
+      <section aria-label="Resumen del inventario">
+        <h2>Resumen del inventario</h2>
+
+        {summaryError && (
+          <div className="offers-feedback" role="alert">
+            <p>{summaryError}</p>
+            {token && (
+              <button
+                className="chip"
+                type="button"
+                onClick={() => reloadOffers()}
+              >
+                Reintentar métricas
+              </button>
+            )}
+          </div>
+        )}
+
+        {!summary && !summaryError && !missingSession && (
+          <p role="status">Cargando métricas del inventario…</p>
+        )}
+
+        {summary && (
+          <div className="offers-summary">
+            {summaryMetrics.map(({ label, value }) => (
+              <article
+                key={label}
+                className="card offers-summary__card"
+              >
+                <strong className="offers-summary__value">{value}</strong>
+                <span className="offers-summary__label">{label}</span>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section aria-label="Listado de mis ofertas">
-        {offers.map((offer) => {
-          const isEditable =
-            offer.estado === 'ACTIVO' || offer.estado === 'PAUSADO';
-          const isSaving = savingId === offer.id;
+        <nav className="offers-filters" aria-label="Filtrar ofertas por estado">
+          {offerFilters.map(({ value, label }) => (
+            <button
+              key={value}
+              className={`chip${filter === value ? ' chip--active' : ''}`}
+              type="button"
+              aria-pressed={filter === value}
+              onClick={() => setFilter(value)}
+            >
+              {label} <span>({countForFilter(value)})</span>
+            </button>
+          ))}
+        </nav>
 
-          return (
-            <article key={offer.id}>
-              <h2>{offer.titulo}</h2>
-              <p>{offer.descripcion}</p>
-              <p>Estado: {offer.estado}</p>
+        {loading && <p role="status">Cargando tus ofertas…</p>}
 
-              <img
-                src={new URL(offer.imagen, API_URL).toString()}
-                alt={`Imagen de ${offer.titulo}`}
-                loading="lazy"
-                width={240}
-                height={180}
-                style={{ objectFit: 'contain' }}
-              />
+        {!loading && !loadingError && offers.length === 0 && (
+          <div className="card offers-empty">
+            <h2>Todavía no publicaste ofertas</h2>
+            <p>Creá tu primera publicación para empezar a gestionar tu inventario.</p>
+            <Link className="offers-hero__create" to="/ofertas/nueva">
+              Crear oferta
+            </Link>
+          </div>
+        )}
 
-              {isEditable && (
-                <div aria-label={`Acciones de estado para ${offer.titulo}`}>
-                  {offer.estado === 'ACTIVO' && (
-                    <button
-                      type="button"
-                      disabled={isSaving}
-                      onClick={() =>
-                        void handleStatusChange(offer, 'PAUSADO')
-                      }
-                    >
-                      {isSaving ? 'Procesando…' : 'Pausar oferta'}
-                    </button>
-                  )}
+        {!loading &&
+          !loadingError &&
+          offers.length > 0 &&
+          filteredOffers.length === 0 && (
+            <div className="card offers-empty">
+              <h2>No hay ofertas en este filtro</h2>
+              <button
+                className="chip"
+                type="button"
+                onClick={() => setFilter('TODAS')}
+              >
+                Ver todas
+              </button>
+            </div>
+          )}
 
-                  {offer.estado === 'PAUSADO' && (
-                    <button
-                      type="button"
-                      disabled={isSaving}
-                      onClick={() =>
-                        void handleStatusChange(offer, 'ACTIVO')
-                      }
-                    >
-                      {isSaving ? 'Procesando…' : 'Reactivar oferta'}
-                    </button>
-                  )}
+        {filteredOffers.length > 0 && (
+          <div className="offers-grid">
+            {filteredOffers.map((offer) => {
+              const isEditable =
+                offer.estado === 'ACTIVO' || offer.estado === 'PAUSADO';
+              const isSaving = savingId === offer.id;
 
-                  <button
-                    type="button"
-                    disabled={isSaving}
-                    onClick={() =>
-                      void handleStatusChange(offer, 'ELIMINADO')
-                    }
-                  >
-                    {isSaving ? 'Procesando…' : 'Dar de baja'}
-                  </button>
-                </div>
-              )}
-
-              {isEditable ? (
-                <form
-                  key={`${offer.id}-${offer.precioLista}-${offer.precioMenorcost}-${offer.stock}-${offer.imagen}`}
-                  onSubmit={(event) => void handleUpdate(event, offer)}
-                >
-                  <label>
-                    Precio de lista
-                    <input
-                      name="precioLista"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      defaultValue={offer.precioLista}
-                      required
+              return (
+                <article key={offer.id} className="card offer-card">
+                  <div className="offer-card__image">
+                    <img
+                      src={new URL(offer.imagen, API_URL).toString()}
+                      alt={`Imagen de ${offer.titulo}`}
+                      loading="lazy"
+                      width={320}
+                      height={220}
                     />
-                  </label>
+                  </div>
 
-                  <label>
-                    Precio promocional
-                    <input
-                      name="precioMenorcost"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      defaultValue={offer.precioMenorcost}
-                      required
-                    />
-                  </label>
+                  <div className="offer-card__body">
+                    <div className="offer-card__heading">
+                      <h2>{offer.titulo}</h2>
+                      <span className={statusClasses[offer.estado]}>
+                        {statusLabels[offer.estado]}
+                      </span>
+                    </div>
 
-                  <label>
-                    Stock
-                    <input
-                      name="stock"
-                      type="number"
-                      min="0"
-                      step="1"
-                      defaultValue={offer.stock}
-                      required
-                    />
-                  </label>
+                    <p>{offer.descripcion}</p>
 
-                  <label>
-                    Cambiar imagen (opcional)
-                    <input
-                      name="imagen"
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                    />
-                  </label>
+                    <div className="offer-card__details">
+                      <p>
+                        <span>Tipo</span>
+                        <strong>
+                          {offer.tipo === 'COMBO' ? 'Combo' : 'Individual'}
+                        </strong>
+                      </p>
+                      <p>
+                        <span>Vencimiento</span>
+                        <strong>{formatDate(offer.fechaVencimiento)}</strong>
+                      </p>
+                      <p>
+                        <span>Precio de lista</span>
+                        <strong>${offer.precioLista}</strong>
+                      </p>
+                      <p>
+                        <span>Precio promocional</span>
+                        <strong>${offer.precioMenorcost}</strong>
+                      </p>
+                      <p>
+                        <span>Stock disponible</span>
+                        <strong>{offer.stock}</strong>
+                      </p>
+                    </div>
 
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                  >
-                    {isSaving ? 'Guardando…' : 'Guardar cambios'}
-                  </button>
-                </form>
-              ) : (
-                <p>Esta oferta ya no puede modificarse.</p>
-              )}
-            </article>
-          );
-        })}
+                    {isEditable ? (
+                      <>
+                        <div
+                          className="offer-card__actions"
+                          aria-label={`Acciones de estado para ${offer.titulo}`}
+                        >
+                          {offer.estado === 'ACTIVO' && (
+                            <button
+                              className="chip"
+                              type="button"
+                              disabled={isSaving}
+                              onClick={() =>
+                                void handleStatusChange(offer, 'PAUSADO')
+                              }
+                            >
+                              {isSaving ? 'Procesando…' : 'Pausar oferta'}
+                            </button>
+                          )}
+
+                          {offer.estado === 'PAUSADO' && (
+                            <button
+                              className="chip"
+                              type="button"
+                              disabled={isSaving}
+                              onClick={() =>
+                                void handleStatusChange(offer, 'ACTIVO')
+                              }
+                            >
+                              {isSaving ? 'Procesando…' : 'Reactivar oferta'}
+                            </button>
+                          )}
+
+                          <button
+                            className="chip chip--danger"
+                            type="button"
+                            disabled={isSaving}
+                            onClick={() =>
+                              void handleStatusChange(offer, 'ELIMINADO')
+                            }
+                          >
+                            {isSaving ? 'Procesando…' : 'Dar de baja'}
+                          </button>
+                        </div>
+
+                        <form
+                          key={`${offer.id}-${offer.precioLista}-${offer.precioMenorcost}-${offer.stock}-${offer.imagen}`}
+                          className="offer-edit-form"
+                          onSubmit={(event) => void handleUpdate(event, offer)}
+                        >
+                          <label>
+                            Precio de lista
+                            <input
+                              name="precioLista"
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              defaultValue={offer.precioLista}
+                              required
+                            />
+                          </label>
+
+                          <label>
+                            Precio promocional
+                            <input
+                              name="precioMenorcost"
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              defaultValue={offer.precioMenorcost}
+                              required
+                            />
+                          </label>
+
+                          <label>
+                            Stock
+                            <input
+                              name="stock"
+                              type="number"
+                              min="0"
+                              step="1"
+                              defaultValue={offer.stock}
+                              required
+                            />
+                          </label>
+
+                          <label>
+                            Cambiar imagen (opcional)
+                            <input
+                              name="imagen"
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                            />
+                          </label>
+
+                          <button
+                            className="chip chip--active"
+                            type="submit"
+                            disabled={isSaving}
+                          >
+                            {isSaving ? 'Guardando…' : 'Guardar cambios'}
+                          </button>
+                        </form>
+                      </>
+                    ) : (
+                      <p>Esta oferta ya no puede modificarse.</p>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </section>
     </main>
   );
