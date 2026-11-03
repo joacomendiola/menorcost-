@@ -10,10 +10,13 @@ import { ConfigModule } from '@nestjs/config';
 import { OffersModule } from './modules/ofertas/ofertas.module.js';
 import { ReputacionModule } from './modules/reputacion/reputacion.module.js';
 import { BackofficeModule } from './modules/backoffice/backoffice.module.js';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ReportesModule } from './modules/reportes/reportes.module.js';
+import { NotificacionesModule } from './modules/notificaciones/notificaciones.module.js';
 import { SimuladorPreciosModule } from './modules/simulador-precios/simulador-precios.module.js';
 @Module({
   imports: [
+    
     PrismaModule,
     AuthModule,
     UsuariosModule,
@@ -25,7 +28,9 @@ import { SimuladorPreciosModule } from './modules/simulador-precios/simulador-pr
     BackofficeModule,
     ReportesModule,
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     OffersModule,
+    NotificacionesModule,
     SimuladorPreciosModule,
   ],
 })
