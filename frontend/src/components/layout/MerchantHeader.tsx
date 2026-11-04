@@ -9,11 +9,14 @@ import { useAuth } from '../../auth/contexto';
 import { comerciosApi } from '../../comercios/api';
 
 const TABS = [
-  { id: 'resumen', label: 'Resumen', href: '/panel' },
-  { id: 'pedidos', label: 'Pedidos', href: '/panel/pedidos' },
-  { id: 'productos', label: 'Productos', href: '/panel/productos' },
-  { id: 'mi-local', label: 'Mi local', href: '/panel/mi-local' },
-  { id: 'reputacion', label: 'Reputación', href: '/panel/reputacion' },
+  { id: 'ofertas', label: 'Ofertas', href: '/ofertas/mias' },
+  { id: 'mi-local', label: 'Mi local', href: '/comercios/perfil' },
+  { id: 'horarios', label: 'Horarios', href: '/comercios/horarios' },
+  {
+    id: 'reputacion',
+    label: 'Reputación',
+    href: '/panel/reputacion',
+  },
 ] as const;
 
 export function MerchantHeader() {
@@ -69,18 +72,20 @@ export function MerchantHeader() {
 
   if (cargando || !usuario) return null;
 
-  const currentTab = TABS.find(t => location.pathname === t.href)?.id ?? 'resumen';
+  const currentTab =
+    TABS.find((tab) => location.pathname === tab.href)?.id ??
+    (location.pathname === '/panel' ? 'reputacion' : '');
 
   return (
     <header className="merchant-header">
       <div className="merchant-header__left">
-        <Link to="/panel" aria-label="Ir al panel de control">
+        <Link to="/ofertas/mias" aria-label="Ir a mis ofertas">
           <Logo />
         </Link>
       </div>
 
-      <nav className="merchant-header__tabs" aria-label="Secciones del panel">
-        {TABS.map(tab => (
+      <nav className="merchant-header__tabs" aria-label="Secciones del comercio">
+        {TABS.map((tab) => (
           <Chip
             key={tab.id}
             active={currentTab === tab.id}

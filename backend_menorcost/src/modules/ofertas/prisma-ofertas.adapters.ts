@@ -285,4 +285,22 @@ export class PrismaOfferReservationsAdapter implements OfferReservations {
 
     return result._sum.cantidad ?? 0;
   }
+  async getReservedUnitsForOwner(userId: string): Promise<number> {
+  const result = await this.prisma.pedidoItem.aggregate({
+    where: {
+      producto: {
+        is: {
+          comercio: {
+            is: { userId },
+          },
+        },
+      },
+      pedido: {
+        is: { estado: 'PENDIENTE_DE_RETIRO' },
+      },
+    },
+    _sum: { cantidad: true },
+  });
+  return result._sum.cantidad ?? 0;
+    }
 }

@@ -48,7 +48,7 @@ function isValidDateOnly(value: string): boolean {
   );
 }
 
-function todayInArgentina(now: Date): string {
+export function todayInArgentina(now: Date): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Argentina/Ushuaia',
     year: 'numeric',

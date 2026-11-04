@@ -18,6 +18,7 @@ describe('OffersController', () => {
   let getOffer: ReturnType<typeof vi.fn>;
   let updateOffer: ReturnType<typeof vi.fn>;
   let updateStatusOffer: ReturnType<typeof vi.fn>;
+  let getDashboardSummary: ReturnType<typeof vi.fn>;
 
   const dto: CreateOfferDto = {
     tipo: 'INDIVIDUAL',
@@ -73,6 +74,7 @@ describe('OffersController', () => {
       ...offerDetails,
       estado: 'PAUSADO',
     });
+    getDashboardSummary = vi.fn().mockResolvedValue({offerDetails});
 
     const moduleRef = await Test.createTestingModule({
       controllers: [OffersController],
@@ -85,6 +87,7 @@ describe('OffersController', () => {
             getByIdForOwner: getOffer,
             update: updateOffer,
             updateStatus: updateStatusOffer,
+            getDashboardSummary: getDashboardSummary,
           },
         },
       ],
@@ -170,5 +173,23 @@ describe('OffersController', () => {
       offerId,
       'PAUSADO',
     );
+  });
+  it('obtiene el resumen para el comerciante autenticado', async () => {
+  const summary = {
+    total: 6,
+    activas: 3,
+    pausadas: 1,
+    proximasAVencer: 2,
+    vencidas: 1,
+    sinStock: 5,
+    unidadesReservadas: 12,
+  };
+  getDashboardSummary.mockResolvedValueOnce(summary);
+
+  await expect(controller.getDashboardSummary(usuario)).resolves.toEqual(
+    summary,
+  );
+
+  expect(getDashboardSummary).toHaveBeenCalledWith('user-1');
   });
 });

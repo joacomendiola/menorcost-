@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../auth/contexto';
 import { Logo } from './Logo';
 
@@ -13,11 +13,51 @@ export function TopBar() {
 
       {!cargando &&
         (usuario ? (
-          <nav aria-label="Navegación principal">
+          <nav
+            className="topbar__nav"
+            aria-label="Navegación principal del comerciante"
+          >
             {usuario.rol === 'COMERCIANTE' && (
-              <Link to="/ofertas/mias" className="pill">
-                Mis Ofertas
-              </Link>
+              <>
+                <NavLink
+                  to="/ofertas/mias"
+                  end
+                  className={({ isActive }) =>
+                    `pill${isActive ? ' pill--active' : ''}`
+                  }
+                >
+                  Ofertas
+                </NavLink>
+
+                <NavLink
+                  to="/comercios/perfil"
+                  end
+                  className={({ isActive }) =>
+                    `pill${isActive ? ' pill--active' : ''}`
+                  }
+                >
+                  Mi local
+                </NavLink>
+
+                <NavLink
+                  to="/comercios/horarios"
+                  end
+                  className={({ isActive }) =>
+                    `pill${isActive ? ' pill--active' : ''}`
+                  }
+                >
+                  Horarios
+                </NavLink>
+
+                <NavLink
+                  to="/panel/reputacion"
+                  className={({ isActive }) =>
+                    `pill${isActive ? ' pill--active' : ''}`
+                  }
+                >
+                  Reputación
+                </NavLink>
+              </>
             )}
 
             <Link to="/perfil" className="pill">

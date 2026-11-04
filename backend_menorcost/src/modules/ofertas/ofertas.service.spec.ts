@@ -93,6 +93,7 @@ describe('OffersService', () => {
 
     reservations = {
       getReservedUnitsForOffer: vi.fn().mockResolvedValue(0),
+      getReservedUnitsForOwner: vi.fn().mockResolvedValue(0),
     };
 
     service = new OffersService(
@@ -204,6 +205,97 @@ describe('OffersService', () => {
     ]);
 
     expect(repository.listByOwner).toHaveBeenCalledWith('user-1');
+  });
+
+  it('calcula las métricas del panel para las ofertas del comerciante', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-10-29T15:00:00.000Z'));
+
+  try {
+    const offers: OfferDetails[] = [
+      {
+        ...offerDetails,
+        id: 'offer-active-today',
+        estado: 'ACTIVO',
+        fechaVencimiento: '2026-10-29',
+        stock: 0,
+      },
+      {
+        ...offerDetails,
+        id: 'offer-paused-day-seven',
+        estado: 'PAUSADO',
+        fechaVencimiento: '2026-11-05',
+        stock: 0,
+      },
+      {
+        ...offerDetails,
+        id: 'offer-active-day-eight',
+        estado: 'ACTIVO',
+        fechaVencimiento: '2026-11-06',
+        stock: 0,
+      },
+      {
+        ...offerDetails,
+        id: 'offer-expired',
+        estado: 'VENCIDO_ELIMINADO',
+        fechaVencimiento: '2026-10-28',
+        stock: 0,
+      },
+      {
+        ...offerDetails,
+        id: 'offer-manually-deleted',
+        estado: 'ELIMINADO',
+        fechaVencimiento: '2026-10-30',
+        stock: 0,
+      },
+      {
+        ...offerDetails,
+        id: 'offer-active-past-date',
+        estado: 'ACTIVO',
+        fechaVencimiento: '2026-10-28',
+        stock: 0,
+      },
+    ];
+
+    vi.mocked(repository.listByOwner).mockResolvedValueOnce(offers);
+    vi.mocked(reservations.getReservedUnitsForOwner).mockResolvedValueOnce(12);
+
+    await expect(service.getDashboardSummary('user-1')).resolves.toEqual({
+      total: 6,
+      activas: 3,
+      pausadas: 1,
+      proximasAVencer: 2,
+      vencidas: 1,
+      sinStock: 5,
+      unidadesReservadas: 12,
+    });
+
+    expect(repository.listByOwner).toHaveBeenCalledWith('user-1');
+    expect(reservations.getReservedUnitsForOwner).toHaveBeenCalledWith(
+      'user-1',
+    );
+  } finally {
+    vi.useRealTimers();
+  }
+  });
+
+  it('propaga el error si falla la consulta de unidades reservadas del comerciante', async () => {
+    const reservationsError = new Error(
+      'No se pudieron consultar las unidades reservadas',
+    );
+
+    vi.mocked(reservations.getReservedUnitsForOwner).mockRejectedValueOnce(
+      reservationsError,
+    );
+
+    await expect(
+      service.getDashboardSummary('user-1'),
+    ).rejects.toBe(reservationsError);
+
+    expect(repository.listByOwner).toHaveBeenCalledWith('user-1');
+    expect(reservations.getReservedUnitsForOwner).toHaveBeenCalledWith(
+      'user-1',
+    );
   });
 
   it('devuelve una oferta propia por su identificador', async () => {

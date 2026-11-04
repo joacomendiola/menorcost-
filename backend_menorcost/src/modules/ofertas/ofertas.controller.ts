@@ -26,6 +26,7 @@ import { UpdateOfferDto } from './dto/update-oferta.dto.js';
 import type {
   OfferDetails,
   OfferRecord,
+  OfferDashboardSummary,
 } from './ofertas-creation.ports.js';
 import { OffersService } from './ofertas.service.js';
 
@@ -40,6 +41,13 @@ export class OffersController {
     @CurrentUser() usuario: AuthenticatedUser,
   ): Promise<OfferDetails[]> {
     return this.offersService.listByOwner(usuario.id);
+  }
+
+  @Get('dashboard-summary')
+  getDashboardSummary(
+    @CurrentUser() usuario: AuthenticatedUser,
+  ): Promise<OfferDashboardSummary> {
+    return this.offersService.getDashboardSummary(usuario.id);
   }
 
   @Get(':offerId')
