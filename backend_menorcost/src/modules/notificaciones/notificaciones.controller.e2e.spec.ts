@@ -57,7 +57,7 @@ describe('Endpoints HTTP de notificaciones', () => {
       'La oferta "Canasta de verduras" fue retirada automáticamente por alcanzar su fecha de vencimiento.',
     tipo: 'OFERTA_VENCIDA',
     leida: false,
-    createdAt: new Date('2026-11-03T03:00:00.000Z'),
+    createdAt: '2026-11-03T03:00:00.000Z',
   };
 
   const listByUser = vi.fn();

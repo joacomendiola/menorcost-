@@ -17,7 +17,7 @@ import {
   PrismaOfferRepositoryAdapter,
   PrismaOfferReservationsAdapter,
 } from './prisma-ofertas.adapters.js';
-import { OffersExpirationService } from './ofertas-expiration.service.js';
+import { OffersExpirationService } from './ofertas-vencimiento.service.js';
 
 @Module({
   imports: [AuthModule],

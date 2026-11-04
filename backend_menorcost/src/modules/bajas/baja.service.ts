@@ -22,6 +22,7 @@ const MSG_BLOQUEO =
 @Injectable()
 export class BajaService {
   constructor(
+    @Inject(PrismaService)
     private readonly prisma: PrismaService,
     @Inject(BAJA_BLOQUEOS_PORT)
     private readonly bloqueos: BajaBloqueosPort,

@@ -1,16 +1,22 @@
 import 'dotenv/config';
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from '../src/app.module.js';
-import { OffersExpirationService } from '../src/modules/ofertas/ofertas-expiration.service.js';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../src/generated/prisma/client.js';
+import { OffersExpirationService } from '../src/modules/ofertas/ofertas-vencimiento.service.js';
 
-console.log('Iniciando contexto de NestJS...');
+const connectionString = process.env.DATABASE_URL;
 
-const app = await NestFactory.createApplicationContext(AppModule);
+if (!connectionString) {
+  throw new Error('DATABASE_URL no está definida');
+}
+
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString }),
+});
+
+console.log('Iniciando depuración de ofertas vencidas...');
 
 try {
-  console.log('Contexto iniciado. Ejecutando depuración...');
-
-  const expirationService = app.get(OffersExpirationService);
+  const expirationService = new OffersExpirationService(prisma as never);
   const expiredCount = await expirationService.expireOffers();
 
   console.log(`Ofertas depuradas: ${expiredCount}`);
@@ -18,6 +24,6 @@ try {
   console.error('Error ejecutando la depuración:', error);
   process.exitCode = 1;
 } finally {
-  await app.close();
+  await prisma.$disconnect();
   console.log('Proceso finalizado.');
 }

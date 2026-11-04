@@ -31,14 +31,10 @@ export function NotificationsBell() {
 
   useEffect(() => {
     if (!token) {
-      setNotifications([]);
       return;
     }
 
     let active = true;
-    setLoading(true);
-    setError('');
-
     void api<Notification[]>('/notifications', { token })
       .then((result) => {
         if (active) {
@@ -91,12 +87,12 @@ export function NotificationsBell() {
     }
   }
 
+  if (!token) {
+    return null;
+  }
+
   return (
-    <div
-      style={{
-        position: 'relative',
-      }}
-    >
+    <div style={{ position: 'relative' }}>
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}

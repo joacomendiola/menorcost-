@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { OffersExpirationService } from './ofertas-expiration.service.js';
+import { OffersExpirationService } from './ofertas-vencimiento.service.js';
 
 describe('OffersExpirationService', () => {
   let service: OffersExpirationService;
@@ -149,5 +149,68 @@ describe('OffersExpirationService', () => {
     expect(result).toBe(0);
     expect(transaction.auditoriaVencimientoOferta.create).not.toHaveBeenCalled();
     expect(transaction.notificacion.create).not.toHaveBeenCalled();
+  });
+
+  it('preserva pedidos pagados y sus códigos QR al vencer una oferta', async () => {
+    const transaction = {
+      producto: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      auditoriaVencimientoOferta: {
+        create: vi.fn().mockResolvedValue({
+          id: '44444444-4444-4444-8444-444444444444',
+        }),
+      },
+      notificacion: {
+        create: vi.fn().mockResolvedValue({
+          id: '55555555-5555-4555-8555-555555555555',
+        }),
+      },
+      pedido: {
+        update: vi.fn(),
+        updateMany: vi.fn(),
+        delete: vi.fn(),
+        deleteMany: vi.fn(),
+      },
+      pedidoItem: {
+        update: vi.fn(),
+        updateMany: vi.fn(),
+        delete: vi.fn(),
+        deleteMany: vi.fn(),
+      },
+      pago: {
+        update: vi.fn(),
+        updateMany: vi.fn(),
+        delete: vi.fn(),
+        deleteMany: vi.fn(),
+      },
+    };
+
+    prisma.producto.findMany.mockResolvedValue([expiredOffer]);
+    prisma.$transaction.mockImplementation(
+      async (
+        callback: (transactionClient: typeof transaction) => Promise<boolean>,
+      ) => callback(transaction),
+    );
+
+    const result = await service.expireOffers(now);
+
+    expect(result).toBe(1);
+    expect(transaction.producto.updateMany).toHaveBeenCalledTimes(1);
+
+    expect(transaction.pedido.update).not.toHaveBeenCalled();
+    expect(transaction.pedido.updateMany).not.toHaveBeenCalled();
+    expect(transaction.pedido.delete).not.toHaveBeenCalled();
+    expect(transaction.pedido.deleteMany).not.toHaveBeenCalled();
+
+    expect(transaction.pedidoItem.update).not.toHaveBeenCalled();
+    expect(transaction.pedidoItem.updateMany).not.toHaveBeenCalled();
+    expect(transaction.pedidoItem.delete).not.toHaveBeenCalled();
+    expect(transaction.pedidoItem.deleteMany).not.toHaveBeenCalled();
+
+    expect(transaction.pago.update).not.toHaveBeenCalled();
+    expect(transaction.pago.updateMany).not.toHaveBeenCalled();
+    expect(transaction.pago.delete).not.toHaveBeenCalled();
+    expect(transaction.pago.deleteMany).not.toHaveBeenCalled();
   });
 });
