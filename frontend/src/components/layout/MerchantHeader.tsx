@@ -5,6 +5,7 @@ import { Logo } from '../Logo';
 import { Chip } from '../ui/Chip';
 import { Badge } from '../ui/Badge';
 import { useAuth } from '../../auth/contexto';
+import {NotificationsBell} from "./NotificacionCampana";
 
 const TABS = [
   { id: 'ofertas', label: 'Ofertas', href: '/ofertas/mias' },
@@ -51,6 +52,9 @@ export function MerchantHeader() {
       </nav>
 
       <div className="merchant-header__right">
+
+        <NotificationsBell />
+
         <Badge tone={abierto ? 'ok' : 'bad'}>
           {abierto ? 'Local abierto' : 'Local cerrado'}
         </Badge>
