@@ -48,6 +48,7 @@ model Producto {
   comercio              Comercio                     @relation(fields: [comercioId], references: [idComercio])
   categoria             Categoria                    @relation(fields: [categoriaId], references: [idCategoria])
   pedidoItems           PedidoItem[]
+  canastaItems          CanastaItem[]
   auditoriasVencimiento AuditoriaVencimientoOferta[]
 
   @@map("producto")
@@ -83,6 +84,7 @@ model Comercio {
   usuario               Usuario                      @relation(fields: [userId], references: [id])
   productos             Producto[]
   pedidos               Pedido[]
+  canastas              Canasta[]
   credencialMp          CredencialMp?
   horarios              HorarioAtencion[]
   franjas               FranjaRetiro[]
@@ -188,6 +190,7 @@ model Usuario {
   direcciones Direccion[]
   codigos     CodigoSeguridad[]
   pedidos     Pedido[]
+  canastas    Canasta[]
 
   comercio Comercio?
 
@@ -346,6 +349,40 @@ model Reporte {
   admin    Usuario? @relation("ReportesSupervisados", fields: [id_admin], references: [id])
 
   @@map("reporte")
+}
+
+model Canasta {
+  idCanasta  String   @id @default(uuid()) @map("id_canasta") @db.Uuid
+  usuarioId  String   @map("usuario_id")
+  comercioId String   @map("comercio_id") @db.Uuid
+  subtotal   Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  usuario  Usuario       @relation(fields: [usuarioId], references: [id])
+  comercio Comercio      @relation(fields: [comercioId], references: [idComercio])
+  items    CanastaItem[]
+
+  @@unique([usuarioId, comercioId])
+  @@index([usuarioId])
+  @@index([comercioId])
+  @@map("canasta")
+}
+
+model CanastaItem {
+  idCanastaItem String   @id @default(uuid()) @map("id_canasta_item") @db.Uuid
+  canastaId     String   @map("canasta_id") @db.Uuid
+  productoId    String   @map("producto_id") @db.Uuid
+  cantidad      Int
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  canasta  Canasta  @relation(fields: [canastaId], references: [idCanasta], onDelete: Cascade)
+  producto Producto @relation(fields: [productoId], references: [idProducto])
+
+  @@unique([canastaId, productoId])
+  @@index([productoId])
+  @@map("canasta_item")
 }
 
 model Pedido {
