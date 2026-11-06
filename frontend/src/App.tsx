@@ -4,6 +4,8 @@ import { RutaProtegida, RutaPublica, RutaComerciante, RutaAdmin, RutaCliente } f
 import { DetalleOfertaPage } from './comercios/DetalleOfertaPage';
 import { HorariosComercioPage } from './comercios/HorariosComercioPage';
 import { PerfilComercioPage } from './comercios/PerfilComercioPage';
+import { CanastaPage } from './comercios/CanastaPage';
+import { ListaCanastasPage } from './comercios/ListaCanastasPage';
 import { RegistroComercioPage } from './comercios/RegistroComercioPage';
 import { TiendaPublicaPage } from './comercios/TiendaPublicaPage';
 import { TopBar } from './components/TopBar';
@@ -55,6 +57,17 @@ export default function App() {
             path="/comercios/:comercioId/productos/:productoId"
             element={<DetalleOfertaPage />}
           />
+
+          <Route
+            path="/canastas"
+            element={<ListaCanastasPage />}
+          />
+
+          <Route
+            path="/canastas/:comercioId"
+            element={<CanastaPage />}
+          />
+
           <Route path="/pedido/:codigo" element={<Ticket />} />
         </Route>
 

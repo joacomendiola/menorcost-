@@ -15,11 +15,16 @@ import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.in
 import { AgregarCanastaItemDto } from './dto/agregar-canasta-item.dto.js';
 import { CanastasService } from './canastas.service.js';
 
-@Controller('baskets')
+@Controller('canastas')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('CLIENTE')
 export class CanastasController {
   constructor(private readonly canastasService: CanastasService) {}
+
+  @Get()
+  obtenerTodas(@CurrentUser() usuario: AuthenticatedUser) {
+    return this.canastasService.obtenerTodas(usuario.id);
+  }
 
   @Get(':comercioId')
   obtenerPorComercio(

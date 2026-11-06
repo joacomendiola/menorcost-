@@ -499,3 +499,185 @@
     grid-template-columns: 1fr;
   }
 }
+.canasta-page {
+  max-width: 1000px;
+}
+
+.canasta-cabecera h1 {
+  margin-bottom: 6px;
+}
+
+.canasta-vacia {
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.canasta-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 14px;
+  margin-top: 14px;
+  align-items: start;
+}
+
+.canasta-items h2,
+.canasta-resumen h2 {
+  margin-bottom: 16px;
+}
+
+.canasta-item {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--bd);
+}
+
+.canasta-item:last-child {
+  border-bottom: 0;
+}
+
+.canasta-item__imagen {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  overflow: hidden;
+  border-radius: var(--radius-input);
+  background: var(--soft);
+  color: var(--mut);
+  font-size: 11px;
+  text-align: center;
+}
+
+.canasta-item__imagen img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.canasta-item__contenido {
+  min-width: 0;
+}
+
+.canasta-item__contenido h3 {
+  overflow-wrap: anywhere;
+  font-size: 15px;
+}
+
+.canasta-item__cantidad {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.canasta-item__subtotal {
+  white-space: nowrap;
+  color: var(--brand);
+}
+
+.canasta-resumen {
+  position: sticky;
+  top: 20px;
+}
+
+.canasta-resumen__fila,
+.canasta-resumen__total {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.canasta-resumen__fila {
+  color: var(--mut);
+  border-bottom: 1px solid var(--bd);
+}
+
+.canasta-resumen__total {
+  margin-top: 8px;
+  font-size: 18px;
+}
+
+.canasta-resumen__total strong {
+  color: var(--brand);
+}
+
+@media (max-width: 700px) {
+  .canasta-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .canasta-resumen {
+    position: static;
+  }
+}
+
+@media (max-width: 480px) {
+  .canasta-item {
+    grid-template-columns: 60px minmax(0, 1fr);
+  }
+
+  .canasta-item__imagen {
+    width: 60px;
+    height: 60px;
+  }
+
+  .canasta-item__subtotal {
+    grid-column: 2;
+  }
+}
+.canastas-page {
+  max-width: 900px;
+}
+
+.canastas-page__cabecera h1 {
+  margin-bottom: 6px;
+}
+
+.canastas-lista {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.canastas-vacia {
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.canasta-resumen-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.canasta-resumen-card h2 {
+  margin-top: 10px;
+  overflow-wrap: anywhere;
+}
+
+.canasta-resumen-card__datos {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.canasta-resumen-card__datos strong {
+  color: var(--brand);
+  font-size: 19px;
+}
+
+@media (max-width: 560px) {
+  .canasta-resumen-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .canasta-resumen-card__datos {
+    align-items: stretch;
+  }
+}

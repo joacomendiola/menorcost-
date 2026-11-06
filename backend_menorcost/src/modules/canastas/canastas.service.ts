@@ -9,7 +9,49 @@ import type { AgregarCanastaItemDto } from './dto/agregar-canasta-item.dto.js';
 @Injectable()
 export class CanastasService {
   constructor(private readonly prisma: PrismaService) {}
-
+    async obtenerTodas(usuarioId: string) {
+    const canastas = await this.prisma.canasta.findMany({
+      where: {
+        usuarioId,
+        comercio: {
+          estado: 'HABILITADO',
+        },
+      },
+      include: {
+        comercio: {
+          select: {
+            idComercio: true,
+            nombreFantasia: true,
+          },
+        },
+        items: {
+          include: {
+            producto: {
+              select: {
+                idProducto: true,
+                titulo: true,
+                imagen: true,
+                stock: true,
+                precioMenorcost: true,
+                estado: true,
+                fechaVencimiento: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+  
+    return canastas.map((canasta) =>
+      this.serializarCanasta(canasta),
+    );
+  }
   async obtenerPorComercio(usuarioId: string, comercioId: string) {
     const comercio = await this.prisma.comercio.findFirst({
       where: {

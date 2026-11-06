@@ -230,7 +230,7 @@ export function DetalleOfertaPage() {
         message: 'Producto agregado a la canasta correctamente.',
       });
 
-      navigate(`/comercios/${comercioId}`);
+      navigate(`/canastas/${comercioId}`);
     } catch (err) {
       notifications.show({
         color: 'red',
@@ -443,6 +443,15 @@ export function DetalleOfertaPage() {
               {hayStock
                 ? 'Agregar a la canasta'
                 : 'Producto sin stock'}
+            </Button>
+
+            <Button
+              onClick={() =>
+                navigate(`/canastas/${oferta.comercio.id}`)
+              }
+              variant="default"
+            >
+              Ver canasta
             </Button>
           </div>
         </div>

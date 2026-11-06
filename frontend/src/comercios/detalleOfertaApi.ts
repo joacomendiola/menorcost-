@@ -27,17 +27,32 @@ export interface DetalleOferta {
   };
 }
 
+export interface CanastaItem {
+  idCanastaItem: string;
+  productoId: string;
+  cantidad: number;
+  precioUnitario: string;
+  subtotal: string;
+  producto: {
+    idProducto: string;
+    titulo: string;
+    imagen: string;
+    stock: number;
+    precioMenorcost: string;
+    estado: string;
+    fechaVencimiento: string;
+  };
+}
+
 export interface CanastaResumen {
   idCanasta: string | null;
   comercioId: string;
+  comercio: {
+    idComercio: string;
+    nombreFantasia: string;
+  } | null;
   subtotal: string;
-  items: Array<{
-    idCanastaItem: string;
-    productoId: string;
-    cantidad: number;
-    precioUnitario: string;
-    subtotal: string;
-  }>;
+  items: CanastaItem[];
 }
 
 export const detalleOfertaApi = {
@@ -48,18 +63,34 @@ export const detalleOfertaApi = {
       )}/productos/${encodeURIComponent(productoId)}`,
     ),
 
+  obtenerTodasLasCanastas: (token: string) =>
+    api<CanastaResumen[]>('/canastas', {
+      token,
+    }),
+
+  obtenerCanasta: (token: string, comercioId: string) =>
+    api<CanastaResumen>(
+      `/baskets/${encodeURIComponent(comercioId)}`,
+      {
+        token,
+      },
+    ),
+
   agregarACanasta: (
     token: string,
     comercioId: string,
     productoId: string,
     cantidad = 1,
   ) =>
-    api<CanastaResumen>(`/baskets/${encodeURIComponent(comercioId)}/items`, {
-      method: 'POST',
-      token,
-      body: {
-        productoId,
-        cantidad,
+    api<CanastaResumen>(
+      `/baskets/${encodeURIComponent(comercioId)}/items`,
+      {
+        method: 'POST',
+        token,
+        body: {
+          productoId,
+          cantidad,
+        },
       },
-    }),
+    ),
 };
