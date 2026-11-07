@@ -17,11 +17,13 @@ import {
   PrismaOfferRepositoryAdapter,
   PrismaOfferReservationsAdapter,
 } from './prisma-ofertas.adapters.js';
+import { OffersExpirationService } from './ofertas-vencimiento.service.js';
 
 @Module({
   imports: [AuthModule],
   controllers: [OffersController],
   providers: [
+    OffersExpirationService,
     OffersService,
     ImageStorageService,
     JwtAuthGuard,

@@ -12,8 +12,6 @@ datasource db {
   provider = "postgresql"
 }
 
-// Modelo de Producto
-
 enum TipoProducto {
   INDIVIDUAL
   COMBO
@@ -49,47 +47,48 @@ model Producto {
   estado           EstadoProducto @default(ACTIVO)
   pausadoPorBaja   Boolean        @default(false) @map("pausado_por_baja")
 
-  comercio         Comercio       @relation(fields: [comercioId], references: [idComercio])
-  categoria        Categoria      @relation(fields: [categoriaId], references: [idCategoria])
-  pedidoItems      PedidoItem[]
+  comercio              Comercio                     @relation(fields: [comercioId], references: [idComercio])
+  categoria             Categoria                    @relation(fields: [categoriaId], references: [idCategoria])
+  pedidoItems           PedidoItem[]
+  auditoriasVencimiento AuditoriaVencimientoOferta[]
 
   @@map("producto")
 }
 
 model Comercio {
+  idComercio           String         @id @default(uuid()) @map("id_comercio") @db.Uuid
+  userId               String         @unique @map("usuario_id")
+  mercadoPagoVinculado Boolean        @default(false) @map("mercado_pago_vinculado")
+  reputacionPromedio   Float          @default(0) @map("reputacion_promedio")
+  totalCalificaciones  Int            @default(0) @map("total_calificaciones")
+  nombreFantasia       String         @map("nombre_fantasia") @db.VarChar(120)
+  razonSocial          String         @map("razon_social") @db.VarChar(160)
+  cuit                 String         @unique @db.VarChar(13)
+  telefono             String         @db.VarChar(30)
+  descripcion          String?        @db.Text
+  calle                String         @db.VarChar(120)
+  numero               String         @db.VarChar(20)
+  piso                 String?        @db.VarChar(20)
+  localidad            String         @db.VarChar(120)
+  provincia            String         @db.VarChar(120)
+  codigoPostal         String?        @map("codigo_postal") @db.VarChar(10)
+  latitud              Decimal        @db.Decimal(9, 6)
+  longitud             Decimal        @db.Decimal(9, 6)
+  googlePlaceId        String         @unique @map("google_place_id") @db.VarChar(255)
+  logoUrl              String         @map("logo_url") @db.VarChar(500)
+  portadaUrl           String?        @map("portada_url") @db.VarChar(500)
+  abierto              Boolean        @default(false)
+  estado               EstadoComercio @default(PENDIENTE_VERIFICACION)
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
 
-  idComercio            String          @id @default(uuid()) @map("id_comercio") @db.Uuid
-    userId                String          @unique @map("usuario_id")
-    mercadoPagoVinculado  Boolean         @default(false) @map("mercado_pago_vinculado")
-    reputacionPromedio    Float           @default(0) @map("reputacion_promedio")
-    totalCalificaciones   Int             @default(0) @map("total_calificaciones")
-    nombreFantasia        String          @map("nombre_fantasia") @db.VarChar(120)
-    razonSocial           String          @map("razon_social") @db.VarChar(160)
-    cuit                  String          @unique @db.VarChar(13)
-    telefono              String          @db.VarChar(30)
-    descripcion           String?         @db.Text
-    calle                 String          @db.VarChar(120)
-    numero                String          @db.VarChar(20)
-    piso                  String?         @db.VarChar(20)
-    localidad             String          @db.VarChar(120)
-    provincia             String          @db.VarChar(120)
-    codigoPostal          String?         @map("codigo_postal") @db.VarChar(10)
-    latitud               Decimal         @db.Decimal(9, 6)
-    longitud              Decimal         @db.Decimal(9, 6)
-    googlePlaceId         String          @unique @map("google_place_id") @db.VarChar(255)
-    logoUrl               String          @map("logo_url") @db.VarChar(500)
-    portadaUrl            String?         @map("portada_url") @db.VarChar(500)
-    abierto               Boolean         @default(false)
-    estado                EstadoComercio  @default(PENDIENTE_VERIFICACION)
-    createdAt             DateTime        @default(now()) @map("created_at")
-    updatedAt             DateTime        @updatedAt @map("updated_at")
-
-    usuario      Usuario        @relation(fields: [userId], references: [id])
-    productos    Producto[]
-    pedidos      Pedido[]
-    credencialMp CredencialMp?
-    horarios     HorarioAtencion[]
-    franjas      FranjaRetiro[]
+  usuario               Usuario                      @relation(fields: [userId], references: [id])
+  productos             Producto[]
+  pedidos               Pedido[]
+  credencialMp          CredencialMp?
+  horarios              HorarioAtencion[]
+  franjas               FranjaRetiro[]
+  auditoriasVencimiento AuditoriaVencimientoOferta[]
 
   @@index([localidad])
   @@index([estado])
@@ -141,6 +140,7 @@ model Categoria {
 
   @@map("categoria")
 }
+
 enum Rol {
   CLIENTE
   COMERCIANTE
@@ -167,55 +167,59 @@ enum EstadoSolicitudBaja {
   RECHAZADA
 }
 
+enum TipoNotificacion {
+  OFERTA_VENCIDA
+}
+
 model Usuario {
-  id             String        @id @default(uuid())
-  dni            String        @unique
-  nombre         String
-  apellido       String
-  email          String        @unique
-  telefono       String
+  id              String        @id @default(uuid())
+  dni             String        @unique
+  nombre          String
+  apellido        String
+  email           String        @unique
+  telefono        String
   fechaNacimiento DateTime
-  passwordHash   String
-  rol            Rol           @default(CLIENTE)
-  estado         EstadoUsuario @default(PENDIENTE_VERIFICACION)
-  tokenVersion   Int           @default(0)
-  deletedAt      DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  passwordHash    String
+  rol             Rol           @default(CLIENTE)
+  estado          EstadoUsuario @default(PENDIENTE_VERIFICACION)
+  tokenVersion    Int           @default(0)
+  deletedAt       DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   direcciones Direccion[]
   codigos     CodigoSeguridad[]
-  pedidos Pedido[]
+  pedidos     Pedido[]
 
-  // TODO integración: adaptar si el modelo real permite varios comercios
-  // por usuario o define esta relación desde el módulo de comercios.
   comercio Comercio?
 
   solicitudesBaja SolicitudBaja[] @relation("BajaSolicitada")
   bajasResueltas  SolicitudBaja[] @relation("BajaResuelta")
 
-  reportesEmitidos   Reporte[] @relation("ReportesEmitidos")
-  reportesRecibidos  Reporte[] @relation("ReportesRecibidos")
+  reportesEmitidos     Reporte[] @relation("ReportesEmitidos")
+  reportesRecibidos    Reporte[] @relation("ReportesRecibidos")
   reportesSupervisados Reporte[] @relation("ReportesSupervisados")
+
+  notificaciones Notificacion[]
 
   @@map("usuarios")
 }
 
 model Direccion {
-  id              String   @id @default(uuid())
-  usuarioId       String
-  etiqueta        String
-  calle           String
-  numero          String
-  piso            String?
-  localidad       String
-  descripcion     String?
-  latitud         Decimal  @db.Decimal(9, 6)
-  longitud        Decimal  @db.Decimal(9, 6)
-  esPredeterminada Boolean @default(false)
-  deletedAt       DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               String    @id @default(uuid())
+  usuarioId        String
+  etiqueta         String
+  calle            String
+  numero           String
+  piso             String?
+  localidad        String
+  descripcion      String?
+  latitud          Decimal   @db.Decimal(9, 6)
+  longitud         Decimal   @db.Decimal(9, 6)
+  esPredeterminada Boolean   @default(false)
+  deletedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
@@ -240,7 +244,7 @@ model CodigoSeguridad {
 }
 
 model SolicitudBaja {
-  id            String               @id @default(uuid())
+  id            String              @id @default(uuid())
   usuarioId     String
   motivo        String
   estado        EstadoSolicitudBaja  @default(PENDIENTE)
@@ -248,8 +252,8 @@ model SolicitudBaja {
   observaciones String?
   resueltoPorId String?
   resueltoEn    DateTime?
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   usuario     Usuario  @relation("BajaSolicitada", fields: [usuarioId], references: [id], onDelete: Cascade)
   resueltoPor Usuario? @relation("BajaResuelta", fields: [resueltoPorId], references: [id])
@@ -259,13 +263,46 @@ model SolicitudBaja {
   @@map("solicitudes_baja")
 }
 
-//Dev 5: faltaria crear modelo pedido para Calificacion y Reporte
+model AuditoriaVencimientoOferta {
+  id               String         @id @default(uuid()) @db.Uuid
+  productoId       String         @unique @map("producto_id") @db.Uuid
+  comercioId       String         @map("comercio_id") @db.Uuid
+  estadoAnterior   EstadoProducto @map("estado_anterior")
+  estadoNuevo      EstadoProducto @map("estado_nuevo")
+  fechaVencimiento DateTime       @map("fecha_vencimiento") @db.Date
+  ejecutadoEn      DateTime       @default(now()) @map("ejecutado_en")
+
+  producto     Producto      @relation(fields: [productoId], references: [idProducto])
+  comercio     Comercio      @relation(fields: [comercioId], references: [idComercio])
+  notificacion Notificacion?
+
+  @@index([comercioId, ejecutadoEn])
+  @@index([productoId, ejecutadoEn])
+  @@map("auditoria_vencimiento_oferta")
+}
+
+model Notificacion {
+  id                     String           @id @default(uuid())
+  usuarioId              String           @map("usuario_id")
+  auditoriaVencimientoId String?          @unique @map("auditoria_vencimiento_id") @db.Uuid
+  titulo                 String           @db.VarChar(160)
+  mensaje                String           @db.VarChar(500)
+  tipo                   TipoNotificacion
+  leida                  Boolean          @default(false)
+  createdAt              DateTime         @default(now()) @map("created_at")
+
+  usuario              Usuario                     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  auditoriaVencimiento AuditoriaVencimientoOferta? @relation(fields: [auditoriaVencimientoId], references: [id], onDelete: SetNull)
+
+  @@index([usuarioId, leida, createdAt])
+  @@map("notificacion")
+}
 
 enum EstadoReporte {
-  PENDIENTE_REVISION 
-  BAJO_INVESTIGACION 
-  RESUELTO           
-  DESESTIMADO        
+  PENDIENTE_REVISION
+  BAJO_INVESTIGACION
+  RESUELTO
+  DESESTIMADO
 }
 
 enum TipoDestinoReporte {
@@ -275,61 +312,60 @@ enum TipoDestinoReporte {
 
 model Calificacion {
   id_calificacion Int      @id @default(autoincrement())
-  puntaje         Int      // Escala obligatoria de 1 a 5
+  puntaje         Int // Escala obligatoria de 1 a 5
   comentario      String?  @db.VarChar(250) // Máximo 250 caracteres según CU-5.01
-  fecha_creacion  DateTime @default(now())  // Necesario para mostrar por ej:"02 sep" en Pantalla
+  fecha_creacion  DateTime @default(now()) // Necesario para mostrar por ej:"02 sep" en Pantalla
 
   // Relación 1 a 1 con Pedido (Pedido --(0,1)Genera/(1,1)--> Calificacion)
-  id_pedido       String   @unique   @db.Uuid
-  pedido          Pedido   @relation(fields: [id_pedido], references: [id_pedido])
-   
-  @@map("calificacion") 
+  id_pedido String @unique @db.Uuid
+  pedido    Pedido @relation(fields: [id_pedido], references: [id_pedido])
+
+  @@map("calificacion")
 }
 
 model Reporte {
-  id_reporte      Int                @id @default(autoincrement())
-  motivo          String             // Categoría seleccionada en el select
-  descripcion     String?            @db.VarChar(300) // Máximo 300 caracteres según CU-5.02
-  estado_reporte  EstadoReporte      @default(PENDIENTE_REVISION)
-  tipo_destino    TipoDestinoReporte // Hacia quién va dirigida la denuncia
-  fecha_reporte   DateTime           @default(now())
+  id_reporte       Int                @id @default(autoincrement())
+  motivo           String // Categoría seleccionada en el select
+  descripcion      String?            @db.VarChar(300) // Máximo 300 caracteres según CU-5.02
+  estado_reporte   EstadoReporte      @default(PENDIENTE_REVISION)
+  tipo_destino     TipoDestinoReporte // Hacia quién va dirigida la denuncia
+  fecha_reporte    DateTime           @default(now())
   fecha_resolucion DateTime?
 
   // Relación con Pedido (En el DER: Reporte --Referencia (1,1)--> Pedido)
-  id_pedido       String             @db.Uuid
-  pedido          Pedido             @relation(fields: [id_pedido], references: [id_pedido])
+  id_pedido String @db.Uuid
+  pedido    Pedido @relation(fields: [id_pedido], references: [id_pedido])
 
   // Relación Usuario Emite Reporte (1,n)
-  id_emisor       String
-  emisor          Usuario            @relation("ReportesEmitidos", fields: [id_emisor], references: [id])
+  id_emisor String
+  emisor    Usuario @relation("ReportesEmitidos", fields: [id_emisor], references: [id])
 
   // Usuario o Comercio denunciado (Requerido por CU-5.02 para contar el umbral de 3 reportes)
-  id_denunciado   String
-  denunciado      Usuario            @relation("ReportesRecibidos", fields: [id_denunciado], references: [id])
+  id_denunciado String
+  denunciado    Usuario @relation("ReportesRecibidos", fields: [id_denunciado], references: [id])
 
   // Relación Usuario (Admin) Supervisa Reporte (0,n) 
-  id_admin        String?
-  admin           Usuario?            @relation("ReportesSupervisados", fields: [id_admin], references: [id])
+  id_admin String?
+  admin    Usuario? @relation("ReportesSupervisados", fields: [id_admin], references: [id])
 
   @@map("reporte")
 }
 
-
 model Pedido {
-  id_pedido       String         @id @default(uuid()) @map("id_pedido") @db.Uuid
-  nroPedido       String         @unique @map("nro_pedido") @db.VarChar(30)
-  usuarioId       String         @map("usuario_id")
-  comercioId      String         @map("id_comercio") @db.Uuid
-  estado          EstadoPedido   @default(PENDIENTE_PAGO)
-  codigoQR        String         @unique @map("codigo_qr") @db.VarChar(100)
-  codigoAlfanumerico String      @unique @map("codigo_alfanumerico") @db.VarChar(20)
-  fecha_pedido    DateTime       @default(now()) @map("fecha_pedido") @db.Timestamp(0)
-  fechaExpiracionPago DateTime?  @map("fecha_expiracion_pago")
-  franjaHorarioId String?        @map("franja_horario_id") @db.Uuid
-  subtotal        Decimal        @db.Decimal(10, 2)
+  id_pedido           String       @id @default(uuid()) @map("id_pedido") @db.Uuid
+  nroPedido           String       @unique @map("nro_pedido") @db.VarChar(30)
+  usuarioId           String       @map("usuario_id")
+  comercioId          String       @map("id_comercio") @db.Uuid
+  estado              EstadoPedido @default(PENDIENTE_PAGO)
+  codigoQR            String       @unique @map("codigo_qr") @db.VarChar(100)
+  codigoAlfanumerico  String       @unique @map("codigo_alfanumerico") @db.VarChar(20)
+  fecha_pedido        DateTime     @default(now()) @map("fecha_pedido") @db.Timestamp(0)
+  fechaExpiracionPago DateTime?    @map("fecha_expiracion_pago")
+  franjaHorarioId     String?      @map("franja_horario_id") @db.Uuid
+  subtotal            Decimal      @db.Decimal(10, 2)
 
   // Monto de la comisión de Menorcost congelado al crear el pedido.
-  tarifa_servicio Decimal        @map("tarifa_servicio") @db.Decimal(10, 2)
+  tarifa_servicio       Decimal  @map("tarifa_servicio") @db.Decimal(10, 2)
   // Tasa de comisión de Menorcost aplicada (fracción, ej. 0.1000).
   comisionMenorcostTasa Decimal  @map("comision_menorcost_tasa") @db.Decimal(6, 4)
   // Tasa estimada de Mercado Pago usada en el cálculo (constante de código).
@@ -341,13 +377,13 @@ model Pedido {
 
   // Configuración de comisión utilizada para congelar los valores del pedido.
 
-  usuario         Usuario        @relation(fields: [usuarioId], references: [id])
-  comercio        Comercio       @relation(fields: [comercioId], references: [idComercio])
-  franjaHoraria   FranjaRetiro?  @relation(fields: [franjaHorarioId], references: [id], onDelete: Restrict)
-  calificacion    Calificacion?
-  reportes        Reporte[]
-  items           PedidoItem[]
-  pagos           Pago[]
+  usuario       Usuario       @relation(fields: [usuarioId], references: [id])
+  comercio      Comercio      @relation(fields: [comercioId], references: [idComercio])
+  franjaHoraria FranjaRetiro? @relation(fields: [franjaHorarioId], references: [id], onDelete: Restrict)
+  calificacion  Calificacion?
+  reportes      Reporte[]
+  items         PedidoItem[]
+  pagos         Pago[]
 
   @@index([usuarioId])
   @@index([comercioId])
@@ -356,23 +392,23 @@ model Pedido {
 }
 
 model PedidoItem {
-  id_pedido_item String   @id @default(uuid()) @map("id_pedido_item") @db.Uuid
-  pedidoId       String   @map("id_pedido") @db.Uuid
-  productoId     String   @map("id_producto") @db.Uuid
-  nroLinea       Int      @map("nro_linea")
-  cantidad       Int
+  id_pedido_item            String   @id @default(uuid()) @map("id_pedido_item") @db.Uuid
+  pedidoId                  String   @map("id_pedido") @db.Uuid
+  productoId                String   @map("id_producto") @db.Uuid
+  nroLinea                  Int      @map("nro_linea")
+  cantidad                  Int
   // Precio público final (precioMenorcost calculado) congelado al comprar.
-  precio_unitario Decimal  @map("precio_unitario") @db.Decimal(10, 2)
+  precio_unitario           Decimal  @map("precio_unitario") @db.Decimal(10, 2)
   // Precio base neto deseado por el comerciante, usado para el cálculo.
-  precioBaseNetoAplicado Decimal @map("precio_base_neto_aplicado") @db.Decimal(10, 2)
+  precioBaseNetoAplicado    Decimal  @map("precio_base_neto_aplicado") @db.Decimal(10, 2)
   // Comisión de Menorcost correspondiente a esta línea.
-  comisionMenorcostMonto Decimal @map("comision_menorcost_monto") @db.Decimal(10, 2)
-  subtotal       Decimal  @db.Decimal(10, 2)
-  nombreHistorico String  @map("nombre_historico") @db.VarChar(120)
+  comisionMenorcostMonto    Decimal  @map("comision_menorcost_monto") @db.Decimal(10, 2)
+  subtotal                  Decimal  @db.Decimal(10, 2)
+  nombreHistorico           String   @map("nombre_historico") @db.VarChar(120)
   fechaVencimientoHistorica DateTime @map("fecha_vencimiento_historica") @db.Date
 
-  pedido         Pedido   @relation(fields: [pedidoId], references: [id_pedido])
-  producto       Producto @relation(fields: [productoId], references: [idProducto])
+  pedido   Pedido   @relation(fields: [pedidoId], references: [id_pedido])
+  producto Producto @relation(fields: [productoId], references: [idProducto])
 
   @@unique([pedidoId, nroLinea])
   @@index([productoId])
@@ -418,17 +454,17 @@ model ConfigComision {
 }
 
 model CredencialMp {
-  idCredencial         String   @id @default(uuid()) @map("id_credencial") @db.Uuid
-  mpUserId             String   @unique @map("mp_user_id") @db.VarChar(64)
-  comercioId           String   @unique @map("id_comercio") @db.Uuid
-  email                String?  @db.VarChar(255)
-  accessToken          String   @map("access_token") @db.Text
-  refreshToken         String   @map("refresh_token") @db.Text
-  fechaTokenExpiration DateTime @map("fecha_token_expiration")
-  fechaVinculacion     DateTime @default(now()) @map("fecha_vinculacion")
+  idCredencial         String             @id @default(uuid()) @map("id_credencial") @db.Uuid
+  mpUserId             String             @unique @map("mp_user_id") @db.VarChar(64)
+  comercioId           String             @unique @map("id_comercio") @db.Uuid
+  email                String?            @db.VarChar(255)
+  accessToken          String             @map("access_token") @db.Text
+  refreshToken         String             @map("refresh_token") @db.Text
+  fechaTokenExpiration DateTime           @map("fecha_token_expiration")
+  fechaVinculacion     DateTime           @default(now()) @map("fecha_vinculacion")
   estado               EstadoCredencialMp @default(ACTIVA)
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
 
   comercio Comercio @relation(fields: [comercioId], references: [idComercio], onDelete: Cascade)
 

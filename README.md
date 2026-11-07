@@ -122,6 +122,51 @@ Backend (NestJS): npm run start:dev (dentro de la carpeta /backend_menorcost)
 
 *El frontend estará disponible en tu navegador en:* `http://localhost:5173`
 
+## ⏰ CU-2.07: Depuración automática de ofertas vencida
+
+El backend ejecuta diariamente, a las 00:00, una tarea programada con la zona horaria:
+
+America/Argentina/Ushuaia
+
+La tarea busca ofertas en estado `ACTIVO` cuya fecha de vencimiento sea igual o anterior al día actual. Luego:
+
+- Cambia el estado a `VENCIDO_ELIMINADO`.
+- Registra la operación en `auditoria_vencimiento_oferta`.
+- Crea una notificación persistente para el comerciante.
+- Retira la oferta del catálogo público.
+- Conserva los pedidos, pagos y códigos QR existentes.
+
+### Ejecutar manualmente la depuración
+
+Desde la carpeta del backend:
+
+```powershell
+cd backend_menorcost
+npm run vencimiento:ofertas
+```
+
+Este comando utiliza el mismo servicio que ejecuta el cron automático y muestra la cantidad de ofertas procesadas.
+
+### Datos de prueba del CU-2.07
+
+Para crear las categorías y los datos de prueba:
+
+```powershell
+cd backend_menorcost
+npm run seed
+npm run seed:cu-2-07
+npm run vencimiento:ofertas
+```
+
+Credenciales de prueba:
+
+```text
+Usuario: comerciante-cu207@test.com
+Contraseña: Password123
+```
+
+La notificación puede consultarse desde la campana del panel del comerciante.
+
 ---
 
 ## 🌿 Flujo de Trabajo en Git para el Equipo

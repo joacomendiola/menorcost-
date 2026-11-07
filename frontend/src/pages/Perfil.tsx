@@ -473,7 +473,12 @@ export function Perfil() {
     perfil.rol === 'ADMINISTRADOR'
       ? [{ icono: '🛡', texto: 'Backoffice' }]
       : perfil.rol === 'COMERCIANTE'
-        ? []
+        ? [
+            { icono: '📦', texto: 'Mis ofertas', ruta: '/ofertas/mias' },
+            { icono: '➕', texto: 'Nueva oferta', ruta: '/ofertas/nueva' },
+            { icono: '🏪', texto: 'Mi local', ruta: '/comercios/perfil' },
+            { icono: '⭐', texto: 'Reputación', ruta: '/panel/reputacion' },
+          ]
         : [
             { icono: '📦', texto: 'Mis pedidos' },
             { icono: '🧺', texto: 'Mis canastas' },

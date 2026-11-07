@@ -24,7 +24,10 @@ import {
 import { CreateOfferDto } from './dto/create-oferta.dto.js';
 import type { UpdateOfferDto } from './dto/update-oferta.dto.js';
 import { ImageStorageService } from './image-store.service.js';
-import { validateOfferRules,todayInArgentina } from './ofertas-rules.js';
+import {
+  todayInArgentina,
+  validateOfferRules,
+} from './ofertas-rules.js';
 
 const OFFER_HAS_PENDING_RESERVATIONS =
   'Esta oferta no puede eliminarse porque existen reservas pendientes de entrega. Debe completar o gestionar los retiros antes de darla de baja.';
@@ -40,6 +43,7 @@ export class OffersService {
     private readonly categories: OfferCategories,
     @Inject(OFFER_REPOSITORY)
     private readonly repository: OfferRepository,
+    @Inject(ImageStorageService)
     private readonly imageStorage: ImageStorageService,
     @Inject(OFFER_RESERVATIONS)
     private readonly reservations: OfferReservations,
@@ -76,8 +80,9 @@ export class OffersService {
   async listByOwner(userId: string): Promise<OfferDetails[]> {
     return this.repository.listByOwner(userId);
   }
+
   async getDashboardSummary(
-  userId: string,
+    userId: string,
   ): Promise<OfferDashboardSummary> {
     const [offers, unidadesReservadas] = await Promise.all([
       this.repository.listByOwner(userId),
