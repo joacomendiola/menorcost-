@@ -22,7 +22,8 @@ export type EstadoComercio =
   | 'PENDIENTE_VERIFICACION'
   | 'HABILITADO'
   | 'DOCUMENTACION_RECHAZADA'
-  | 'SUSPENDIDO';
+  | 'SUSPENDIDO'
+  | 'ELIMINADO';
 
 export interface HorarioAtencion {
   id: string;

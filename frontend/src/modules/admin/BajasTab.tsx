@@ -9,6 +9,7 @@ import { useAdminList } from './useAdminList';
 import {
   esSesionVencida,
   formatFechaCorta,
+  formatPesos,
   iniciales,
   mensajeError,
   nombreCompleto,
@@ -49,7 +50,15 @@ export function BajasTab() {
     const q = search.trim().toLowerCase();
     if (!q) return items;
     return items.filter(({ usuario: u }) =>
-      [u.nombre, u.apellido, u.email, u.dni].some((v) => v?.toLowerCase().includes(q)),
+      [
+        u.nombre,
+        u.apellido,
+        u.email,
+        u.dni,
+        u.comercio?.cuit,
+        u.comercio?.razonSocial,
+        u.comercio?.nombreFantasia,
+      ].some((v) => v?.toLowerCase().includes(q)),
     );
   }, [items, search]);
 
@@ -122,7 +131,29 @@ export function BajasTab() {
                     rows={[
                       { label: 'DNI', value: u.dni },
                       { label: 'Correo', value: u.email },
+                      { label: 'Contacto', value: u.telefono ?? '—' },
                       { label: 'Tipo de cuenta', value: u.rol === 'COMERCIANTE' ? 'Comerciante' : 'Cliente' },
+                      { label: 'Pedidos completados', value: String(baja.pedidosCompletados) },
+                      {
+                        label: 'Saldo de tarifas',
+                        value:
+                          baja.saldoTarifas === 0
+                            ? '$0 (sin deudas)'
+                            : formatPesos(baja.saldoTarifas),
+                      },
+                      ...(u.comercio
+                        ? [
+                            { label: 'Razón social', value: u.comercio.razonSocial },
+                            { label: 'CUIT', value: u.comercio.cuit },
+                          ]
+                        : []),
+                      {
+                        label: 'Cuenta activa desde',
+                        value: u.createdAt ? formatFechaCorta(u.createdAt) : '—',
+                      },
+                      ...(baja.resueltoEn
+                        ? [{ label: 'Resuelta', value: formatFechaCorta(baja.resueltoEn) }]
+                        : []),
                       ...(baja.observaciones
                         ? [{ label: 'Observaciones', value: baja.observaciones }]
                         : []),
@@ -165,8 +196,8 @@ export function BajasTab() {
       >
         Se ejecutará el borrado lógico de la cuenta de{' '}
         <strong>{accion ? nombreCompleto(accion.baja.usuario) : ''}</strong> y se cerrarán sus
-        sesiones. El sistema verifica que no existan pedidos pendientes de retiro ni denuncias
-        abiertas; si los hay, la baja no se aplica.
+        sesiones. El sistema verifica que no existan pedidos con pago o retiro pendiente ni
+        denuncias abiertas; si los hay, la baja no se aplica.
       </ConfirmDialog>
 
       <MotivoDialog
