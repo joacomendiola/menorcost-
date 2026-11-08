@@ -137,13 +137,23 @@ export class ComerciosService {
 
   async listarCategorias() {
     const categorias = await this.prisma.categoria.findMany({
-      where: { activa: true },
+      where: { activa: true, categoriaPadreId: null },
       orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
       select: {
         idCategoria: true,
         nombre: true,
         slug: true,
         orden: true,
+        subcategorias: {
+          where: { activa: true },
+          orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
+          select: {
+            idCategoria: true,
+            nombre: true,
+            slug: true,
+            orden: true,
+          },
+        },
       },
     });
 
@@ -152,6 +162,12 @@ export class ComerciosService {
       nombre: categoria.nombre,
       slug: categoria.slug,
       orden: categoria.orden,
+      subcategorias: categoria.subcategorias.map((subcategoria) => ({
+        id: subcategoria.idCategoria,
+        nombre: subcategoria.nombre,
+        slug: subcategoria.slug,
+        orden: subcategoria.orden,
+      })),
     }));
   }
 

@@ -3,14 +3,91 @@ import { hash } from 'bcryptjs';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 
-const categorias = [
-  { nombre: 'Almacén', slug: 'almacen', orden: 1 },
-  { nombre: 'Lácteos', slug: 'lacteos', orden: 2 },
-  { nombre: 'Fiambrería', slug: 'fiambreria', orden: 3 },
-  { nombre: 'Bebidas', slug: 'bebidas', orden: 4 },
-  { nombre: 'Golosinas', slug: 'golosinas', orden: 5 },
-  { nombre: 'Panadería', slug: 'panaderia', orden: 6 },
-  { nombre: 'Limpieza', slug: 'limpieza', orden: 7 },
+type CategoriaSeed = {
+  nombre: string;
+  slug: string;
+  orden: number;
+  subcategorias: Array<{
+    nombre: string;
+    slug: string;
+    orden: number;
+  }>;
+};
+
+const categorias: CategoriaSeed[] = [
+  {
+    nombre: 'Almacén',
+    slug: 'almacen',
+    orden: 1,
+    subcategorias: [
+      { nombre: 'Aceites y conservas', slug: 'aceites-y-conservas', orden: 1 },
+      { nombre: 'Arroz y pastas', slug: 'arroz-y-pastas', orden: 2 },
+      { nombre: 'Harinas y legumbres', slug: 'harinas-y-legumbres', orden: 3 },
+      { nombre: 'Condimentos', slug: 'condimentos', orden: 4 },
+    ],
+  },
+  {
+    nombre: 'Lácteos',
+    slug: 'lacteos',
+    orden: 2,
+    subcategorias: [
+      { nombre: 'Leches', slug: 'leches', orden: 1 },
+      { nombre: 'Yogures', slug: 'yogures', orden: 2 },
+      { nombre: 'Quesos', slug: 'quesos', orden: 3 },
+      { nombre: 'Manteca y crema', slug: 'manteca-y-crema', orden: 4 },
+    ],
+  },
+  {
+    nombre: 'Fiambrería',
+    slug: 'fiambreria',
+    orden: 3,
+    subcategorias: [
+      { nombre: 'Jamones', slug: 'jamones', orden: 1 },
+      { nombre: 'Embutidos', slug: 'embutidos', orden: 2 },
+      { nombre: 'Picadas', slug: 'picadas', orden: 3 },
+    ],
+  },
+  {
+    nombre: 'Bebidas',
+    slug: 'bebidas',
+    orden: 4,
+    subcategorias: [
+      { nombre: 'Gaseosas', slug: 'gaseosas', orden: 1 },
+      { nombre: 'Aguas y jugos', slug: 'aguas-y-jugos', orden: 2 },
+      { nombre: 'Cervezas', slug: 'cervezas', orden: 3 },
+      { nombre: 'Vinos', slug: 'vinos', orden: 4 },
+    ],
+  },
+  {
+    nombre: 'Golosinas',
+    slug: 'golosinas',
+    orden: 5,
+    subcategorias: [
+      { nombre: 'Chocolates', slug: 'chocolates', orden: 1 },
+      { nombre: 'Galletitas', slug: 'galletitas', orden: 2 },
+      { nombre: 'Caramelos', slug: 'caramelos', orden: 3 },
+    ],
+  },
+  {
+    nombre: 'Panadería',
+    slug: 'panaderia',
+    orden: 6,
+    subcategorias: [
+      { nombre: 'Panes', slug: 'panes', orden: 1 },
+      { nombre: 'Facturas y medialunas', slug: 'facturas-y-medialunas', orden: 2 },
+      { nombre: 'Tortas', slug: 'tortas', orden: 3 },
+    ],
+  },
+  {
+    nombre: 'Limpieza',
+    slug: 'limpieza',
+    orden: 7,
+    subcategorias: [
+      { nombre: 'Detergentes', slug: 'detergentes', orden: 1 },
+      { nombre: 'Limpiadores', slug: 'limpiadores', orden: 2 },
+      { nombre: 'Papel higiénico', slug: 'papel-higienico', orden: 3 },
+    ],
+  },
 ];
 
 const CONFIG_COMISION_INICIAL_ID = '00000000-0000-4000-8000-000000000001';
@@ -28,29 +105,64 @@ async function main(): Promise<void> {
   });
 
   try {
-    const resultado = await Promise.all(
-      categorias.map((categoria) =>
-        prisma.categoria.upsert({
-          where: { slug: categoria.slug },
-          update: {
-            nombre: categoria.nombre,
-            orden: categoria.orden,
-            activa: true,
-          },
-          create: categoria,
-        }),
-      ),
-    );
+    let totalCategorias = 0;
+    const rubros: Array<{
+      id: string;
+      nombre: string;
+      slug: string;
+      orden: number;
+      subcategorias: number;
+    }> = [];
 
-    console.log(`Categorías sincronizadas: ${resultado.length}`);
-    console.table(
-      resultado.map((categoria) => ({
-        id: categoria.idCategoria,
-        nombre: categoria.nombre,
-        slug: categoria.slug,
-        orden: categoria.orden,
-      })),
-    );
+    for (const categoria of categorias) {
+      const { subcategorias, ...datos } = categoria;
+      const rubro = await prisma.categoria.upsert({
+        where: { slug: datos.slug },
+        update: {
+          nombre: datos.nombre,
+          orden: datos.orden,
+          activa: true,
+          categoriaPadreId: null,
+        },
+        create: {
+          ...datos,
+          activa: true,
+          categoriaPadreId: null,
+        },
+      });
+
+      totalCategorias += 1;
+
+      for (const subcategoria of subcategorias) {
+        await prisma.categoria.upsert({
+          where: { slug: subcategoria.slug },
+          update: {
+            nombre: subcategoria.nombre,
+            orden: subcategoria.orden,
+            activa: true,
+            categoriaPadreId: rubro.idCategoria,
+          },
+          create: {
+            ...subcategoria,
+            activa: true,
+            categoriaPadreId: rubro.idCategoria,
+          },
+        });
+
+        totalCategorias += 1;
+      }
+
+      rubros.push({
+        id: rubro.idCategoria,
+        nombre: rubro.nombre,
+        slug: rubro.slug,
+        orden: rubro.orden,
+        subcategorias: subcategorias.length,
+      });
+    }
+
+    console.log(`Categorías sincronizadas: ${totalCategorias}`);
+    console.table(rubros);
 
     const clienteDemo = await prisma.usuario.upsert({
       where: {

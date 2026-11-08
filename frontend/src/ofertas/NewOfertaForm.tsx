@@ -175,7 +175,7 @@ export function NewOfferForm({ token, comercioId, categorias }: Props) {
     }
 
     if (!categoriaId) {
-      setError('Seleccioná una categoría.');
+      setError('Seleccioná un rubro y una subcategoría.');
       return;
     }
 
@@ -331,7 +331,7 @@ export function NewOfferForm({ token, comercioId, categorias }: Props) {
           />
 
           <Select
-            label="Categoría"
+            label="Rubro y subcategoría"
             placeholder="Seleccionar..."
             data={categorias.map((categoria) => ({
               value: categoria.id,

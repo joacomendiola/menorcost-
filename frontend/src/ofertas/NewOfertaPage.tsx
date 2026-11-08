@@ -25,9 +25,13 @@ type ComercioPropio = {
   nombreFantasia: string;
 };
 
-type Categoria = Option & {
+type Subcategoria = Option & {
   slug: string;
   orden: number;
+};
+
+type Categoria = Subcategoria & {
+  subcategorias: Subcategoria[];
 };
 
 export function NuevaOfertaPage() {
@@ -58,7 +62,14 @@ export function NuevaOfertaPage() {
           },
         ]);
         setCategorias(
-          categoriasDisponibles.map(({ id, nombre }) => ({ id, nombre })),
+          categoriasDisponibles.flatMap((categoria) =>
+            categoria.subcategorias.length > 0
+              ? categoria.subcategorias.map((subcategoria) => ({
+                  id: subcategoria.id,
+                  nombre: `${categoria.nombre} / ${subcategoria.nombre}`,
+                }))
+              : [{ id: categoria.id, nombre: categoria.nombre }],
+          ),
         );
       })
       .catch((error: unknown) => {
