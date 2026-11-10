@@ -38,7 +38,7 @@ export function Login() {
     try {
       const usuario = await iniciarSesion(email.trim(), password);
       notifications.show({ message: '¡Bienvenido de nuevo!' });
-      navigate(rutaInicio(usuario.rol), { replace: true });
+      navigate(rutaInicio(usuario.rol, usuario.estado), { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === 'CUENTA_PENDIENTE_VERIFICACION') {

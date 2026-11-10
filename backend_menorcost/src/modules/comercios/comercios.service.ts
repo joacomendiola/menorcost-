@@ -45,7 +45,6 @@ const SELECT_FRANJA = {
 
 const SELECT_COMERCIO = {
   idComercio: true,
-  mercadoPagoVinculado: true,
   nombreFantasia: true,
   razonSocial: true,
   cuit: true,
@@ -73,6 +72,9 @@ const SELECT_COMERCIO = {
   franjas: {
     select: SELECT_FRANJA,
     orderBy: ORDEN_HORARIOS,
+  },
+  credencialMp: {
+    select: { estado: true },
   },
 } satisfies Prisma.ComercioSelect;
 
@@ -118,12 +120,25 @@ const SELECT_TIENDA_PUBLICA = {
   },
 } satisfies Prisma.ComercioSelect;
 
-function aComercioPropio<T extends { idComercio: string }>(
+function aComercioPropio<
+  T extends {
+    idComercio: string;
+    credencialMp?: { estado: string } | null;
+  },
+>(
   comercio: T,
-): Omit<T, 'idComercio'> & { id: string } {
-  const { idComercio, ...resto } = comercio;
+): Omit<T, 'idComercio' | 'credencialMp'> & {
+  id: string;
+  mercadoPagoVinculado: boolean;
+} {
+  const { idComercio, credencialMp, ...resto } = comercio;
 
-  return { id: idComercio, ...resto };
+  return {
+    id: idComercio,
+    ...resto,
+    // Zona de Choque 2: la vinculación real se deriva de las credenciales.
+    mercadoPagoVinculado: credencialMp?.estado === 'ACTIVA',
+  };
 }
 
 @Injectable()
