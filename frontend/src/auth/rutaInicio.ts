@@ -1,6 +1,12 @@
-import type { Rol } from '../api';
+import type { EstadoUsuario, Rol } from '../api';
 
-/** Pantalla de entrada tras iniciar sesión, según el rol (CU-1.03, ext. 6c). */
-export function rutaInicio(rol: Rol): string {
-  return rol === 'ADMINISTRADOR' ? '/admin/altas' : '/perfil';
+/** Pantalla de entrada tras iniciar sesión, según el rol y estado (CU-1.03). */
+export function rutaInicio(rol: Rol, estado?: EstadoUsuario): string {
+  if (rol === 'ADMINISTRADOR') return '/admin/altas';
+
+  if (rol === 'COMERCIANTE') {
+    return estado === 'HABILITADO' ? '/panel' : '/comercio/estado';
+  }
+
+  return '/perfil';
 }

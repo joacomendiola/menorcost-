@@ -71,6 +71,7 @@ const comercioBase = {
   totalCalificaciones: 0,
   horarios: [],
   franjas: [],
+  credencialMp: null,
 };
 
 const horarioBase = {
@@ -307,6 +308,37 @@ describe('ComerciosService.obtenerMio', () => {
       nombreFantasia: 'Almacén Don José',
     });
     expect(resultado).not.toHaveProperty('idComercio');
+  });
+
+  it('marca Mercado Pago como vinculado con una credencial ACTIVA', async () => {
+    prismaMock.comercio.findUnique.mockResolvedValue({
+      ...comercioBase,
+      credencialMp: { estado: 'ACTIVA' },
+    });
+
+    const resultado = await service.obtenerMio('u1');
+
+    expect(resultado.mercadoPagoVinculado).toBe(true);
+    expect(resultado).not.toHaveProperty('credencialMp');
+  });
+
+  it('no marca Mercado Pago si la credencial está REVOCADA', async () => {
+    prismaMock.comercio.findUnique.mockResolvedValue({
+      ...comercioBase,
+      credencialMp: { estado: 'REVOCADA' },
+    });
+
+    const resultado = await service.obtenerMio('u1');
+
+    expect(resultado.mercadoPagoVinculado).toBe(false);
+  });
+
+  it('no marca Mercado Pago si el comercio no tiene credencial', async () => {
+    prismaMock.comercio.findUnique.mockResolvedValue(comercioBase);
+
+    const resultado = await service.obtenerMio('u1');
+
+    expect(resultado.mercadoPagoVinculado).toBe(false);
   });
 });
 

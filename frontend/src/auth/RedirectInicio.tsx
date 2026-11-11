@@ -15,5 +15,10 @@ export function RedirectInicio() {
     );
   }
 
-  return <Navigate to={usuario ? rutaInicio(usuario.rol) : '/login'} replace />;
+  return (
+    <Navigate
+      to={usuario ? rutaInicio(usuario.rol, usuario.estado) : '/login'}
+      replace
+    />
+  );
 }

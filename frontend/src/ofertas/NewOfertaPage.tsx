@@ -93,7 +93,7 @@ export function NuevaOfertaPage() {
       <Stack gap="lg">
         <Button
           component={Link}
-          to="/ofertas/mias"
+          to="/panel/productos"
           variant="default"
           radius="xl"
           size="compact-sm"

@@ -33,7 +33,7 @@ export function RutaPublica() {
   }
 
   if (usuario) {
-  return <Navigate to={rutaInicio(usuario.rol)} replace />;
+    return <Navigate to={rutaInicio(usuario.rol, usuario.estado)} replace />;
   }
 
   return <Outlet />;
@@ -55,7 +55,7 @@ export function RutaComerciante() {
   }
 
   if (usuario.estado !== 'HABILITADO') {
-    return <Navigate to="/perfil" replace />;
+    return <Navigate to="/comercio/estado" replace />;
   }
 
   return <Outlet />;

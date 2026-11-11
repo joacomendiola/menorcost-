@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { Center, Loader, Title, Text, Divider, Stack, Button } from '@mantine/core';
 import { useAuth } from '../../auth/contexto';
 import { reputacionApi, type ReputacionComercio, type Calificacion } from '../../api';
-import { MerchantHeader } from '../../components/layout/MerchantHeader';
 import { Card } from '../../components/ui/Card';
 
 const STAR_FILLED = '★';
@@ -140,7 +139,6 @@ export function Reviews() {
   if (!token) {
     return (
       <>
-        <MerchantHeader />
         <Center mih="50vh">
           <Text c="red" fw={600}>No hay una sesión activa. Iniciá sesión nuevamente.</Text>
         </Center>
@@ -151,7 +149,6 @@ export function Reviews() {
   if (cargando) {
     return (
       <>
-        <MerchantHeader />
         <Center mih="50vh"><Loader color="brand" /></Center>
       </>
     );
@@ -160,7 +157,6 @@ export function Reviews() {
   if (error && !data) {
     return (
       <>
-        <MerchantHeader />
         <Center mih="50vh">
           <Text c="red" fw={600}>{error}</Text>
         </Center>
@@ -174,8 +170,6 @@ export function Reviews() {
 
   return (
     <>
-      <MerchantHeader />
-
       <main className="merchant-content">
         <div className="reviews-grid" style={{ marginTop: '16px' }}>
           {/* Columna izquierda: Reseñas */}

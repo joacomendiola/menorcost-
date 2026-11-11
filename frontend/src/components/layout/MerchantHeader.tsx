@@ -9,9 +9,11 @@ import { useAuth } from '../../auth/contexto';
 import { comerciosApi } from '../../comercios/api';
 
 const TABS = [
-  { id: 'ofertas', label: 'Ofertas', href: '/ofertas/mias' },
-  { id: 'mi-local', label: 'Mi local', href: '/comercios/perfil' },
-  { id: 'horarios', label: 'Horarios', href: '/comercios/horarios' },
+  { id: 'resumen', label: 'Resumen', href: '/panel' },
+  { id: 'pedidos', label: 'Pedidos', href: '/panel/pedidos' },
+  { id: 'productos', label: 'Productos', href: '/panel/productos' },
+  { id: 'mi-local', label: 'Mi local', href: '/panel/mi-local' },
+  { id: 'horarios', label: 'Horarios', href: '/panel/horarios' },
   {
     id: 'reputacion',
     label: 'Reputación',
@@ -73,13 +75,12 @@ export function MerchantHeader() {
   if (cargando || !usuario) return null;
 
   const currentTab =
-    TABS.find((tab) => location.pathname === tab.href)?.id ??
-    (location.pathname === '/panel' ? 'reputacion' : '');
+    TABS.find((tab) => location.pathname === tab.href)?.id ?? '';
 
   return (
     <header className="merchant-header">
       <div className="merchant-header__left">
-        <Link to="/ofertas/mias" aria-label="Ir a mis ofertas">
+        <Link to="/panel" aria-label="Ir al panel">
           <Logo />
         </Link>
       </div>
