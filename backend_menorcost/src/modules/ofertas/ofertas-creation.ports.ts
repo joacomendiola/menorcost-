@@ -47,7 +47,10 @@ export interface OfferDetails {
   fechaVencimiento: string;
   stock: number;
   precioLista: string;
-  precioMenorcost: string;
+  precioBaseNeto: string;
+  precioPublico: string;
+  comisionMenorcostTasaAplicada: string;
+  tasaMpEstimadaAplicada: string;
   imagen: string;
   estado: OfferStatus;
 }
@@ -62,10 +65,11 @@ export interface OfferDashboardSummary {
 }
 export interface OfferRepository {
   create(
-    data: CreateOfferDto & {
-      imagen: string;
-      estado: 'ACTIVO';
-    },
+    data: CreateOfferDto &
+      CalculatedOfferPrices & {
+        imagen: string;
+        estado: 'ACTIVO';
+      },
   ): Promise<OfferRecord>;
 
   listByOwner(userId: string): Promise<OfferDetails[]>;
@@ -78,7 +82,10 @@ export interface OfferRepository {
   updateForOwner(
     userId: string,
     offerId: string,
-    data: UpdateOfferDto & { imagen?: string },
+    data: Partial<CalculatedOfferPrices> &
+      Pick<UpdateOfferDto, 'precioLista' | 'stock'> & {
+        imagen?: string;
+      },
   ): Promise<OfferDetails | null>;
 
   updateStatusForOwner(
@@ -86,4 +93,10 @@ export interface OfferRepository {
     offerId: string,
     estado: ManageableOfferStatus,
   ): Promise<OfferDetails | null>;
+}
+export interface CalculatedOfferPrices {
+  precioBaseNeto: string;
+  precioPublico: string;
+  comisionMenorcostTasaAplicada: string;
+  tasaMpEstimadaAplicada: string;
 }

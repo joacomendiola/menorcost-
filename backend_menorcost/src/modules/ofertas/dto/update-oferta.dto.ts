@@ -13,7 +13,7 @@ export class UpdateOfferDto {
 
   @IsOptional()
   @Matches(/^\d+(\.\d{1,2})?$/)
-  precioMenorcost?: string;
+  precioBaseNeto?: string;
 
   @IsOptional()
   @Type(() => Number)

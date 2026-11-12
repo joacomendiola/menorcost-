@@ -12,6 +12,8 @@ describe('CanastasService', () => {
   const usuarioId = '22222222-2222-4222-8222-222222222222';
   const productoId = '33333333-3333-4333-8333-333333333333';
   const canastaId = '44444444-4444-4444-8444-444444444444';
+  const canastaItemId =
+    '55555555-5555-4555-8555-555555555555';
 
   const comercio = {
     idComercio: comercioId,
@@ -23,10 +25,24 @@ describe('CanastasService', () => {
     titulo: 'Canasta de verduras',
     imagen: '/uploads/verduras.jpg',
     stock: 10,
-    precioMenorcost: '1250.50',
+    precioPublico: '1250.50',
     estado: 'ACTIVO',
     fechaVencimiento: new Date('2099-12-31T00:00:00.000Z'),
   };
+
+  const canastaSerializada = (cantidad: number) => ({
+    idCanasta: canastaId,
+    comercioId,
+    comercio,
+    items: [
+      {
+        idCanastaItem: canastaItemId,
+        productoId,
+        cantidad,
+        producto,
+      },
+    ],
+  });
 
   const prisma = {
     comercio: {
@@ -35,7 +51,6 @@ describe('CanastasService', () => {
     canasta: {
       findUnique: vi.fn(),
       upsert: vi.fn(),
-      update: vi.fn(),
     },
     producto: {
       findFirst: vi.fn(),
@@ -43,7 +58,6 @@ describe('CanastasService', () => {
     canastaItem: {
       findUnique: vi.fn(),
       upsert: vi.fn(),
-      findMany: vi.fn(),
     },
     $transaction: vi.fn(),
   };
@@ -104,31 +118,13 @@ describe('CanastasService', () => {
         upsert: vi.fn().mockResolvedValue({
           idCanasta: canastaId,
         }),
-        update: vi.fn().mockResolvedValue({
-          idCanasta: canastaId,
-          comercioId,
-          subtotal: '2501.00',
-          comercio,
-          items: [
-            {
-              idCanastaItem:
-                '55555555-5555-4555-8555-555555555555',
-              productoId,
-              cantidad: 2,
-              producto,
-            },
-          ],
-        }),
+        findUnique: vi
+          .fn()
+          .mockResolvedValue(canastaSerializada(2)),
       },
       canastaItem: {
         findUnique: vi.fn().mockResolvedValue(null),
         upsert: vi.fn(),
-        findMany: vi.fn().mockResolvedValue([
-          {
-            cantidad: 2,
-            producto,
-          },
-        ]),
       },
     };
 
@@ -156,19 +152,34 @@ describe('CanastasService', () => {
       subtotal: '2501.00',
       items: [
         {
-          idCanastaItem:
-            '55555555-5555-4555-8555-555555555555',
+          idCanastaItem: canastaItemId,
           productoId,
           cantidad: 2,
           precioUnitario: '1250.50',
           subtotal: '2501.00',
           producto: {
             ...producto,
-            precioMenorcost: '1250.50',
+            precioPublico: '1250.50',
             fechaVencimiento: '2099-12-31',
           },
         },
       ],
+    });
+
+    expect(transaction.canasta.upsert).toHaveBeenCalledWith({
+      where: {
+        usuarioId_comercioId: {
+          usuarioId,
+          comercioId,
+        },
+      },
+      create: {
+        usuarioId,
+        comercioId,
+      },
+      update: {
+        updatedAt: expect.any(Date),
+      },
     });
 
     expect(transaction.canastaItem.upsert).toHaveBeenCalledWith({
@@ -188,12 +199,9 @@ describe('CanastasService', () => {
       },
     });
 
-    expect(transaction.canasta.update).toHaveBeenCalledWith({
+    expect(transaction.canasta.findUnique).toHaveBeenCalledWith({
       where: {
         idCanasta: canastaId,
-      },
-      data: {
-        subtotal: '2501.00',
       },
       include: {
         comercio: {
@@ -210,7 +218,7 @@ describe('CanastasService', () => {
                 titulo: true,
                 imagen: true,
                 stock: true,
-                precioMenorcost: true,
+                precioPublico: true,
                 estado: true,
                 fechaVencimiento: true,
               },
@@ -236,20 +244,15 @@ describe('CanastasService', () => {
         upsert: vi.fn().mockResolvedValue({
           idCanasta: canastaId,
         }),
-        update: vi.fn().mockResolvedValue({
-          idCanasta: canastaId,
-          comercioId,
-          subtotal: '3751.50',
-          comercio,
-          items: [],
-        }),
+        findUnique: vi
+          .fn()
+          .mockResolvedValue(canastaSerializada(3)),
       },
       canastaItem: {
         findUnique: vi.fn().mockResolvedValue({
           cantidad: 2,
         }),
         upsert: vi.fn(),
-        findMany: vi.fn().mockResolvedValue([]),
       },
     };
 
@@ -261,9 +264,37 @@ describe('CanastasService', () => {
       ) => callback(transaction),
     );
 
-    await service.agregarProducto(usuarioId, comercioId, {
+    const resultado = await service.agregarProducto(
+      usuarioId,
+      comercioId,
+      {
+        productoId,
+        cantidad: 1,
+      },
+    );
+
+    expect(resultado.subtotal).toBe('3751.50');
+    expect(resultado.items[0]).toMatchObject({
       productoId,
-      cantidad: 1,
+      cantidad: 3,
+      precioUnitario: '1250.50',
+      subtotal: '3751.50',
+    });
+
+    expect(transaction.canasta.upsert).toHaveBeenCalledWith({
+      where: {
+        usuarioId_comercioId: {
+          usuarioId,
+          comercioId,
+        },
+      },
+      create: {
+        usuarioId,
+        comercioId,
+      },
+      update: {
+        updatedAt: expect.any(Date),
+      },
     });
 
     expect(transaction.canastaItem.upsert).toHaveBeenCalledWith({
@@ -305,7 +336,6 @@ describe('CanastasService', () => {
           cantidad: 2,
         }),
         upsert: vi.fn(),
-        findMany: vi.fn(),
       },
     };
 
@@ -335,7 +365,9 @@ describe('CanastasService', () => {
       producto: {
         findFirst: vi.fn().mockResolvedValue({
           ...producto,
-          fechaVencimiento: new Date('2020-01-01T00:00:00.000Z'),
+          fechaVencimiento: new Date(
+            '2020-01-01T00:00:00.000Z',
+          ),
         }),
       },
       canasta: {

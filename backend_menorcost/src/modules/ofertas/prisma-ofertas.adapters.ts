@@ -7,6 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import type { CreateOfferDto } from './dto/create-oferta.dto.js';
 import type { UpdateOfferDto } from './dto/update-oferta.dto.js';
 import type {
+  CalculatedOfferPrices,
   ManageableOfferStatus,
   OfferAccess,
   OfferCategories,
@@ -26,7 +27,10 @@ const offerDetailsSelect = {
   fechaVencimiento: true,
   stock: true,
   precioLista: true,
-  precioMenorcost: true,
+  precioBaseNeto: true,
+  precioPublico: true,
+  comisionMenorcostTasaAplicada: true,
+  tasaMpEstimadaAplicada: true,
   imagen: true,
   estado: true,
 } as const;
@@ -41,7 +45,10 @@ type OfferProjection = {
   fechaVencimiento: Date;
   stock: number;
   precioLista: { toString(): string };
-  precioMenorcost: { toString(): string };
+  precioBaseNeto: { toString(): string };
+  precioPublico: { toString(): string };
+  comisionMenorcostTasaAplicada: { toString(): string };
+  tasaMpEstimadaAplicada: { toString(): string };
   imagen: string;
   estado: OfferDetails['estado'];
 };
@@ -54,10 +61,17 @@ function toOfferDetails(producto: OfferProjection): OfferDetails {
     tipo: producto.tipo,
     titulo: producto.titulo,
     descripcion: producto.descripcion,
-    fechaVencimiento: producto.fechaVencimiento.toISOString().slice(0, 10),
+    fechaVencimiento: producto.fechaVencimiento
+      .toISOString()
+      .slice(0, 10),
     stock: producto.stock,
     precioLista: producto.precioLista.toString(),
-    precioMenorcost: producto.precioMenorcost.toString(),
+    precioBaseNeto: producto.precioBaseNeto.toString(),
+    precioPublico: producto.precioPublico.toString(),
+    comisionMenorcostTasaAplicada:
+      producto.comisionMenorcostTasaAplicada.toString(),
+    tasaMpEstimadaAplicada:
+      producto.tasaMpEstimadaAplicada.toString(),
     imagen: producto.imagen,
     estado: producto.estado,
   };
@@ -65,9 +79,12 @@ function toOfferDetails(producto: OfferProjection): OfferDetails {
 
 @Injectable()
 export class PrismaOfferAccessAdapter implements OfferAccess {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
-  async assertCanPublish(userId: string, comercioId: string): Promise<void> {
+  async assertCanPublish(
+    userId: string,
+    comercioId: string,
+  ): Promise<void> {
     const usuario = await this.prisma.usuario.findFirst({
       where: { id: userId, deletedAt: null },
       select: { rol: true, estado: true },
@@ -123,7 +140,7 @@ export class PrismaOfferAccessAdapter implements OfferAccess {
 
 @Injectable()
 export class PrismaOfferCategoriesAdapter implements OfferCategories {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async assertExists(categoriaId: string): Promise<void> {
     const categoria = await this.prisma.categoria.findUnique({
@@ -142,13 +159,14 @@ export class PrismaOfferCategoriesAdapter implements OfferCategories {
 
 @Injectable()
 export class PrismaOfferRepositoryAdapter implements OfferRepository {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(
-    data: CreateOfferDto & {
-      imagen: string;
-      estado: 'ACTIVO';
-    },
+    data: CreateOfferDto &
+      CalculatedOfferPrices & {
+        imagen: string;
+        estado: 'ACTIVO';
+      },
   ): Promise<OfferRecord> {
     const producto = await this.prisma.producto.create({
       data: {
@@ -157,16 +175,23 @@ export class PrismaOfferRepositoryAdapter implements OfferRepository {
         categoriaId: data.categoriaId,
         titulo: data.titulo,
         descripcion: data.descripcion,
-        fechaVencimiento: new Date(`${data.fechaVencimiento}T00:00:00.000Z`),
+        fechaVencimiento: new Date(
+          `${data.fechaVencimiento}T00:00:00.000Z`,
+        ),
         stock: data.stock,
         precioLista: data.precioLista,
-        precioMenorcost: data.precioMenorcost,
+        precioBaseNeto: data.precioBaseNeto,
+        precioPublico: data.precioPublico,
+        comisionMenorcostTasaAplicada:
+          data.comisionMenorcostTasaAplicada,
+        tasaMpEstimadaAplicada: data.tasaMpEstimadaAplicada,
         imagen: data.imagen,
         estado: data.estado,
       },
       select: {
         idProducto: true,
         imagen: true,
+        estado: true,
       },
     });
 
@@ -211,14 +236,32 @@ export class PrismaOfferRepositoryAdapter implements OfferRepository {
   async updateForOwner(
     userId: string,
     offerId: string,
-    data: UpdateOfferDto & { imagen?: string },
+    data: Partial<CalculatedOfferPrices> &
+      Pick<UpdateOfferDto, 'precioLista' | 'stock'> & {
+        imagen?: string;
+      },
   ): Promise<OfferDetails | null> {
     const updateData = {
       ...(data.precioLista !== undefined
         ? { precioLista: data.precioLista }
         : {}),
-      ...(data.precioMenorcost !== undefined
-        ? { precioMenorcost: data.precioMenorcost }
+      ...(data.precioBaseNeto !== undefined
+        ? { precioBaseNeto: data.precioBaseNeto }
+        : {}),
+      ...(data.precioPublico !== undefined
+        ? { precioPublico: data.precioPublico }
+        : {}),
+      ...(data.comisionMenorcostTasaAplicada !== undefined
+        ? {
+            comisionMenorcostTasaAplicada:
+              data.comisionMenorcostTasaAplicada,
+          }
+        : {}),
+      ...(data.tasaMpEstimadaAplicada !== undefined
+        ? {
+            tasaMpEstimadaAplicada:
+              data.tasaMpEstimadaAplicada,
+          }
         : {}),
       ...(data.stock !== undefined ? { stock: data.stock } : {}),
       ...(data.imagen !== undefined ? { imagen: data.imagen } : {}),
@@ -285,22 +328,32 @@ export class PrismaOfferReservationsAdapter implements OfferReservations {
 
     return result._sum.cantidad ?? 0;
   }
-  async getReservedUnitsForOwner(userId: string): Promise<number> {
-  const result = await this.prisma.pedidoItem.aggregate({
-    where: {
-      producto: {
-        is: {
-          comercio: {
-            is: { userId },
+
+  async getReservedUnitsForOwner(
+    userId: string,
+  ): Promise<number> {
+    const result = await this.prisma.pedidoItem.aggregate({
+      where: {
+        producto: {
+          is: {
+            comercio: {
+              is: {
+                userId,
+              },
+            },
+          },
+        },
+        pedido: {
+          is: {
+            estado: 'PENDIENTE_DE_RETIRO',
           },
         },
       },
-      pedido: {
-        is: { estado: 'PENDIENTE_DE_RETIRO' },
+      _sum: {
+        cantidad: true,
       },
-    },
-    _sum: { cantidad: true },
-  });
-  return result._sum.cantidad ?? 0;
-    }
+    });
+
+    return result._sum.cantidad ?? 0;
+  }
 }

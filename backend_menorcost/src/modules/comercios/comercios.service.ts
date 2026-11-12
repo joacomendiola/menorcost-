@@ -103,7 +103,7 @@ const SELECT_TIENDA_PUBLICA = {
       descripcion: true,
       imagen: true,
       precioLista: true,
-      precioMenorcost: true,
+      precioPublico: true,
       fechaVencimiento: true,
       stock: true,
       categoria: {

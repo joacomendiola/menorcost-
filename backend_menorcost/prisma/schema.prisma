@@ -41,9 +41,15 @@ model Producto {
   fechaVencimiento DateTime       @map("fecha_vencimiento") @db.Date
   stock            Int
   precioLista      Decimal        @map("precio_lista") @db.Decimal(10, 2)
-  precioMenorcost  Decimal        @map("precio_menorcost") @db.Decimal(10, 2)
-  imagen           String         @db.VarChar(500)
-  estado           EstadoProducto @default(ACTIVO)
+  precioBaseNeto   Decimal        @map("precio_base_neto") @db.Decimal(10, 2)
+  precioPublico    Decimal        @map("precio_publico") @db.Decimal(10, 2)
+
+  comisionMenorcostTasaAplicada Decimal @map("comision_menorcost_tasa_aplicada") @db.Decimal(6, 4)
+
+  tasaMpEstimadaAplicada Decimal @map("tasa_mp_estimada_aplicada") @db.Decimal(6, 4)
+
+  imagen String         @db.VarChar(500)
+  estado EstadoProducto @default(ACTIVO)
 
   comercio              Comercio                     @relation(fields: [comercioId], references: [idComercio])
   categoria             Categoria                    @relation(fields: [categoriaId], references: [idCategoria])
@@ -51,6 +57,8 @@ model Producto {
   canastaItems          CanastaItem[]
   auditoriasVencimiento AuditoriaVencimientoOferta[]
 
+  @@index([comercioId, estado])
+  @@index([fechaVencimiento, estado])
   @@map("producto")
 }
 
@@ -265,15 +273,15 @@ model SolicitudBaja {
 
 model AuditoriaVencimientoOferta {
   id               String         @id @default(uuid()) @db.Uuid
-  productoId       String         @unique @map("producto_id") @db.Uuid
+  productoId       String         @map("producto_id") @db.Uuid
   comercioId       String         @map("comercio_id") @db.Uuid
   estadoAnterior   EstadoProducto @map("estado_anterior")
   estadoNuevo      EstadoProducto @map("estado_nuevo")
   fechaVencimiento DateTime       @map("fecha_vencimiento") @db.Date
   ejecutadoEn      DateTime       @default(now()) @map("ejecutado_en")
 
-  producto     Producto      @relation(fields: [productoId], references: [idProducto])
-  comercio     Comercio      @relation(fields: [comercioId], references: [idComercio])
+  producto     Producto      @relation(fields: [productoId], references: [idProducto], onDelete: Restrict)
+  comercio     Comercio      @relation(fields: [comercioId], references: [idComercio], onDelete: Restrict)
   notificacion Notificacion?
 
   @@index([comercioId, ejecutadoEn])
@@ -355,7 +363,6 @@ model Canasta {
   idCanasta  String   @id @default(uuid()) @map("id_canasta") @db.Uuid
   usuarioId  String   @map("usuario_id")
   comercioId String   @map("comercio_id") @db.Uuid
-  subtotal   Decimal  @default(0) @db.Decimal(10, 2)
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
@@ -364,7 +371,7 @@ model Canasta {
   items    CanastaItem[]
 
   @@unique([usuarioId, comercioId])
-  @@index([usuarioId])
+  @@index([usuarioId, updatedAt])
   @@index([comercioId])
   @@map("canasta")
 }
@@ -378,7 +385,7 @@ model CanastaItem {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   canasta  Canasta  @relation(fields: [canastaId], references: [idCanasta], onDelete: Cascade)
-  producto Producto @relation(fields: [productoId], references: [idProducto])
+  producto Producto @relation(fields: [productoId], references: [idProducto], onDelete: Restrict)
 
   @@unique([canastaId, productoId])
   @@index([productoId])
@@ -418,8 +425,8 @@ model Pedido {
   items         PedidoItem[]
   pagos         Pago[]
 
-  @@index([usuarioId])
-  @@index([comercioId])
+  @@index([usuarioId, estado])
+  @@index([comercioId, estado])
   @@index([estado])
   @@map("pedido")
 }
@@ -440,10 +447,11 @@ model PedidoItem {
   nombreHistorico           String   @map("nombre_historico") @db.VarChar(120)
   fechaVencimientoHistorica DateTime @map("fecha_vencimiento_historica") @db.Date
 
-  pedido   Pedido   @relation(fields: [pedidoId], references: [id_pedido])
-  producto Producto @relation(fields: [productoId], references: [idProducto])
+  pedido   Pedido   @relation(fields: [pedidoId], references: [id_pedido], onDelete: Cascade)
+  producto Producto @relation(fields: [productoId], references: [idProducto], onDelete: Restrict)
 
   @@unique([pedidoId, nroLinea])
+  @@unique([pedidoId, productoId])
   @@index([productoId])
   @@map("pedido_item")
 }

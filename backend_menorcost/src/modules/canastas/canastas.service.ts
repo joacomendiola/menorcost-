@@ -9,12 +9,16 @@ import type { AgregarCanastaItemDto } from './dto/agregar-canasta-item.dto.js';
 @Injectable()
 export class CanastasService {
   constructor(private readonly prisma: PrismaService) {}
-    async obtenerTodas(usuarioId: string) {
+
+  async obtenerTodas(usuarioId: string) {
     const canastas = await this.prisma.canasta.findMany({
       where: {
         usuarioId,
         comercio: {
           estado: 'HABILITADO',
+        },
+        items: {
+          some: {},
         },
       },
       include: {
@@ -32,7 +36,7 @@ export class CanastasService {
                 titulo: true,
                 imagen: true,
                 stock: true,
-                precioMenorcost: true,
+                precioPublico: true,
                 estado: true,
                 fechaVencimiento: true,
               },
@@ -47,12 +51,16 @@ export class CanastasService {
         updatedAt: 'desc',
       },
     });
-  
+
     return canastas.map((canasta) =>
       this.serializarCanasta(canasta),
     );
   }
-  async obtenerPorComercio(usuarioId: string, comercioId: string) {
+
+  async obtenerPorComercio(
+    usuarioId: string,
+    comercioId: string,
+  ) {
     const comercio = await this.prisma.comercio.findFirst({
       where: {
         idComercio: comercioId,
@@ -92,7 +100,7 @@ export class CanastasService {
                 titulo: true,
                 imagen: true,
                 stock: true,
-                precioMenorcost: true,
+                precioPublico: true,
                 estado: true,
                 fechaVencimiento: true,
               },
@@ -152,7 +160,7 @@ export class CanastasService {
           idProducto: true,
           titulo: true,
           stock: true,
-          precioMenorcost: true,
+          precioPublico: true,
           estado: true,
           fechaVencimiento: true,
         },
@@ -170,8 +178,18 @@ export class CanastasService {
         );
       }
 
-      if (this.obtenerFechaProducto(producto.fechaVencimiento) < hoy) {
-        throw new BadRequestException('El producto está vencido.');
+      if (
+        this.obtenerFechaProducto(producto.fechaVencimiento) < hoy
+      ) {
+        throw new BadRequestException(
+          'El producto está vencido.',
+        );
+      }
+
+      if (dto.cantidad > producto.stock) {
+        throw new BadRequestException(
+          `La cantidad solicitada supera el stock disponible de "${producto.titulo}".`,
+        );
       }
 
       const canasta = await tx.canasta.upsert({
@@ -184,9 +202,10 @@ export class CanastasService {
         create: {
           usuarioId,
           comercioId,
-          subtotal: 0,
         },
-        update: {},
+        update: {
+          updatedAt: new Date(),
+        },
       });
 
       const itemExistente = await tx.canastaItem.findUnique({
@@ -201,7 +220,8 @@ export class CanastasService {
         },
       });
 
-      const cantidadFinal = (itemExistente?.cantidad ?? 0) + dto.cantidad;
+      const cantidadFinal =
+        (itemExistente?.cantidad ?? 0) + dto.cantidad;
 
       if (cantidadFinal > producto.stock) {
         throw new BadRequestException(
@@ -226,37 +246,9 @@ export class CanastasService {
         },
       });
 
-      const items = await tx.canastaItem.findMany({
-        where: {
-          canastaId: canasta.idCanasta,
-        },
-        include: {
-          producto: {
-            select: {
-              idProducto: true,
-              titulo: true,
-              imagen: true,
-              stock: true,
-              precioMenorcost: true,
-              estado: true,
-              fechaVencimiento: true,
-            },
-          },
-        },
-      });
-
-      const subtotal = items.reduce(
-        (total, item) =>
-          total + Number(item.producto.precioMenorcost) * item.cantidad,
-        0,
-      );
-
-      const canastaActualizada = await tx.canasta.update({
+      const canastaActualizada = await tx.canasta.findUnique({
         where: {
           idCanasta: canasta.idCanasta,
-        },
-        data: {
-          subtotal: subtotal.toFixed(2),
         },
         include: {
           comercio: {
@@ -273,7 +265,7 @@ export class CanastasService {
                   titulo: true,
                   imagen: true,
                   stock: true,
-                  precioMenorcost: true,
+                  precioPublico: true,
                   estado: true,
                   fechaVencimiento: true,
                 },
@@ -285,6 +277,12 @@ export class CanastasService {
           },
         },
       });
+
+      if (!canastaActualizada) {
+        throw new NotFoundException(
+          'No se pudo recuperar la canasta actualizada.',
+        );
+      }
 
       return this.serializarCanasta(canastaActualizada);
     });
@@ -322,7 +320,6 @@ export class CanastasService {
   private serializarCanasta(canasta: {
     idCanasta: string;
     comercioId: string;
-    subtotal: unknown;
     comercio: {
       idComercio: string;
       nombreFantasia: string;
@@ -336,14 +333,14 @@ export class CanastasService {
         titulo: string;
         imagen: string;
         stock: number;
-        precioMenorcost: unknown;
+        precioPublico: unknown;
         estado: string;
         fechaVencimiento: Date;
       };
     }>;
   }) {
     const items = canasta.items.map((item) => {
-      const precioUnitario = Number(item.producto.precioMenorcost);
+      const precioUnitario = Number(item.producto.precioPublico);
 
       return {
         idCanastaItem: item.idCanastaItem,
@@ -353,7 +350,7 @@ export class CanastasService {
         subtotal: (precioUnitario * item.cantidad).toFixed(2),
         producto: {
           ...item.producto,
-          precioMenorcost: precioUnitario.toFixed(2),
+          precioPublico: precioUnitario.toFixed(2),
           fechaVencimiento: this.obtenerFechaProducto(
             item.producto.fechaVencimiento,
           ),
