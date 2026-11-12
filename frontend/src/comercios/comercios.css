@@ -359,10 +359,21 @@
 .tienda-producto {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  padding: 0;
   overflow: hidden;
   border: 1px solid var(--bd);
   border-radius: var(--radius-card);
   background: var(--card);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tienda-producto:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
 }
 
 .tienda-producto__imagen {
@@ -498,6 +509,7 @@
   .tienda-productos {
     grid-template-columns: 1fr;
   }
+
 }
 .canasta-page {
   max-width: 1000px;

@@ -68,7 +68,7 @@ export interface ProductoTienda {
   descripcion: string;
   imagen: string;
   precioLista: string | number;
-  precioMenorcost: string | number;
+  precioPublico: string | number;
   fechaVencimiento: string;
   stock: number;
   categoria: {

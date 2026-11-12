@@ -7,7 +7,7 @@ export interface DetalleOferta {
     descripcion: string;
     imagen: string;
     precioLista: string;
-    precioMenorcost: string;
+    precioPublico: string;
     fechaVencimiento: string;
     stock: number;
     categoria: {
@@ -38,7 +38,7 @@ export interface CanastaItem {
     titulo: string;
     imagen: string;
     stock: number;
-    precioMenorcost: string;
+    precioPublico: string;
     estado: string;
     fechaVencimiento: string;
   };
@@ -70,7 +70,7 @@ export const detalleOfertaApi = {
 
   obtenerCanasta: (token: string, comercioId: string) =>
     api<CanastaResumen>(
-      `/baskets/${encodeURIComponent(comercioId)}`,
+      `/canastas/${encodeURIComponent(comercioId)}`,
       {
         token,
       },
@@ -83,7 +83,7 @@ export const detalleOfertaApi = {
     cantidad = 1,
   ) =>
     api<CanastaResumen>(
-      `/baskets/${encodeURIComponent(comercioId)}/items`,
+      `/canastas/${encodeURIComponent(comercioId)}/items`,
       {
         method: 'POST',
         token,

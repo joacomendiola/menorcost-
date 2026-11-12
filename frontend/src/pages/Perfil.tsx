@@ -480,8 +480,8 @@ export function Perfil() {
             { icono: '⭐', texto: 'Reputación', ruta: '/panel/reputacion' },
           ]
         : [
-            { icono: '📦', texto: 'Mis pedidos' },
-            { icono: '🧺', texto: 'Mis canastas' },
+            { icono: '📦', texto: 'Mis pedidos', ruta: '/pedidos' },
+            { icono: '🧺', texto: 'Mis canastas', ruta: '/canastas' },
             { icono: '🔎', texto: 'Buscar ofertas' },
             {
               icono: '🏪',

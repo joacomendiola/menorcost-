@@ -31,7 +31,7 @@ function fechaExacta(fecha: string): string {
 
 function calcularDescuento(oferta: DetalleOferta): number {
   const lista = numero(oferta.producto.precioLista);
-  const promocional = numero(oferta.producto.precioMenorcost);
+  const promocional = numero(oferta.producto.precioPublico);
 
   if (lista <= 0 || promocional >= lista) return 0;
 
@@ -167,14 +167,14 @@ export function DetalleOfertaPage() {
     return Math.max(
       0,
       numero(oferta.producto.precioLista) -
-        numero(oferta.producto.precioMenorcost),
+        numero(oferta.producto.precioPublico),
     );
   }, [oferta]);
 
   const subtotalSeleccionado = useMemo(() => {
     if (!oferta) return 0;
 
-    return numero(oferta.producto.precioMenorcost) * cantidad;
+    return numero(oferta.producto.precioPublico) * cantidad;
   }, [oferta, cantidad]);
 
   const distancia = useMemo(() => {
@@ -230,7 +230,7 @@ export function DetalleOfertaPage() {
         message: 'Producto agregado a la canasta correctamente.',
       });
 
-      navigate(`/canastas/${comercioId}`);
+      navigate(`/comercios/${comercioId}`);
     } catch (err) {
       notifications.show({
         color: 'red',
@@ -345,7 +345,7 @@ export function DetalleOfertaPage() {
             )}
 
             <strong>
-              {moneda.format(numero(oferta.producto.precioMenorcost))}
+              {moneda.format(numero(oferta.producto.precioPublico))}
             </strong>
           </div>
 

@@ -31,11 +31,11 @@ function numero(valor: string | number): number {
 
 function descuento(producto: ProductoTienda): number {
   const lista = numero(producto.precioLista);
-  const menorcost = numero(producto.precioMenorcost);
+  const precioPublico = numero(producto.precioPublico);
 
-  if (lista <= 0 || menorcost >= lista) return 0;
+  if (lista <= 0 || precioPublico >= lista) return 0;
 
-  return Math.round((1 - menorcost / lista) * 100);
+  return Math.round((1 - precioPublico / lista) * 100);
 }
 
 function fechaCorta(fecha: string): string {
@@ -98,7 +98,7 @@ export function TiendaPublicaPage() {
 
     return [...tienda.productos].sort((a, b) => {
       if (orden === 'precio') {
-        return numero(a.precioMenorcost) - numero(b.precioMenorcost);
+        return numero(a.precioPublico) - numero(b.precioPublico);
       }
 
       if (orden === 'descuento') {
@@ -247,13 +247,23 @@ export function TiendaPublicaPage() {
                 const descuentoProducto = descuento(producto);
 
                 return (
-                  <article className="tienda-producto" key={producto.id}>
+                  <button
+                    type="button"
+                    className="tienda-producto"
+                    key={producto.id}
+                    onClick={() =>
+                      navigate(
+                        `/comercios/${tienda.id}/productos/${producto.id}`,
+                      )
+                    }
+                  >
                     <div className="tienda-producto__imagen">
                       {imagen ? (
                         <img src={imagen} alt={producto.titulo} />
                       ) : (
                         <span>Sin imagen</span>
                       )}
+
                       {descuentoProducto > 0 && (
                         <span className="tienda-producto__descuento">
                           -{descuentoProducto}%
@@ -265,7 +275,9 @@ export function TiendaPublicaPage() {
                       <span className="badge badge--blue">
                         {producto.categoria.nombre}
                       </span>
+
                       <h3>{producto.titulo}</h3>
+
                       <p className="tienda-producto__descripcion">
                         {producto.descripcion}
                       </p>
@@ -276,8 +288,9 @@ export function TiendaPublicaPage() {
                             {moneda.format(numero(producto.precioLista))}
                           </span>
                         )}
+
                         <strong>
-                          {moneda.format(numero(producto.precioMenorcost))}
+                          {moneda.format(numero(producto.precioPublico))}
                         </strong>
                       </div>
 
@@ -290,7 +303,7 @@ export function TiendaPublicaPage() {
                         </span>
                       </div>
                     </div>
-                  </article>
+                  </button>
                 );
               })}
             </div>
