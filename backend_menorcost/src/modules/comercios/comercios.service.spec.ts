@@ -109,28 +109,59 @@ beforeEach(() => {
 });
 
 describe('ComerciosService.listarCategorias', () => {
-  it('devuelve solo categorías activas ordenadas y con id público', async () => {
+  it('devuelve los rubros activos con sus subcategorías ordenadas', async () => {
     prismaMock.categoria.findMany.mockResolvedValue([
       {
         idCategoria: 'cat-1',
         nombre: 'Bebidas',
         slug: 'bebidas',
         orden: 4,
+        subcategorias: [
+          {
+            idCategoria: 'cat-2',
+            nombre: 'Gaseosas',
+            slug: 'gaseosas',
+            orden: 1,
+          },
+        ],
       },
     ]);
 
     await expect(service.listarCategorias()).resolves.toEqual([
-      { id: 'cat-1', nombre: 'Bebidas', slug: 'bebidas', orden: 4 },
+      {
+        id: 'cat-1',
+        nombre: 'Bebidas',
+        slug: 'bebidas',
+        orden: 4,
+        subcategorias: [
+          {
+            id: 'cat-2',
+            nombre: 'Gaseosas',
+            slug: 'gaseosas',
+            orden: 1,
+          },
+        ],
+      },
     ]);
 
     expect(prismaMock.categoria.findMany).toHaveBeenCalledWith({
-      where: { activa: true },
+      where: { activa: true, categoriaPadreId: null },
       orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
       select: {
         idCategoria: true,
         nombre: true,
         slug: true,
         orden: true,
+        subcategorias: {
+          where: { activa: true },
+          orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
+          select: {
+            idCategoria: true,
+            nombre: true,
+            slug: true,
+            orden: true,
+          },
+        },
       },
     });
   });
