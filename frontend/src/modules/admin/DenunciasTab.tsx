@@ -267,10 +267,7 @@ export function DenunciasTab() {
                           d.tipo_destino === 'COMERCIO'
                             ? 'Registro del comercio'
                             : 'Registro del usuario',
-                        value:
-                          d.tipo_destino === 'COMERCIO'
-                            ? 'Verificado'
-                            : `${d.registro.total} denuncia(s) recibida(s) · ${d.registro.abiertas} abierta(s) · ${d.registro.resueltas} resuelta(s) · ${d.registro.desestimadas} desestimada(s)`,
+                        value: `${d.registro.total} denuncia(s) recibida(s) · ${d.registro.abiertas} abierta(s) · ${d.registro.resueltas} resuelta(s) · ${d.registro.desestimadas} desestimada(s)`,
                       },
                       ...(d.denunciado.comercio
                         ? [
@@ -373,8 +370,8 @@ export function DenunciasTab() {
         onConfirm={() => sancionando && void ejecutar(sancionando, 'sancionar')}
       >
         La cuenta de <strong>{sancionando ? nombreCompleto(sancionando.denunciado) : ''}</strong>{' '}
-        pasará a <strong>SUSPENDIDO</strong>, se cerrarán sus sesiones y se le notificará por
-        correo. También se cerrarán las demás denuncias abiertas del mismo usuario. La
+        pasará a <strong>SUSPENDIDO</strong>, se cerrarán sus sesiones y se notificará a ambas
+        partes por correo. También se cerrarán las demás denuncias abiertas del mismo usuario. La
         resolución del conflicto es externa: el sistema solo actualiza el estado.
       </ConfirmDialog>
 
