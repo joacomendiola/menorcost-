@@ -8,7 +8,22 @@ import {
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { CrearReporteDto } from './dto/crear-reporte.dto.js';
 import type { ListarMisReportesQueryDto } from './dto/listar-mis-reportes-query.dto.js';
-import type { EstadoReporte, TipoDestinoReporte, Rol } from '../../generated/prisma/enums.js';
+import type {
+  EstadoPedido,
+  TipoDestinoReporte,
+  Rol,
+} from '../../generated/prisma/enums.js';
+
+const ESTADOS_REPORTABLES: Record<Rol, EstadoPedido[]> = {
+  CLIENTE: ['ENTREGADO', 'PENDIENTE_DE_RETIRO', 'CANCELADO'],
+  COMERCIANTE: [
+    'ENTREGADO',
+    'PENDIENTE_DE_RETIRO',
+    'CANCELADO',
+    'CANCELADO_POR_FALTA_RETIRO',
+  ],
+  ADMINISTRADOR: [],
+};
 
 @Injectable()
 export class ReportesService {
@@ -32,14 +47,6 @@ export class ReportesService {
       throw new NotFoundException('Comercio asociado al pedido no encontrado');
     }
 
-    // No se puede reportar un pedido cancelado.
-    if (
-      pedido.estado === 'CANCELADO' ||
-      pedido.estado === 'CANCELADO_POR_FALTA_RETIRO'
-    ) {
-      throw new BadRequestException('No se puede reportar un pedido cancelado');
-    }
-
     // 2. Validar permisos según rol y determinar denunciado
     let idDenunciado: string;
     let tipoDestinoEsperado: TipoDestinoReporte;
@@ -60,12 +67,19 @@ export class ReportesService {
       throw new ForbiddenException('Solo clientes y comerciantes pueden crear reportes');
     }
 
-    // 3. Validar que el tipo_destino coincide con el rol
+    // 3. Validar que el pedido esté en un estado reportable para el rol.
+    if (!ESTADOS_REPORTABLES[rolUsuario].includes(pedido.estado)) {
+      throw new BadRequestException(
+        `No se puede reportar un pedido en estado ${pedido.estado}`,
+      );
+    }
+
+    // 4. Validar que el tipo_destino coincide con el rol
     if (dto.tipo_destino !== tipoDestinoEsperado) {
       throw new BadRequestException('El tipo de destino no corresponde a tu rol');
     }
 
-    // 4. Validar que no exista un reporte ABIERTO previo del mismo usuario.
+    // 5. Validar que no exista un reporte ABIERTO previo del mismo usuario.
     //    Si el anterior fue DESESTIMADO o RESUELTO, se permite volver a reportar.
     const reporteExistente = await this.prisma.reporte.findFirst({
       where: {
@@ -81,13 +95,13 @@ export class ReportesService {
       );
     }
 
-    // 5. Validar descripción obligatoria si motivo es "Otro motivo"
+    // 6. Validar descripción obligatoria si motivo es "Otro motivo"
     const esOtroMotivo = dto.motivo.toLowerCase().includes('otro');
     if (esOtroMotivo && (!dto.descripcion || dto.descripcion.trim() === '')) {
       throw new BadRequestException('Por favor, especifica brevemente el problema ocurrido');
     }
 
-    // 6. Crear el reporte en transacción
+    // 7. Crear el reporte en transacción
     return this.prisma.$transaction(async (tx) => {
       const reporte = await tx.reporte.create({
         data: {
@@ -106,7 +120,7 @@ export class ReportesService {
         },
       });
 
-      // 7. Verificar umbral de 3 reportes para poner BAJO_INVESTIGACION
+      // 8. Verificar umbral de 3 reportes para poner BAJO_INVESTIGACION
       await this.verificarUmbralReportes(tx, idDenunciado);
 
       return reporte;
