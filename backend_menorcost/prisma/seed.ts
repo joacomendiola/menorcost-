@@ -74,7 +74,11 @@ const categorias: CategoriaSeed[] = [
     orden: 6,
     subcategorias: [
       { nombre: 'Panes', slug: 'panes', orden: 1 },
-      { nombre: 'Facturas y medialunas', slug: 'facturas-y-medialunas', orden: 2 },
+      {
+        nombre: 'Facturas y medialunas',
+        slug: 'facturas-y-medialunas',
+        orden: 2,
+      },
       { nombre: 'Tortas', slug: 'tortas', orden: 3 },
     ],
   },
@@ -92,6 +96,19 @@ const categorias: CategoriaSeed[] = [
 
 const CONFIG_COMISION_INICIAL_ID = '00000000-0000-4000-8000-000000000001';
 const COMISION_MENORCOST_INICIAL = '0.1000'; // 10 %
+const PASSWORD_DEMO = 'Password123';
+
+function fechaVencimiento(diasDesdeHoy: number): Date {
+  const hoy = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  const fecha = new Date(`${hoy}T00:00:00.000Z`);
+  fecha.setUTCDate(fecha.getUTCDate() + diasDesdeHoy);
+  return fecha;
+}
 
 async function main(): Promise<void> {
   const connectionString = process.env.DATABASE_URL;
@@ -164,6 +181,7 @@ async function main(): Promise<void> {
     console.log(`Categorías sincronizadas: ${totalCategorias}`);
     console.table(rubros);
 
+    const passwordDemoHash = await hash(PASSWORD_DEMO, 10);
     const clienteDemo = await prisma.usuario.upsert({
       where: {
         email: 'cliente@test.com',
@@ -174,7 +192,7 @@ async function main(): Promise<void> {
         apellido: 'Demo',
         telefono: '+54 2901 555556',
         fechaNacimiento: new Date('1995-05-20T00:00:00.000Z'),
-        passwordHash: await hash('Password123', 10),
+        passwordHash: passwordDemoHash,
         rol: 'CLIENTE',
         estado: 'HABILITADO',
         deletedAt: null,
@@ -187,13 +205,353 @@ async function main(): Promise<void> {
         email: 'cliente@test.com',
         telefono: '+54 2901 555556',
         fechaNacimiento: new Date('1995-05-20T00:00:00.000Z'),
-        passwordHash: await hash('Password123', 10),
+        passwordHash: passwordDemoHash,
         rol: 'CLIENTE',
         estado: 'HABILITADO',
       },
     });
 
     console.log(`Cliente demo sincronizado: ${clienteDemo.email}`);
+
+    await prisma.direccion.updateMany({
+      where: { usuarioId: clienteDemo.id, deletedAt: null },
+      data: { esPredeterminada: false },
+    });
+    await prisma.direccion.upsert({
+      where: { id: '00000000-0000-4000-8000-000000000121' },
+      update: {
+        usuarioId: clienteDemo.id,
+        etiqueta: 'Casa',
+        calle: 'Avenida Corrientes',
+        numero: '1200',
+        localidad: 'Buenos Aires',
+        descripcion: 'Dirección de prueba para explorar por cercanía',
+        latitud: '-34.603700',
+        longitud: '-58.381600',
+        esPredeterminada: true,
+        deletedAt: null,
+      },
+      create: {
+        id: '00000000-0000-4000-8000-000000000121',
+        usuarioId: clienteDemo.id,
+        etiqueta: 'Casa',
+        calle: 'Avenida Corrientes',
+        numero: '1200',
+        localidad: 'Buenos Aires',
+        descripcion: 'Dirección de prueba para explorar por cercanía',
+        latitud: '-34.603700',
+        longitud: '-58.381600',
+        esPredeterminada: true,
+      },
+    });
+
+    const rubrosDemo = await prisma.categoria.findMany({
+      where: { activa: true, categoriaPadreId: { not: null } },
+      select: { idCategoria: true, slug: true },
+    });
+    const categoriasPorSlug = new Map(
+      rubrosDemo.map((categoria) => [categoria.slug, categoria.idCategoria]),
+    );
+    const obtenerCategoria = (slug: string): string => {
+      const id = categoriasPorSlug.get(slug);
+      if (!id) throw new Error(`Falta la subcategoría activa ${slug}`);
+      return id;
+    };
+
+    const comerciosDemo = [
+      {
+        id: '00000000-0000-4000-8000-000000000131',
+        userId: '00000000-0000-4000-8000-000000000130',
+        dni: '20123460',
+        email: 'comercio.centro@test.com',
+        nombre: 'Comercio Centro',
+        apellido: 'Demo',
+        nombreFantasia: 'Almacén del Centro',
+        razonSocial: 'Almacén del Centro S.R.L.',
+        cuit: '30-12345678-1',
+        googlePlaceId: 'menorcost-demo-centro',
+        calle: 'Avenida Corrientes',
+        numero: '1250',
+        localidad: 'Buenos Aires',
+        latitud: '-34.604200',
+        longitud: '-58.382000',
+        abierto: true,
+      },
+      {
+        id: '00000000-0000-4000-8000-000000000141',
+        userId: '00000000-0000-4000-8000-000000000140',
+        dni: '20123461',
+        email: 'comercio.barrio@test.com',
+        nombre: 'Comercio Barrio',
+        apellido: 'Demo',
+        nombreFantasia: 'Mercado del Barrio',
+        razonSocial: 'Mercado del Barrio S.R.L.',
+        cuit: '30-12345678-2',
+        googlePlaceId: 'menorcost-demo-barrio',
+        calle: 'Avenida Santa Fe',
+        numero: '2400',
+        localidad: 'Buenos Aires',
+        latitud: '-34.595000',
+        longitud: '-58.395000',
+        abierto: false,
+      },
+    ];
+
+    const comerciosCreados = new Map<string, string>();
+    for (const comercio of comerciosDemo) {
+      const { id, userId, dni, email, nombre, apellido, ...datosComercio } =
+        comercio;
+      await prisma.usuario.upsert({
+        where: { email },
+        update: {
+          dni,
+          nombre,
+          apellido,
+          telefono: '+54 11 5555 0100',
+          fechaNacimiento: new Date('1988-04-15T00:00:00.000Z'),
+          passwordHash: passwordDemoHash,
+          rol: 'COMERCIANTE',
+          estado: 'HABILITADO',
+          deletedAt: null,
+        },
+        create: {
+          id: userId,
+          dni,
+          nombre,
+          apellido,
+          email,
+          telefono: '+54 11 5555 0100',
+          fechaNacimiento: new Date('1988-04-15T00:00:00.000Z'),
+          passwordHash: passwordDemoHash,
+          rol: 'COMERCIANTE',
+          estado: 'HABILITADO',
+        },
+      });
+
+      const comercioCreado = await prisma.comercio.upsert({
+        where: { userId },
+        update: {
+          ...datosComercio,
+          estado: 'HABILITADO',
+          mercadoPagoVinculado: true,
+        },
+        create: {
+          idComercio: id,
+          userId,
+          ...datosComercio,
+          provincia: 'Ciudad Autónoma de Buenos Aires',
+          codigoPostal: 'C1043',
+          telefono: '+54 11 5555 0100',
+          descripcion: 'Comercio demo para probar búsqueda y exploración.',
+          logoUrl: '/uploads/logo-test.png',
+          mercadoPagoVinculado: true,
+          estado: 'HABILITADO',
+        },
+      });
+      comerciosCreados.set(email, comercioCreado.idComercio);
+    }
+
+    const ofertasDemo = [
+      {
+        id: '00000000-0000-4000-8000-000000000151',
+        comercio: 'comercio.centro@test.com',
+        categoria: 'aceites-y-conservas',
+        titulo: 'Aceite de girasol 900 ml',
+        descripcion: 'Oferta de almacén válida hasta hoy inclusive.',
+        precioLista: '5000.00',
+        precioBaseNeto: '2800.00',
+        precioPublico: '3500.00',
+        vencimiento: 0,
+      },
+      {
+        id: '00000000-0000-4000-8000-000000000152',
+        comercio: 'comercio.centro@test.com',
+        categoria: 'leches',
+        titulo: 'Leche entera 1 litro',
+        descripcion: 'Oferta de lácteos para búsqueda por producto.',
+        precioLista: '3200.00',
+        precioBaseNeto: '2000.00',
+        precioPublico: '2500.00',
+        vencimiento: 10,
+      },
+      {
+        id: '00000000-0000-4000-8000-000000000153',
+        comercio: 'comercio.barrio@test.com',
+        categoria: 'gaseosas',
+        titulo: 'Gaseosa cola 2.25 litros',
+        descripcion:
+          'Oferta en comercio cerrado para probar el filtro operativo.',
+        precioLista: '4000.00',
+        precioBaseNeto: '2100.00',
+        precioPublico: '2800.00',
+        vencimiento: 20,
+      },
+      {
+        id: '00000000-0000-4000-8000-000000000154',
+        comercio: 'comercio.centro@test.com',
+        categoria: 'yogures',
+        titulo: 'Yogur de frutilla 190 g',
+        descripcion: 'Segunda oferta del mismo local para agrupar marcadores.',
+        precioLista: '1800.00',
+        precioBaseNeto: '1000.00',
+        precioPublico: '1250.00',
+        vencimiento: 5,
+      },
+    ];
+
+    for (const oferta of ofertasDemo) {
+      const comercioId = comerciosCreados.get(oferta.comercio);
+      if (!comercioId)
+        throw new Error(`Falta comercio demo ${oferta.comercio}`);
+      await prisma.producto.upsert({
+        where: { idProducto: oferta.id },
+        update: {
+          comercioId,
+          categoriaId: obtenerCategoria(oferta.categoria),
+          tipo: 'INDIVIDUAL',
+          titulo: oferta.titulo,
+          descripcion: oferta.descripcion,
+          fechaVencimiento: fechaVencimiento(oferta.vencimiento),
+          stock: 10,
+          precioLista: oferta.precioLista,
+          precioBaseNeto: oferta.precioBaseNeto,
+          precioPublico: oferta.precioPublico,
+          comisionMenorcostTasaAplicada: COMISION_MENORCOST_INICIAL,
+          tasaMpEstimadaAplicada: '0.0650',
+          imagen: '/uploads/producto-test.png',
+          estado: 'ACTIVO',
+        },
+        create: {
+          idProducto: oferta.id,
+          comercioId,
+          categoriaId: obtenerCategoria(oferta.categoria),
+          tipo: 'INDIVIDUAL',
+          titulo: oferta.titulo,
+          descripcion: oferta.descripcion,
+          fechaVencimiento: fechaVencimiento(oferta.vencimiento),
+          stock: 10,
+          precioLista: oferta.precioLista,
+          precioBaseNeto: oferta.precioBaseNeto,
+          precioPublico: oferta.precioPublico,
+          comisionMenorcostTasaAplicada: COMISION_MENORCOST_INICIAL,
+          tasaMpEstimadaAplicada: '0.0650',
+          imagen: '/uploads/producto-test.png',
+          estado: 'ACTIVO',
+        },
+      });
+    }
+
+    const categoriaVencida = await prisma.categoria.findFirstOrThrow({
+      where: { activa: true },
+      orderBy: { orden: 'asc' },
+    });
+    const comercianteVencido = await prisma.usuario.upsert({
+      where: { email: 'comerciante-cu207@test.com' },
+      update: {
+        dni: '20123458',
+        nombre: 'Comerciante',
+        apellido: 'Demo',
+        telefono: '+54 2901 555557',
+        fechaNacimiento: new Date('1990-04-15T00:00:00.000Z'),
+        passwordHash: passwordDemoHash,
+        rol: 'COMERCIANTE',
+        estado: 'HABILITADO',
+        deletedAt: null,
+      },
+      create: {
+        id: '00000000-0000-4000-8000-000000000201',
+        dni: '20123458',
+        nombre: 'Comerciante',
+        apellido: 'Demo',
+        email: 'comerciante-cu207@test.com',
+        telefono: '+54 2901 555557',
+        fechaNacimiento: new Date('1990-04-15T00:00:00.000Z'),
+        passwordHash: passwordDemoHash,
+        rol: 'COMERCIANTE',
+        estado: 'HABILITADO',
+      },
+    });
+    const comercioVencido = await prisma.comercio.upsert({
+      where: { userId: comercianteVencido.id },
+      update: {
+        estado: 'HABILITADO',
+        mercadoPagoVinculado: true,
+        abierto: true,
+      },
+      create: {
+        idComercio: '00000000-0000-4000-8000-000000000202',
+        userId: comercianteVencido.id,
+        mercadoPagoVinculado: true,
+        nombreFantasia: 'Comercio CU-2.07',
+        razonSocial: 'Comercio CU-2.07 S.R.L.',
+        cuit: '30-12345678-9',
+        telefono: '+54 2901 555557',
+        descripcion: 'Comercio usado para probar el vencimiento automático.',
+        calle: 'San Martín',
+        numero: '123',
+        localidad: 'Ushuaia',
+        provincia: 'Tierra del Fuego',
+        codigoPostal: '9410',
+        latitud: '-54.801912',
+        longitud: '-68.302951',
+        googlePlaceId: 'cu-207-test-place',
+        logoUrl: '/uploads/logo-test.png',
+        abierto: true,
+        estado: 'HABILITADO',
+      },
+    });
+    const vencidaId = '00000000-0000-4000-8000-000000000203';
+    await prisma.notificacion.deleteMany({
+      where: { auditoriaVencimiento: { productoId: vencidaId } },
+    });
+    await prisma.auditoriaVencimientoOferta.deleteMany({
+      where: { productoId: vencidaId },
+    });
+    await prisma.producto.upsert({
+      where: { idProducto: vencidaId },
+      update: {
+        comercioId: comercioVencido.idComercio,
+        categoriaId: categoriaVencida.idCategoria,
+        tipo: 'INDIVIDUAL',
+        titulo: 'Oferta vencida CU-2.07',
+        descripcion: 'Oferta creada para probar la depuración automática.',
+        fechaVencimiento: fechaVencimiento(-2),
+        stock: 5,
+        precioLista: '100.00',
+        precioBaseNeto: '75.00',
+        precioPublico: '88.24',
+        comisionMenorcostTasaAplicada: COMISION_MENORCOST_INICIAL,
+        tasaMpEstimadaAplicada: '0.0650',
+        imagen: '/uploads/producto-test.png',
+        estado: 'ACTIVO',
+      },
+      create: {
+        idProducto: vencidaId,
+        comercioId: comercioVencido.idComercio,
+        categoriaId: categoriaVencida.idCategoria,
+        tipo: 'INDIVIDUAL',
+        titulo: 'Oferta vencida CU-2.07',
+        descripcion: 'Oferta creada para probar la depuración automática.',
+        fechaVencimiento: fechaVencimiento(-2),
+        stock: 5,
+        precioLista: '100.00',
+        precioBaseNeto: '75.00',
+        precioPublico: '88.24',
+        comisionMenorcostTasaAplicada: COMISION_MENORCOST_INICIAL,
+        tasaMpEstimadaAplicada: '0.0650',
+        imagen: '/uploads/producto-test.png',
+        estado: 'ACTIVO',
+      },
+    });
+
+    console.log(
+      'Datos demo para catálogo, cercanía, filtros y búsqueda sincronizados.',
+    );
+    console.log(`Cliente: ${clienteDemo.email} / ${PASSWORD_DEMO}`);
+    console.log(
+      'Comercios: comercio.centro@test.com y comercio.barrio@test.com / Password123',
+    );
+    console.log('Comercio CU-2.07: comerciante-cu207@test.com / Password123');
 
     // Garantiza una única configuración activa y carga la tasa inicial (10 %).
     await prisma.configComision.updateMany({
