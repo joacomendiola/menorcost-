@@ -45,7 +45,6 @@ const SELECT_FRANJA = {
 
 const SELECT_COMERCIO = {
   idComercio: true,
-  mercadoPagoVinculado: true,
   nombreFantasia: true,
   razonSocial: true,
   cuit: true,
@@ -74,6 +73,9 @@ const SELECT_COMERCIO = {
     select: SELECT_FRANJA,
     orderBy: ORDEN_HORARIOS,
   },
+  credencialMp: {
+    select: { estado: true },
+  },
 } satisfies Prisma.ComercioSelect;
 
 const SELECT_TIENDA_PUBLICA = {
@@ -90,6 +92,8 @@ const SELECT_TIENDA_PUBLICA = {
   latitud: true,
   longitud: true,
   abierto: true,
+  reputacionPromedio: true,
+  totalCalificaciones: true,
   horarios: {
     select: SELECT_HORARIO,
     orderBy: ORDEN_HORARIOS,
@@ -116,12 +120,25 @@ const SELECT_TIENDA_PUBLICA = {
   },
 } satisfies Prisma.ComercioSelect;
 
-function aComercioPropio<T extends { idComercio: string }>(
+function aComercioPropio<
+  T extends {
+    idComercio: string;
+    credencialMp?: { estado: string } | null;
+  },
+>(
   comercio: T,
-): Omit<T, 'idComercio'> & { id: string } {
-  const { idComercio, ...resto } = comercio;
+): Omit<T, 'idComercio' | 'credencialMp'> & {
+  id: string;
+  mercadoPagoVinculado: boolean;
+} {
+  const { idComercio, credencialMp, ...resto } = comercio;
 
-  return { id: idComercio, ...resto };
+  return {
+    id: idComercio,
+    ...resto,
+    // Zona de Choque 2: la vinculación real se deriva de las credenciales.
+    mercadoPagoVinculado: credencialMp?.estado === 'ACTIVA',
+  };
 }
 
 @Injectable()
@@ -135,13 +152,23 @@ export class ComerciosService {
 
   async listarCategorias() {
     const categorias = await this.prisma.categoria.findMany({
-      where: { activa: true },
+      where: { activa: true, categoriaPadreId: null },
       orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
       select: {
         idCategoria: true,
         nombre: true,
         slug: true,
         orden: true,
+        subcategorias: {
+          where: { activa: true },
+          orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
+          select: {
+            idCategoria: true,
+            nombre: true,
+            slug: true,
+            orden: true,
+          },
+        },
       },
     });
 
@@ -150,6 +177,12 @@ export class ComerciosService {
       nombre: categoria.nombre,
       slug: categoria.slug,
       orden: categoria.orden,
+      subcategorias: categoria.subcategorias.map((subcategoria) => ({
+        id: subcategoria.idCategoria,
+        nombre: subcategoria.nombre,
+        slug: subcategoria.slug,
+        orden: subcategoria.orden,
+      })),
     }));
   }
 
@@ -166,12 +199,18 @@ export class ComerciosService {
       throw new NotFoundException(COMERCIO_PUBLICO_NO_ENCONTRADO);
     }
 
-    const { idComercio: id, productos, ...tienda } = comercio;
+    const {
+      idComercio: id,
+      productos,
+      reputacionPromedio,
+      totalCalificaciones,
+      ...tienda
+    } = comercio;
 
     return {
       id,
       ...tienda,
-      reputacion: null,
+      reputacion: totalCalificaciones > 0 ? reputacionPromedio : null,
       productos: productos.map(({ idProducto, ...producto }) => ({
         id: idProducto,
         ...producto,

@@ -263,7 +263,7 @@ export interface Calificacion {
   clienteNombre: string;
   fecha: string;
   puntaje: number;
-  comentario: string;
+  comentario: string | null;
 }
 
 export interface ReputacionComercio {
@@ -429,6 +429,11 @@ export interface AdminUsuario {
   createdAt?: string;
   updatedAt?: string;
   direcciones?: Direccion[];
+  comercio?: {
+    cuit: string;
+    razonSocial: string;
+    nombreFantasia: string;
+  } | null;
 }
 
 export interface AdminAlta {
@@ -437,6 +442,25 @@ export interface AdminAlta {
   mercadoPagoVinculado: boolean;
   reputacionPromedio: number;
   totalCalificaciones: number;
+  nombreFantasia: string;
+  razonSocial: string;
+  cuit: string;
+  telefono: string;
+  descripcion?: string | null;
+  calle: string;
+  numero: string;
+  piso?: string | null;
+  localidad: string;
+  provincia: string;
+  codigoPostal?: string | null;
+  latitud: number | string;
+  longitud: number | string;
+  estado:
+    | 'PENDIENTE_VERIFICACION'
+    | 'HABILITADO'
+    | 'DOCUMENTACION_RECHAZADA'
+    | 'SUSPENDIDO'
+    | 'ELIMINADO';
   usuario: AdminUsuario & { direcciones: Direccion[] };
 }
 
@@ -448,8 +472,11 @@ export interface AdminBaja {
   motivo: string;
   estado: EstadoBaja;
   observaciones: string | null;
+  resueltoEn: string | null;
   createdAt: string;
   updatedAt: string;
+  pedidosCompletados: number;
+  saldoTarifas: number;
   usuario: AdminUsuario;
 }
 
@@ -476,10 +503,23 @@ export interface AdminDenuncia {
     estado: EstadoPedido;
     codigoAlfanumerico: string;
     total: number | string;
+    formaPago: string;
+    items: {
+      id_pedido_item: string;
+      cantidad: number;
+      subtotal: number | string;
+      producto: { titulo: string };
+    }[];
   } | null;
   emisor: AdminUsuario;
   denunciado: AdminUsuario;
   admin: AdminUsuario | null;
+  registro: {
+    total: number;
+    abiertas: number;
+    resueltas: number;
+    desestimadas: number;
+  };
 }
 
 interface AdminNotificacion {
@@ -542,6 +582,12 @@ export const adminApi = {
       { method: 'PATCH', token },
     ),
 
+  desestimarDenuncia: (token: string, id: number) =>
+    api<{ success: true }>(`/admin/denuncias/${id}/desestimar`, {
+      method: 'PATCH',
+      token,
+    }),
+
   resolverDenuncia: (token: string, id: number) =>
     api<{ success: true }>(`/admin/denuncias/${id}/resolver`, {
       method: 'PATCH',
@@ -552,6 +598,13 @@ export const adminApi = {
     api<{
       reporte: Pick<AdminDenuncia, 'id_reporte' | 'estado_reporte'>;
       usuario: AdminUsuario;
+      denunciasCerradas: number;
       notificacion: AdminNotificacion;
     }>(`/admin/denuncias/${id}/sancionar`, { method: 'PATCH', token }),
+
+  rehabilitarUsuario: (token: string, idUsuario: string) =>
+    api<AdminUsuario>(
+      `/admin/usuarios/${encodeURIComponent(idUsuario)}/rehabilitar`,
+      { method: 'PATCH', token },
+    ),
 };

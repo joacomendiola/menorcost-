@@ -58,12 +58,20 @@ export class BackofficeController {
     return this.backofficeService.alternarInvestigacion(idReporte);
   }
 
-  @Patch('denuncias/:id/resolver')
-  async marcarResuelto(
+  @Patch('denuncias/:id/desestimar')
+  async desestimar(
     @Param('id', ParseIntPipe) idReporte: number,
     @CurrentUser() admin: AuthenticatedUser,
   ) {
-    return this.backofficeService.marcarResuelto(idReporte, admin.id);
+    return this.backofficeService.desestimar(idReporte, admin.id);
+  }
+
+  @Patch('denuncias/:id/resolver')
+  async resolver(
+    @Param('id', ParseIntPipe) idReporte: number,
+    @CurrentUser() admin: AuthenticatedUser,
+  ) {
+    return this.backofficeService.resolver(idReporte, admin.id);
   }
 
   @Patch('denuncias/:id/sancionar')
@@ -72,5 +80,11 @@ export class BackofficeController {
     @CurrentUser() admin: AuthenticatedUser,
   ) {
     return this.backofficeService.sancionar(idReporte, admin.id);
+  }
+
+  // --- MÓDULO USUARIOS ---
+  @Patch('usuarios/:id/rehabilitar')
+  async rehabilitarUsuario(@Param('id') idUsuario: string) {
+    return this.backofficeService.rehabilitarUsuario(idUsuario);
   }
 }

@@ -471,18 +471,28 @@ export function Perfil() {
 
   const accesos: Array<{ icono: string; texto: string; ruta?: string }> =
     perfil.rol === 'ADMINISTRADOR'
-      ? [{ icono: '🛡', texto: 'Backoffice' }]
+      ? [{ icono: '🛡', texto: 'Backoffice', ruta: '/admin/altas' }]
       : perfil.rol === 'COMERCIANTE'
         ? [
-            { icono: '📦', texto: 'Mis ofertas', ruta: '/ofertas/mias' },
+            ...(perfil.estado !== 'HABILITADO'
+              ? [
+                  {
+                    icono: '⏳',
+                    texto: 'Estado de mi cuenta',
+                    ruta: '/comercio/estado',
+                  },
+                ]
+              : []),
+            { icono: '📊', texto: 'Mi panel', ruta: '/panel' },
+            { icono: '📦', texto: 'Mis ofertas', ruta: '/panel/productos' },
             { icono: '➕', texto: 'Nueva oferta', ruta: '/ofertas/nueva' },
-            { icono: '🏪', texto: 'Mi local', ruta: '/comercios/perfil' },
+            { icono: '🏪', texto: 'Mi local', ruta: '/panel/mi-local' },
             { icono: '⭐', texto: 'Reputación', ruta: '/panel/reputacion' },
           ]
         : [
-            { icono: '📦', texto: 'Mis pedidos', ruta: '/pedidos' },
+            { icono: '📦', texto: 'Mis pedidos', ruta: '/mis-pedidos' },
             { icono: '🧺', texto: 'Mis canastas', ruta: '/canastas' },
-            { icono: '🔎', texto: 'Buscar ofertas' },
+            { icono: '🔎', texto: 'Buscar ofertas', ruta: '/buscar' },
             {
               icono: '🏪',
               texto: 'Mi comercio',

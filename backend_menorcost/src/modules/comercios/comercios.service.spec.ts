@@ -66,9 +66,12 @@ const dto = {
 
 const comercioBase = {
   idComercio: 'c1',
-  nombreFantasia: 'Almacén Don José',
+  nombreFantasia: dto.nombreFantasia,
+  reputacionPromedio: 0,
+  totalCalificaciones: 0,
   horarios: [],
   franjas: [],
+  credencialMp: null,
 };
 
 const horarioBase = {
@@ -106,28 +109,59 @@ beforeEach(() => {
 });
 
 describe('ComerciosService.listarCategorias', () => {
-  it('devuelve solo categorías activas ordenadas y con id público', async () => {
+  it('devuelve los rubros activos con sus subcategorías ordenadas', async () => {
     prismaMock.categoria.findMany.mockResolvedValue([
       {
         idCategoria: 'cat-1',
         nombre: 'Bebidas',
         slug: 'bebidas',
         orden: 4,
+        subcategorias: [
+          {
+            idCategoria: 'cat-2',
+            nombre: 'Gaseosas',
+            slug: 'gaseosas',
+            orden: 1,
+          },
+        ],
       },
     ]);
 
     await expect(service.listarCategorias()).resolves.toEqual([
-      { id: 'cat-1', nombre: 'Bebidas', slug: 'bebidas', orden: 4 },
+      {
+        id: 'cat-1',
+        nombre: 'Bebidas',
+        slug: 'bebidas',
+        orden: 4,
+        subcategorias: [
+          {
+            id: 'cat-2',
+            nombre: 'Gaseosas',
+            slug: 'gaseosas',
+            orden: 1,
+          },
+        ],
+      },
     ]);
 
     expect(prismaMock.categoria.findMany).toHaveBeenCalledWith({
-      where: { activa: true },
+      where: { activa: true, categoriaPadreId: null },
       orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
       select: {
         idCategoria: true,
         nombre: true,
         slug: true,
         orden: true,
+        subcategorias: {
+          where: { activa: true },
+          orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
+          select: {
+            idCategoria: true,
+            nombre: true,
+            slug: true,
+            orden: true,
+          },
+        },
       },
     });
   });
@@ -178,6 +212,21 @@ describe('ComerciosService.obtenerPublico', () => {
         }),
       }),
     );
+  });
+
+  it('expone el promedio de reputación cuando el comercio tiene calificaciones', async () => {
+    prismaMock.comercio.findFirst.mockResolvedValue({
+      ...comercioBase,
+      reputacionPromedio: 4.5,
+      totalCalificaciones: 2,
+      productos: [],
+    });
+
+    const resultado = await service.obtenerPublico('c1');
+
+    expect(resultado.reputacion).toBe(4.5);
+    expect(resultado).not.toHaveProperty('reputacionPromedio');
+    expect(resultado).not.toHaveProperty('totalCalificaciones');
   });
 });
 
@@ -290,6 +339,37 @@ describe('ComerciosService.obtenerMio', () => {
       nombreFantasia: 'Almacén Don José',
     });
     expect(resultado).not.toHaveProperty('idComercio');
+  });
+
+  it('marca Mercado Pago como vinculado con una credencial ACTIVA', async () => {
+    prismaMock.comercio.findUnique.mockResolvedValue({
+      ...comercioBase,
+      credencialMp: { estado: 'ACTIVA' },
+    });
+
+    const resultado = await service.obtenerMio('u1');
+
+    expect(resultado.mercadoPagoVinculado).toBe(true);
+    expect(resultado).not.toHaveProperty('credencialMp');
+  });
+
+  it('no marca Mercado Pago si la credencial está REVOCADA', async () => {
+    prismaMock.comercio.findUnique.mockResolvedValue({
+      ...comercioBase,
+      credencialMp: { estado: 'REVOCADA' },
+    });
+
+    const resultado = await service.obtenerMio('u1');
+
+    expect(resultado.mercadoPagoVinculado).toBe(false);
+  });
+
+  it('no marca Mercado Pago si el comercio no tiene credencial', async () => {
+    prismaMock.comercio.findUnique.mockResolvedValue(comercioBase);
+
+    const resultado = await service.obtenerMio('u1');
+
+    expect(resultado.mercadoPagoVinculado).toBe(false);
   });
 });
 

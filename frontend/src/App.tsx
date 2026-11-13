@@ -15,6 +15,8 @@ import { BajasTab } from './modules/admin/BajasTab';
 import { DenunciasTab } from './modules/admin/DenunciasTab';
 import { Reviews } from './modules/merchant/Reviews';
 import { Ticket } from './modules/orders/Ticket';
+import { ComercioEstadoPage } from './pages/ComercioEstadoPage';
+import { EnConstruccion } from './pages/EnConstruccion';
 import { Login } from './pages/Login';
 import { Perfil } from './pages/Perfil';
 import { Recuperar } from './pages/Recuperar';
@@ -22,6 +24,10 @@ import { Registro } from './pages/Registro';
 import { Restablecer } from './pages/Restablecer';
 import { VerificarCorreo } from './pages/VerificarCorreo';
 import { NuevaOfertaPage } from './ofertas/NewOfertaPage';
+import { PanelComerciante } from './modules/merchant/PanelComerciante';
+import { PedidosPanel } from './modules/merchant/PedidosPanel';
+import { ResumenPanel } from './modules/merchant/ResumenPanel';
+
 import { MisOfertasPage } from './ofertas/MisOfertasPage';
 
 export default function App() {
@@ -45,11 +51,21 @@ export default function App() {
 
         <Route element={<RutaProtegida />}>
           <Route path="/perfil" element={<Perfil />} />
+          <Route path="/comercio/estado" element={<ComercioEstadoPage />} />
           <Route path="/ofertas/nueva" element={<NuevaOfertaPage />} />
           <Route path="/comercios/registro" element={<RegistroComercioPage />} />
-          <Route path="/comercios/perfil" element={<PerfilComercioPage />} />
-          <Route path="/comercios/horarios" element={<HorariosComercioPage />} />
-          <Route path="/ofertas/mias" element={<MisOfertasPage />} />
+          <Route
+            path="/comercios/perfil"
+            element={<Navigate to="/panel/mi-local" replace />}
+          />
+          <Route
+            path="/comercios/horarios"
+            element={<Navigate to="/panel/horarios" replace />}
+          />
+          <Route
+            path="/ofertas/mias"
+            element={<Navigate to="/panel/productos" replace />}
+          />
         </Route>
 
         <Route element={<RutaCliente />}>
@@ -69,12 +85,39 @@ export default function App() {
           />
 
           <Route path="/pedido/:codigo" element={<Ticket />} />
+          <Route
+            path="/mis-pedidos"
+            element={
+              <EnConstruccion
+                titulo="Mis pedidos"
+                descripcion="Acá vas a poder seguir el estado de tus pedidos y acceder a tus tickets."
+              />
+            }
+          />
+         
+          <Route
+            path="/buscar"
+            element={
+              <EnConstruccion
+                titulo="Buscar ofertas"
+                descripcion="Encontrá ofertas cerca tuyo por producto, categoría o comercio."
+              />
+            }
+          />
         </Route>
 
         {/* RUTAS COMERCIANTE */}
         <Route element={<RutaComerciante />}>
-          <Route path="/panel" element={<Reviews />} />  {/* TEMPORAL: Reviews en /panel */}
-          <Route path="/panel/reputacion" element={<Reviews />} />
+          <Route path="/panel" element={<PanelComerciante />}>
+            <Route index element={<ResumenPanel />} />
+            <Route path="resumen" element={<ResumenPanel />} />
+            <Route path="pedidos" element={<PedidosPanel />} />
+            <Route path="productos" element={<MisOfertasPage />} />
+            <Route path="mi-local" element={<PerfilComercioPage />} />
+            <Route path="horarios" element={<HorariosComercioPage />} />
+            <Route path="reputacion" element={<Reviews />} />
+            <Route path="*" element={<Navigate to="/panel" replace />} />
+          </Route>
         </Route>
 
         {/* RUTAS ADMIN · Backoffice (Pantallas 24, 25 y 26) */}

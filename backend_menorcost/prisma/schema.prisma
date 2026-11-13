@@ -29,6 +29,7 @@ enum EstadoComercio {
   HABILITADO
   DOCUMENTACION_RECHAZADA
   SUSPENDIDO
+  ELIMINADO
 }
 
 model Producto {
@@ -48,8 +49,9 @@ model Producto {
 
   tasaMpEstimadaAplicada Decimal @map("tasa_mp_estimada_aplicada") @db.Decimal(6, 4)
 
-  imagen String         @db.VarChar(500)
-  estado EstadoProducto @default(ACTIVO)
+  imagen           String         @db.VarChar(500)
+  estado           EstadoProducto @default(ACTIVO)
+  pausadoPorBaja   Boolean        @default(false) @map("pausado_por_baja")
 
   comercio              Comercio                     @relation(fields: [comercioId], references: [idComercio])
   categoria             Categoria                    @relation(fields: [categoriaId], references: [idCategoria])
@@ -136,16 +138,20 @@ model FranjaRetiro {
 }
 
 model Categoria {
-  idCategoria String   @id @default(uuid()) @map("id_categoria") @db.Uuid
-  nombre      String   @unique @db.VarChar(80)
-  slug        String   @unique @db.VarChar(80)
-  orden       Int      @default(0)
-  activa      Boolean  @default(true)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  idCategoria      String   @id @default(uuid()) @map("id_categoria") @db.Uuid
+  categoriaPadreId String?  @map("categoria_padre_id") @db.Uuid
+  nombre           String   @unique @db.VarChar(80)
+  slug             String   @unique @db.VarChar(80)
+  orden            Int      @default(0)
+  activa           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
-  productos Producto[]
+  categoriaPadre Categoria?  @relation("Subcategorias", fields: [categoriaPadreId], references: [idCategoria], onDelete: Restrict)
+  subcategorias  Categoria[] @relation("Subcategorias")
+  productos      Producto[]
 
+  @@index([categoriaPadreId])
   @@map("categoria")
 }
 
@@ -256,7 +262,8 @@ model SolicitudBaja {
   id            String              @id @default(uuid())
   usuarioId     String
   motivo        String
-  estado        EstadoSolicitudBaja @default(PENDIENTE)
+  estado        EstadoSolicitudBaja  @default(PENDIENTE)
+  estadoPrevioUsuario EstadoUsuario?
   observaciones String?
   resueltoPorId String?
   resueltoEn    DateTime?
@@ -410,10 +417,11 @@ model Pedido {
   // Tasa de comisión de Menorcost aplicada (fracción, ej. 0.1000).
   comisionMenorcostTasa Decimal  @map("comision_menorcost_tasa") @db.Decimal(6, 4)
   // Tasa estimada de Mercado Pago usada en el cálculo (constante de código).
-  tasaMpEstimada        Decimal  @map("tasa_mp_estimada") @db.Decimal(6, 4)
-  total                 Decimal  @db.Decimal(10, 2)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  tasaMpEstimada  Decimal        @map("tasa_mp_estimada") @db.Decimal(6, 4)
+  total           Decimal        @db.Decimal(10, 2)
+  formaPago       String         @default("MERCADO_PAGO") @map("forma_pago") @db.VarChar(30)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   // Configuración de comisión utilizada para congelar los valores del pedido.
 

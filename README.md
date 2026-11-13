@@ -47,7 +47,6 @@ menorcost/
 │   └── tsconfig.json
 │
 ├── docker-compose.yml
-├── package.json
 └── README.md
 ```
 
@@ -114,8 +113,20 @@ npm install
 
 ---
 
-5. Ejecutar el Proyecto
-Una vez instaladas las dependencias y con la base de datos corriendo, podés iniciar los servidores de desarrollo:
+5. Preparar la Base de Datos
+Con PostgreSQL corriendo, aplicá las migraciones y generá el cliente de Prisma desde la carpeta del backend:
+
+```powershell
+cd backend_menorcost
+npx prisma migrate dev
+npx prisma generate
+npm run seed
+```
+
+Si la base ya está migrada y solo cambiaste el schema, alcanza con `npx prisma generate`. Para verificar el estado de las migraciones usá `npx prisma migrate status`.
+
+6. Ejecutar el Proyecto
+Una vez instaladas las dependencias, aplicadas las migraciones y con la base de datos corriendo, podés iniciar los servidores de desarrollo:
 
 Frontend (Vite): npm run dev (dentro de la carpeta /frontend)
 Backend (NestJS): npm run start:dev (dentro de la carpeta /backend_menorcost)

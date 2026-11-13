@@ -1,16 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Switch } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { Logo } from '../Logo';
 import { Chip } from '../ui/Chip';
 import { Badge } from '../ui/Badge';
 import { useAuth } from '../../auth/contexto';
-import {NotificationsBell} from "./NotificacionCampana";
+import { comerciosApi } from '../../comercios/api';
 
 const TABS = [
-  { id: 'ofertas', label: 'Ofertas', href: '/ofertas/mias' },
-  { id: 'mi-local', label: 'Mi local', href: '/comercios/perfil' },
-  { id: 'horarios', label: 'Horarios', href: '/comercios/horarios' },
+  { id: 'resumen', label: 'Resumen', href: '/panel' },
+  { id: 'pedidos', label: 'Pedidos', href: '/panel/pedidos' },
+  { id: 'productos', label: 'Productos', href: '/panel/productos' },
+  { id: 'mi-local', label: 'Mi local', href: '/panel/mi-local' },
+  { id: 'horarios', label: 'Horarios', href: '/panel/horarios' },
   {
     id: 'reputacion',
     label: 'Reputación',
@@ -19,21 +22,65 @@ const TABS = [
 ] as const;
 
 export function MerchantHeader() {
-  const { usuario, cargando } = useAuth();
+  const { usuario, token, cargando } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [abierto, setAbierto] = useState(true); // En producción vendría del backend
+  const [abierto, setAbierto] = useState<boolean | null>(null);
+  const [cambiandoApertura, setCambiandoApertura] = useState(false);
+
+  useEffect(() => {
+    if (!token || usuario?.rol !== 'COMERCIANTE') return;
+    let activo = true;
+
+    comerciosApi
+      .mio(token)
+      .then((comercio) => {
+        if (activo) setAbierto(comercio?.abierto ?? null);
+      })
+      .catch(() => {
+        if (activo) setAbierto(null);
+      });
+
+    return () => {
+      activo = false;
+    };
+  }, [token, usuario?.rol]);
+
+  async function alternarApertura(nuevo: boolean) {
+    if (!token || cambiandoApertura) return;
+
+    const anterior = abierto;
+    setAbierto(nuevo);
+    setCambiandoApertura(true);
+
+    try {
+      const resultado = await comerciosApi.cambiarApertura(token, nuevo);
+      setAbierto(resultado.abierto);
+      notifications.show({
+        message: resultado.abierto
+          ? 'Tu comercio figura abierto.'
+          : 'Tu comercio figura cerrado.',
+      });
+    } catch {
+      setAbierto(anterior);
+      notifications.show({
+        color: 'red',
+        message: 'No pudimos cambiar el estado del local.',
+      });
+    } finally {
+      setCambiandoApertura(false);
+    }
+  }
 
   if (cargando || !usuario) return null;
 
   const currentTab =
-    TABS.find((tab) => location.pathname === tab.href)?.id ??
-    (location.pathname === '/panel' ? 'reputacion' : '');
+    TABS.find((tab) => location.pathname === tab.href)?.id ?? '';
 
   return (
     <header className="merchant-header">
       <div className="merchant-header__left">
-        <Link to="/ofertas/mias" aria-label="Ir a mis ofertas">
+        <Link to="/panel" aria-label="Ir al panel">
           <Logo />
         </Link>
       </div>
@@ -52,15 +99,17 @@ export function MerchantHeader() {
       </nav>
 
       <div className="merchant-header__right">
-
-        <NotificationsBell />
-
-        <Badge tone={abierto ? 'ok' : 'bad'}>
-          {abierto ? 'Local abierto' : 'Local cerrado'}
+        <Badge tone={abierto === null ? 'neutro' : abierto ? 'ok' : 'bad'}>
+          {abierto === null
+            ? 'Local sin estado'
+            : abierto
+              ? 'Local abierto'
+              : 'Local cerrado'}
         </Badge>
         <Switch
-          checked={abierto}
-          onChange={e => setAbierto(e.currentTarget.checked)}
+          checked={abierto ?? false}
+          disabled={abierto === null || cambiandoApertura}
+          onChange={e => void alternarApertura(e.currentTarget.checked)}
           size="md"
           color="green"
           radius="xl"

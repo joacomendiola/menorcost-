@@ -57,6 +57,7 @@ const ESTADOS: Record<EstadoComercio, { etiqueta: string; clase: string }> = {
     clase: 'comercio-estado--malo',
   },
   SUSPENDIDO: { etiqueta: 'Suspendido', clase: 'comercio-estado--malo' },
+  ELIMINADO: { etiqueta: 'Cuenta eliminada', clase: 'comercio-estado--malo' },
 };
 
 const MAX_IMAGEN = 5 * 1024 * 1024;

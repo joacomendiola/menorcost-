@@ -322,6 +322,21 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
         );
       });
 
+      it('filtro search por CUIT funciona', async () => {
+        const comercio = await prisma.comercio.findUnique({
+          where: { idComercio: comercioPendienteId },
+        });
+        expect(comercio).not.toBeNull();
+
+        const res = await request(server())
+          .get(`/admin/altas?search=${encodeURIComponent(comercio?.cuit ?? '')}`)
+          .set(auth(adminToken))
+          .expect(200);
+
+        expect(res.body.length).toBe(1);
+        expect(res.body[0].cuit).toBe(comercio?.cuit);
+      });
+
       it('filtro estado funciona', async () => {
         const res = await request(server())
           .get('/admin/altas?estado=PENDIENTE_VERIFICACION')
@@ -359,6 +374,16 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
           where: { id: comerciantePendiente.id },
         });
         expect(usuario?.estado).toBe('HABILITADO');
+
+        const comercio = await prisma.comercio.findUnique({
+          where: { idComercio: comercioPendienteId },
+        });
+        expect(comercio?.estado).toBe('HABILITADO');
+
+        // El comercio aprobado ya es visible en la tienda pública
+        await request(server())
+          .get(`/comercios/publicos/${comercioPendienteId}`)
+          .expect(200);
       });
 
       it('rechaza aprobar comercio ya aprobado (409)', async () => {
@@ -366,6 +391,26 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
           .patch(`/admin/altas/${comercioPendienteId}/aprobar`)
           .set(auth(adminToken))
           .expect(409);
+      });
+
+      it('si usuario y comercio están desincronizados, revierte todo (409)', async () => {
+        const usuario = await crearUsuario({
+          email: 'comerciante-desync-aprobar@test.com',
+          dni: '70000007',
+          rol: 'COMERCIANTE',
+          estado: 'HABILITADO',
+        });
+        const comercio = await crearComercio(usuario.id, false);
+
+        await request(server())
+          .patch(`/admin/altas/${comercio.idComercio}/aprobar`)
+          .set(auth(adminToken))
+          .expect(409);
+
+        const comercioDb = await prisma.comercio.findUnique({
+          where: { idComercio: comercio.idComercio },
+        });
+        expect(comercioDb?.estado).toBe('PENDIENTE_VERIFICACION');
       });
 
       it('rechaza comercio inexistente (404)', async () => {
@@ -416,6 +461,37 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
           where: { email: 'comerciante-rechazar@test.com' },
         });
         expect(usuario?.estado).toBe('DOCUMENTACION_RECHAZADA');
+
+        const comercio = await prisma.comercio.findUnique({
+          where: { idComercio: comercioParaRechazarId },
+        });
+        expect(comercio?.estado).toBe('DOCUMENTACION_RECHAZADA');
+
+        // El comercio rechazado no es visible públicamente
+        await request(server())
+          .get(`/comercios/publicos/${comercioParaRechazarId}`)
+          .expect(404);
+      });
+
+      it('si usuario y comercio están desincronizados, revierte todo (409)', async () => {
+        const usuario = await crearUsuario({
+          email: 'comerciante-desync-rechazar@test.com',
+          dni: '70000008',
+          rol: 'COMERCIANTE',
+          estado: 'HABILITADO',
+        });
+        const comercio = await crearComercio(usuario.id, false);
+
+        await request(server())
+          .patch(`/admin/altas/${comercio.idComercio}/rechazar`)
+          .set(auth(adminToken))
+          .send({ motivo: 'Documentación ilegible' })
+          .expect(409);
+
+        const comercioDb = await prisma.comercio.findUnique({
+          where: { idComercio: comercio.idComercio },
+        });
+        expect(comercioDb?.estado).toBe('PENDIENTE_VERIFICACION');
       });
 
       it('rechaza sin motivo (400)', async () => {
@@ -459,6 +535,16 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
         expect(r.emisor).toBeDefined();
         expect(r.denunciado).toBeDefined();
         expect(r.pedido).toBeDefined();
+        expect(r.denunciado.comercio).toMatchObject({
+          cuit: expect.any(String),
+          razonSocial: expect.any(String),
+        });
+        expect(r.registro).toMatchObject({
+          total: expect.any(Number),
+          abiertas: expect.any(Number),
+          resueltas: expect.any(Number),
+          desestimadas: expect.any(Number),
+        });
       });
 
       it('filtro search por motivo funciona', async () => {
@@ -469,6 +555,34 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
 
         expect(res.body.length).toBe(1);
         expect(res.body[0].motivo).toContain('mal estado');
+      });
+
+      it('filtro search por CUIT del comercio denunciado funciona', async () => {
+        const comercio = await prisma.comercio.findUnique({
+          where: { idComercio: comercioHabilitadoId },
+        });
+
+        const res = await request(server())
+          .get(`/admin/denuncias?search=${encodeURIComponent(comercio?.cuit ?? '')}`)
+          .set(auth(adminToken))
+          .expect(200);
+
+        expect(res.body.some((r: any) => r.id_reporte === reporteId)).toBe(true);
+      });
+
+      it('filtro search por razón social del comercio denunciado funciona', async () => {
+        const comercio = await prisma.comercio.findUnique({
+          where: { idComercio: comercioHabilitadoId },
+        });
+
+        const res = await request(server())
+          .get(
+            `/admin/denuncias?search=${encodeURIComponent(comercio?.razonSocial ?? '')}`,
+          )
+          .set(auth(adminToken))
+          .expect(200);
+
+        expect(res.body.some((r: any) => r.id_reporte === reporteId)).toBe(true);
       });
 
       it('filtro estado funciona', async () => {
@@ -583,7 +697,7 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
       });
     });
 
-    describe('PATCH /admin/denuncias/:id/resolver - Desestimar denuncia', () => {
+    describe('PATCH /admin/denuncias/:id/desestimar - Desestimar denuncia', () => {
       let reporteResolverId: number;
 
       beforeAll(async () => {
@@ -608,7 +722,7 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
 
       it('marca reporte como DESESTIMADO con admin y fecha', async () => {
         const res = await request(server())
-          .patch(`/admin/denuncias/${reporteResolverId}/resolver`)
+          .patch(`/admin/denuncias/${reporteResolverId}/desestimar`)
           .set(auth(adminToken))
           .expect(200);
 
@@ -642,7 +756,7 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
         });
 
         await request(server())
-          .patch(`/admin/denuncias/${r.id_reporte}/resolver`)
+          .patch(`/admin/denuncias/${r.id_reporte}/desestimar`)
           .set(auth(adminToken))
           .expect(200);
 
@@ -654,16 +768,49 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
         await prisma.reporte.delete({ where: { id_reporte: r.id_reporte } });
       });
 
-      it('rechaza resolver reporte ya cerrado', async () => {
+      it('rechaza desestimar reporte ya cerrado', async () => {
         await request(server())
-          .patch(`/admin/denuncias/${reporteResolverId}/resolver`)
+          .patch(`/admin/denuncias/${reporteResolverId}/desestimar`)
           .set(auth(adminToken))
           .expect(400);
       });
     });
 
+    describe('PATCH /admin/denuncias/:id/resolver - Resolver sin sanción', () => {
+      it('marca reporte como RESUELTO sin suspender al denunciado', async () => {
+        const r = await prisma.reporte.create({
+          data: {
+            id_pedido: pedidoId,
+            motivo: 'Para resolver sin sanción',
+            tipo_destino: 'COMERCIO',
+            estado_reporte: 'PENDIENTE_REVISION',
+            id_emisor: cliente.id,
+            id_denunciado: comercianteHabilitado.id,
+          },
+        });
+
+        await request(server())
+          .patch(`/admin/denuncias/${r.id_reporte}/resolver`)
+          .set(auth(adminToken))
+          .expect(200);
+
+        const reporte = await prisma.reporte.findUnique({
+          where: { id_reporte: r.id_reporte },
+        });
+        expect(reporte?.estado_reporte).toBe('RESUELTO');
+
+        const usuario = await prisma.usuario.findUnique({
+          where: { id: comercianteHabilitado.id },
+        });
+        expect(usuario?.estado).toBe('HABILITADO');
+
+        await prisma.reporte.delete({ where: { id_reporte: r.id_reporte } });
+      });
+    });
+
     describe('PATCH /admin/denuncias/:id/sancionar - Sancionar usuario', () => {
       let reporteSancionarId: number;
+      let reporteExtraId: number;
 
       beforeAll(async () => {
         const r = await prisma.reporte.create({
@@ -677,6 +824,18 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
           },
         });
         reporteSancionarId = r.id_reporte;
+
+        const extra = await prisma.reporte.create({
+          data: {
+            id_pedido: pedidoId,
+            motivo: 'Otra denuncia abierta del mismo usuario',
+            tipo_destino: 'COMERCIO',
+            estado_reporte: 'BAJO_INVESTIGACION',
+            id_emisor: cliente.id,
+            id_denunciado: comercianteHabilitado.id,
+          },
+        });
+        reporteExtraId = extra.id_reporte;
       });
 
       afterAll(async () => {
@@ -685,8 +844,12 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
           where: { id: comercianteHabilitado.id },
           data: { estado: 'HABILITADO', tokenVersion: { increment: 1 } },
         });
+        await prisma.comercio.update({
+          where: { idComercio: comercioHabilitadoId },
+          data: { estado: 'HABILITADO' },
+        });
         await prisma.reporte.deleteMany({
-          where: { id_reporte: reporteSancionarId },
+          where: { id_reporte: { in: [reporteSancionarId, reporteExtraId] } },
         });
       });
 
@@ -708,14 +871,29 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
           usuario: {
             estado: 'SUSPENDIDO',
           },
+          comercioSuspendido: true,
+          denunciasCerradas: expect.any(Number),
           notificacion: { enviada: expect.any(Boolean) },
         });
+        expect(res.body.denunciasCerradas).toBeGreaterThanOrEqual(1);
+
+        const extra = await prisma.reporte.findUnique({
+          where: { id_reporte: reporteExtraId },
+        });
+        expect(extra?.estado_reporte).toBe('RESUELTO');
+        expect(extra?.id_admin).toBe(admin.id);
+        expect(extra?.fecha_resolucion).toBeDefined();
 
         const usuario = await prisma.usuario.findUnique({
           where: { id: comercianteHabilitado.id },
         });
         expect(usuario?.estado).toBe('SUSPENDIDO');
         expect(usuario?.tokenVersion).toBe(tokenVersionAntes + 1);
+
+        const comercio = await prisma.comercio.findUnique({
+          where: { idComercio: comercioHabilitadoId },
+        });
+        expect(comercio?.estado).toBe('SUSPENDIDO');
       });
 
       it('rechaza sancionar reporte ya cerrado', async () => {
@@ -736,6 +914,63 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
           .expect(400);
 
         await prisma.reporte.delete({ where: { id_reporte: r.id_reporte } });
+      });
+    });
+
+    describe('PATCH /admin/usuarios/:id/rehabilitar - Rehabilitar cuenta', () => {
+      let usuarioRehabId: string;
+      let comercioRehabId: string;
+
+      beforeAll(async () => {
+        const u = await crearUsuario({
+          email: 'rehabilitar@test.com',
+          dni: '70000009',
+          rol: 'COMERCIANTE',
+          estado: 'SUSPENDIDO',
+        });
+        usuarioRehabId = u.id;
+        const com = await crearComercio(u.id, false);
+        comercioRehabId = com.idComercio;
+        await prisma.comercio.update({
+          where: { idComercio: comercioRehabId },
+          data: { estado: 'SUSPENDIDO' },
+        });
+      });
+
+      it('rehabilita usuario y comercio suspendidos → HABILITADO', async () => {
+        const res = await request(server())
+          .patch(`/admin/usuarios/${usuarioRehabId}/rehabilitar`)
+          .set(auth(adminToken))
+          .expect(200);
+
+        expect(res.body).toMatchObject({
+          id: usuarioRehabId,
+          estado: 'HABILITADO',
+        });
+
+        const usuario = await prisma.usuario.findUnique({
+          where: { id: usuarioRehabId },
+        });
+        expect(usuario?.estado).toBe('HABILITADO');
+
+        const comercio = await prisma.comercio.findUnique({
+          where: { idComercio: comercioRehabId },
+        });
+        expect(comercio?.estado).toBe('HABILITADO');
+      });
+
+      it('rechaza rehabilitar usuario ya HABILITADO (400)', async () => {
+        await request(server())
+          .patch(`/admin/usuarios/${usuarioRehabId}/rehabilitar`)
+          .set(auth(adminToken))
+          .expect(400);
+      });
+
+      it('rechaza no-admin (403)', async () => {
+        await request(server())
+          .patch(`/admin/usuarios/${usuarioRehabId}/rehabilitar`)
+          .set(auth(comercianteToken))
+          .expect(403);
       });
     });
   });
