@@ -1,4 +1,4 @@
-import { Button, Loader, TextInput } from "@mantine/core";
+import { Button, Loader } from "@mantine/core";
 import {
   lazy,
   Suspense,
@@ -10,9 +10,9 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { api, direccionesApi, type Direccion } from "../api";
 import { useAuth } from "../auth/contexto";
-import { Logo } from "../components/Logo";
 import { resolverImagen } from "./api";
 import type { OfertaMapa } from "./mapaCatalogo";
+import { EncabezadoCliente } from "./EncabezadoCliente";
 import "./inicio-cliente.css";
 
 const MapaExploracion = lazy(() =>
@@ -50,7 +50,7 @@ const moneda = new Intl.NumberFormat("es-AR", {
 });
 
 export function InicioClientePage() {
-  const { token, usuario } = useAuth();
+  const { token } = useAuth();
   const navigate = useNavigate();
   const [direccion, setDireccion] = useState<Direccion | null>(null);
   const [productos, setProductos] = useState<ProductoInicio[]>([]);
@@ -156,46 +156,12 @@ export function InicioClientePage() {
 
   return (
     <>
-      <header className="inicio-cliente__top">
-        <Link to="/inicio" aria-label="Ir al inicio de Menorcost">
-          <Logo />
-        </Link>
-
-        <button
-          type="button"
-          className="inicio-cliente__direccion"
-          onClick={() => navigate("/perfil")}
-        >
-          <span>Enviar a</span>
-          <strong>{direccionLabel} ⌄</strong>
-        </button>
-
-        <form className="inicio-cliente__search" onSubmit={buscarLocales}>
-          <TextInput
-            aria-label="Buscar locales"
-            placeholder="Buscar locales"
-            value={busqueda}
-            onChange={(event) => setBusqueda(event.currentTarget.value)}
-          />
-          <Button type="submit" aria-label="Buscar">
-            🔍
-          </Button>
-        </form>
-
-        <nav
-          className="inicio-cliente__actions"
-          aria-label="Acciones de cliente"
-        >
-          <Link className="pill" to="/canastas">
-            <span aria-hidden="true">🧺</span>
-            Mis canastas
-          </Link>
-          <Link className="pill" to="/perfil">
-            <span aria-hidden="true">👤</span>
-            {usuario?.nombre ?? "Mi perfil"}
-          </Link>
-        </nav>
-      </header>
+      <EncabezadoCliente
+        busqueda={busqueda}
+        direccionLabel={direccionLabel}
+        onCambioBusqueda={setBusqueda}
+        onBuscar={buscarLocales}
+      />
 
       <main className="inicio-cliente">
         <section

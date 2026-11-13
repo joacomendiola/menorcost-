@@ -143,6 +143,40 @@ h3 {
   padding: 28px 20px 100px;
 }
 
+.perfil-encabezado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px 0 16px;
+}
+
+.perfil-encabezado h1 {
+  margin: 0;
+}
+
+.perfil-ubicacion-avanzada {
+  border-top: 1px solid var(--bd);
+  padding-top: 12px;
+}
+
+.perfil-ubicacion-avanzada summary {
+  color: var(--pri);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.perfil-ubicacion-avanzada__contenido {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.profile-wrap > .card {
+  margin-bottom: 14px;
+}
+
 .card {
   background: var(--card);
   border: 1px solid var(--bd);
@@ -522,6 +556,11 @@ h3 {
 
   .profile-wrap {
     padding: 20px 16px 80px;
+  }
+
+  .perfil-encabezado {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .grid-2,

@@ -36,10 +36,11 @@ export default function App() {
   const { pathname } = useLocation();
   const esPanelComerciante = pathname.startsWith('/panel');
   const esInicioCliente = pathname === '/inicio';
+  const esExploracionCliente = pathname === '/buscar';
 
   return (
     <>
-      {!esPanelComerciante && !esInicioCliente && <TopBar />}
+      {!esPanelComerciante && !esInicioCliente && !esExploracionCliente && <TopBar />}
 
       <Routes>
         <Route element={<RutaPublica />}>

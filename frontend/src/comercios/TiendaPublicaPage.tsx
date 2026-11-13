@@ -65,6 +65,7 @@ export function TiendaPublicaPage() {
     id ? '' : 'La tienda solicitada no existe.',
   );
   const [orden, setOrden] = useState<OrdenProductos>('relevancia');
+  const [categoria, setCategoria] = useState('Todas');
   const [recargar, setRecargar] = useState(0);
 
   useEffect(() => {
@@ -96,7 +97,12 @@ export function TiendaPublicaPage() {
   const productos = useMemo(() => {
     if (!tienda) return [];
 
-    return [...tienda.productos].sort((a, b) => {
+    return tienda.productos
+      .filter(
+        (producto) =>
+          categoria === 'Todas' || producto.categoria.nombre === categoria,
+      )
+      .sort((a, b) => {
       if (orden === 'precio') {
         return numero(a.precioPublico) - numero(b.precioPublico);
       }
@@ -107,7 +113,7 @@ export function TiendaPublicaPage() {
 
       return 0;
     });
-  }, [tienda, orden]);
+  }, [tienda, orden, categoria]);
 
   if (cargando) {
     return (
@@ -210,6 +216,21 @@ export function TiendaPublicaPage() {
 
       <div className="tienda-layout">
         <section className="card tienda-catalogo">
+          <div className="tienda-categorias" aria-label="Categorías de ofertas">
+            {['Todas', ...new Set(tienda.productos.map((p) => p.categoria.nombre))].map(
+              (nombre) => (
+                <button
+                  type="button"
+                  key={nombre}
+                  className={categoria === nombre ? 'is-active' : ''}
+                  aria-pressed={categoria === nombre}
+                  onClick={() => setCategoria(nombre)}
+                >
+                  {nombre}
+                </button>
+              ),
+            )}
+          </div>
           <div className="tienda-catalogo__cabecera">
             <div>
               <h2>Ofertas del comercio</h2>

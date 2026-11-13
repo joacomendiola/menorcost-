@@ -4,6 +4,7 @@ import { Button, Loader, Modal, Select, TextInput } from '@mantine/core';
 import { api, direccionesApi, type Direccion } from '../api';
 import { useAuth } from '../auth/contexto';
 import { resolverImagen } from './api';
+import { EncabezadoCliente } from './EncabezadoCliente';
 import { obtenerMensajeErrorCatalogo } from './catalogo-errores';
 import type { OfertaMapa } from './mapaCatalogo';
 import './explorar.css';
@@ -176,6 +177,9 @@ export function ExplorarPage() {
       filtros.radioKm ||
       filtros.soloAbiertos,
   );
+  const direccionLabel = direccion
+    ? `${direccion.localidad}${direccion.etiqueta ? ` · ${direccion.etiqueta}` : ''}`
+    : 'Agregá una dirección';
 
   function buscar(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -205,31 +209,29 @@ export function ExplorarPage() {
   else if (filtros.categoriaId) textoSinResultados = SIN_OFERTAS_CATEGORIA;
 
   return (
+    <>
+    <EncabezadoCliente
+      busqueda={busqueda}
+      direccionLabel={direccionLabel}
+      placeholder="Buscar productos o comercios"
+      disabledBuscar={!busqueda.trim()}
+      onCambioBusqueda={(valor) => {
+        setBusqueda(valor);
+        if (valor.trim()) setAvisoBusqueda('');
+      }}
+      onBuscar={buscar}
+    />
     <main className="explorar">
       <header className="explorar__hero">
         <p className="explorar__eyebrow">MENORCOST · OFERTAS CERCA TUYO</p>
         <h1>Encontrá algo bueno</h1>
         <p>Explorá productos con descuento en comercios de tu zona.</p>
-        <form className="explorar__search" onSubmit={buscar}>
-          <TextInput
-            aria-label="Buscar productos o comercios"
-            placeholder="¿Qué estás buscando?"
-            value={busqueda}
-            error={avisoBusqueda || undefined}
-            onChange={(event) => {
-              setBusqueda(event.currentTarget.value);
-              if (event.currentTarget.value.trim()) setAvisoBusqueda('');
-            }}
-          />
-          <Button type="submit" disabled={!busqueda.trim()}>
-            Buscar
-          </Button>
-        </form>
         <p className="explorar__direccion">
           {direccion
             ? `Cerca de ${direccion.etiqueta} · ${direccion.localidad}`
             : 'Agregá una dirección predeterminada en tu perfil para ver ofertas cercanas.'}
         </p>
+        {avisoBusqueda && <p role="alert">{avisoBusqueda}</p>}
       </header>
 
       <section className="explorar__section">
@@ -488,5 +490,6 @@ export function ExplorarPage() {
         </div>
       </Modal>
     </main>
+    </>
   );
 }
