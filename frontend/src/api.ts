@@ -522,9 +522,14 @@ export interface AdminDenuncia {
   };
 }
 
-interface AdminNotificacion {
+export interface AdminNotificacion {
   enviada: boolean;
   aviso?: string;
+}
+
+export interface AdminNotificacionesCierre {
+  emisor: AdminNotificacion;
+  denunciado: AdminNotificacion;
 }
 
 function construirQuery(query: Record<string, string | undefined>): string {
@@ -583,16 +588,16 @@ export const adminApi = {
     ),
 
   desestimarDenuncia: (token: string, id: number) =>
-    api<{ success: true }>(`/admin/denuncias/${id}/desestimar`, {
-      method: 'PATCH',
-      token,
-    }),
+    api<{ success: true; notificaciones: AdminNotificacionesCierre }>(
+      `/admin/denuncias/${id}/desestimar`,
+      { method: 'PATCH', token },
+    ),
 
   resolverDenuncia: (token: string, id: number) =>
-    api<{ success: true }>(`/admin/denuncias/${id}/resolver`, {
-      method: 'PATCH',
-      token,
-    }),
+    api<{ success: true; notificaciones: AdminNotificacionesCierre }>(
+      `/admin/denuncias/${id}/resolver`,
+      { method: 'PATCH', token },
+    ),
 
   sancionarDenuncia: (token: string, id: number) =>
     api<{
@@ -600,6 +605,7 @@ export const adminApi = {
       usuario: AdminUsuario;
       denunciasCerradas: number;
       notificacion: AdminNotificacion;
+      notificacionEmisor: AdminNotificacion;
     }>(`/admin/denuncias/${id}/sancionar`, { method: 'PATCH', token }),
 
   rehabilitarUsuario: (token: string, idUsuario: string) =>
