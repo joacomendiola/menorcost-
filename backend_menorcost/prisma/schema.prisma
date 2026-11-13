@@ -12,11 +12,6 @@ datasource db {
   provider = "postgresql"
 }
 
-enum TipoProducto {
-  INDIVIDUAL
-  COMBO
-}
-
 enum EstadoProducto {
   ACTIVO
   PAUSADO
@@ -36,7 +31,6 @@ model Producto {
   idProducto       String         @id @default(uuid()) @map("id_producto") @db.Uuid
   comercioId       String         @map("id_comercio") @db.Uuid
   categoriaId      String         @map("id_categoria") @db.Uuid
-  tipo             TipoProducto   @default(INDIVIDUAL)
   titulo           String         @db.VarChar(120)
   descripcion      String         @db.Text
   fechaVencimiento DateTime       @map("fecha_vencimiento") @db.Date

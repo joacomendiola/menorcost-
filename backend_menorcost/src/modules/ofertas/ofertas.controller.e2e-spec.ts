@@ -62,7 +62,6 @@ describe('Endpoints HTTP de ofertas', () => {
     id: offerId,
     comercioId: '11111111-1111-4111-8111-111111111111',
     categoriaId: '22222222-2222-4222-8222-222222222222',
-    tipo: 'INDIVIDUAL',
     titulo: 'Yogur',
     descripcion: 'Pack de yogures',
     fechaVencimiento: '2099-12-31',
@@ -140,7 +139,6 @@ describe('Endpoints HTTP de ofertas', () => {
   it('rechaza la solicitud si no hay sesión de prueba', async () => {
     await request(app.getHttpServer())
       .post('/offers')
-      .field('tipo', 'INDIVIDUAL')
       .field('comercioId', '11111111-1111-4111-8111-111111111111')
       .field('categoriaId', '22222222-2222-4222-8222-222222222222')
       .field('titulo', 'Yogur')
@@ -162,7 +160,6 @@ describe('Endpoints HTTP de ofertas', () => {
     await request(app.getHttpServer())
       .post('/offers')
       .set('Authorization', TEST_AUTHORIZATION)
-      .field('tipo', 'INDIVIDUAL')
       .field('comercioId', '11111111-1111-4111-8111-111111111111')
       .field('categoriaId', '22222222-2222-4222-8222-222222222222')
       .field('titulo', 'Yogur')
@@ -180,7 +177,6 @@ describe('Endpoints HTTP de ofertas', () => {
     expect(createOffer).toHaveBeenCalledWith(
       'user-test',
       expect.objectContaining({
-        tipo: 'INDIVIDUAL',
         stock: 5,
         titulo: 'Yogur',
       }),
@@ -195,7 +191,6 @@ describe('Endpoints HTTP de ofertas', () => {
     await request(app.getHttpServer())
       .post('/offers')
       .set('Authorization', TEST_AUTHORIZATION)
-      .field('tipo', 'INDIVIDUAL')
       .field('comercioId', '11111111-1111-4111-8111-111111111111')
       .field('categoriaId', '22222222-2222-4222-8222-222222222222')
       .field('titulo', 'Yogur')
@@ -213,7 +208,6 @@ describe('Endpoints HTTP de ofertas', () => {
     await request(app.getHttpServer())
       .post('/offers')
       .set('Authorization', TEST_AUTHORIZATION)
-      .field('tipo', 'INDIVIDUAL')
       .field('comercioId', '11111111-1111-4111-8111-111111111111')
       .field('categoriaId', '22222222-2222-4222-8222-222222222222')
       .field('titulo', 'Yogur')
@@ -235,7 +229,6 @@ describe('Endpoints HTTP de ofertas', () => {
     await request(app.getHttpServer())
       .post('/offers')
       .set('Authorization', TEST_AUTHORIZATION)
-      .field('tipo', 'INDIVIDUAL')
       .field('comercioId', '11111111-1111-4111-8111-111111111111')
       .field('categoriaId', '22222222-2222-4222-8222-222222222222')
       .field('titulo', 'Yogur')
@@ -257,7 +250,6 @@ describe('Endpoints HTTP de ofertas', () => {
     await request(app.getHttpServer())
       .post('/offers')
       .set('Authorization', TEST_AUTHORIZATION)
-      .field('tipo', 'INDIVIDUAL')
       .field('comercioId', '11111111-1111-4111-8111-111111111111')
       .field('categoriaId', '22222222-2222-4222-8222-222222222222')
       .field('titulo', 'Yogur')

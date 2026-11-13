@@ -20,7 +20,6 @@ describe('Adaptadores Prisma de ofertas', () => {
   const categoriaId = '22222222-2222-4222-8222-222222222222';
 
   const dto: CreateOfferDto = {
-    tipo: 'INDIVIDUAL',
     comercioId,
     categoriaId,
     titulo: 'Yogur',
@@ -42,7 +41,6 @@ describe('Adaptadores Prisma de ofertas', () => {
     idProducto: '33333333-3333-4333-8333-333333333333',
     comercioId,
     categoriaId,
-    tipo: 'INDIVIDUAL' as const,
     titulo: 'Yogur',
     descripcion: 'Pack de yogures',
     fechaVencimiento: new Date('2099-12-31T00:00:00.000Z'),
@@ -260,7 +258,6 @@ describe('Adaptadores Prisma de ofertas', () => {
 
     expect(prismaMock.producto.create).toHaveBeenCalledWith({
       data: {
-        tipo: dto.tipo,
         comercioId: dto.comercioId,
         categoriaId: dto.categoriaId,
         titulo: dto.titulo,
@@ -289,7 +286,6 @@ describe('Adaptadores Prisma de ofertas', () => {
         id: productoProyectado.idProducto,
         comercioId,
         categoriaId,
-        tipo: 'INDIVIDUAL',
         titulo: 'Yogur',
         descripcion: 'Pack de yogures',
         fechaVencimiento: '2099-12-31',

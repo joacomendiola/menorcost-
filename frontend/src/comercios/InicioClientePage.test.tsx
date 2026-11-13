@@ -96,6 +96,12 @@ describe("InicioClientePage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Almacén del Centro")).toBeInTheDocument();
     expect(screen.getByText("Leche entera")).toBeInTheDocument();
+    expect(screen.getByText("Abierto")).toHaveClass("is-open");
+    expect(
+      screen
+        .getByText("Abierto")
+        .querySelector(".inicio-cliente__status-dot"),
+    ).toHaveClass("is-open");
     expect(mocks.api).toHaveBeenCalledWith(
       "/catalogo?latitud=-54.8019&longitud=-68.3029",
     );

@@ -21,7 +21,6 @@ describe('OffersController', () => {
   let getDashboardSummary: ReturnType<typeof vi.fn>;
 
   const dto: CreateOfferDto = {
-    tipo: 'INDIVIDUAL',
     comercioId: '11111111-1111-4111-8111-111111111111',
     categoriaId: '22222222-2222-4222-8222-222222222222',
     titulo: 'Yogur',
@@ -54,7 +53,6 @@ describe('OffersController', () => {
     id: '11111111-1111-4111-8111-111111111111',
     comercioId: '22222222-2222-4222-8222-222222222222',
     categoriaId: '33333333-3333-4333-8333-333333333333',
-    tipo: 'INDIVIDUAL',
     titulo: 'Yogur',
     descripcion: 'Pack de yogures',
     fechaVencimiento: '2099-12-31',

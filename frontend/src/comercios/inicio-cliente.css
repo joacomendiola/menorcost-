@@ -204,7 +204,10 @@
 }
 
 .inicio-cliente__status {
+  display: inline-flex;
   flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
   color: #b45309;
   font-size: 11px;
   font-weight: 700;
@@ -212,6 +215,22 @@
 
 .inicio-cliente__status.is-open {
   color: #15803d;
+}
+
+.inicio-cliente__status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: #dc2626;
+}
+
+.inicio-cliente__status-dot.is-open {
+  background: #16a34a;
+}
+
+.inicio-cliente__status-dot.is-closed {
+  background: #dc2626;
 }
 
 .inicio-cliente__store-body > p,

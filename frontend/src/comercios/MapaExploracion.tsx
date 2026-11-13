@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import L, { type LayerGroup, type Map as LeafletMap } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { agruparOfertasPorComercio, type OfertaMapa } from './mapaCatalogo';
+import { crearUrlTilesCarto } from './mapaTiles';
 
 interface Props {
   ofertas: OfertaMapa[];
@@ -10,6 +11,9 @@ interface Props {
 }
 
 const moneda = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
+const urlTiles = crearUrlTilesCarto(
+  import.meta.env.VITE_CARTO_BASEMAP_API_KEY as string | undefined,
+);
 
 function escaparHtml(texto: string): string {
   return texto.replace(/[&<>"']/g, (caracter) => ({
@@ -26,7 +30,7 @@ export function MapaExploracion({ ofertas, latitudOrigen, longitudOrigen }: Prop
     if (!elemento.current) return;
     const instancia = L.map(elemento.current, { scrollWheelZoom: false })
       .setView([latitudOrigen, longitudOrigen], 12);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer(urlTiles, {
       attribution: '&copy; OpenStreetMap &copy; CARTO',
       subdomains: 'abcd',
     }).addTo(instancia);

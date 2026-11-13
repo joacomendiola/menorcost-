@@ -22,7 +22,6 @@ const offerDetailsSelect = {
   idProducto: true,
   comercioId: true,
   categoriaId: true,
-  tipo: true,
   titulo: true,
   descripcion: true,
   fechaVencimiento: true,
@@ -40,7 +39,6 @@ type OfferProjection = {
   idProducto: string;
   comercioId: string;
   categoriaId: string;
-  tipo: OfferDetails['tipo'];
   titulo: string;
   descripcion: string;
   fechaVencimiento: Date;
@@ -59,7 +57,6 @@ function toOfferDetails(producto: OfferProjection): OfferDetails {
     id: producto.idProducto,
     comercioId: producto.comercioId,
     categoriaId: producto.categoriaId,
-    tipo: producto.tipo,
     titulo: producto.titulo,
     descripcion: producto.descripcion,
     fechaVencimiento: producto.fechaVencimiento
@@ -173,7 +170,6 @@ export class PrismaOfferRepositoryAdapter implements OfferRepository {
   ): Promise<OfferRecord> {
     const producto = await this.prisma.producto.create({
       data: {
-        tipo: data.tipo,
         comercioId: data.comercioId,
         categoriaId: data.categoriaId,
         titulo: data.titulo,

@@ -28,8 +28,6 @@ type Props = {
   categorias: Option[];
 };
 
-type TipoOferta = 'INDIVIDUAL' | 'COMBO';
-
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -110,7 +108,6 @@ export function NewOfferForm({ token, comercioId, categorias }: Props) {
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const [tipo, setTipo] = useState<TipoOferta>('INDIVIDUAL');
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -234,7 +231,6 @@ export function NewOfferForm({ token, comercioId, categorias }: Props) {
     }
 
     const data = new FormData();
-    data.set('tipo', tipo);
     data.set('comercioId', comercioId);
     data.set('categoriaId', categoriaId);
     data.set('titulo', titulo.trim());
@@ -264,7 +260,6 @@ export function NewOfferForm({ token, comercioId, categorias }: Props) {
 
       setMessage('Oferta publicada correctamente.');
 
-      setTipo('INDIVIDUAL');
       setCategoriaId(null);
       setTitulo('');
       setDescripcion('');
@@ -296,30 +291,6 @@ export function NewOfferForm({ token, comercioId, categorias }: Props) {
       p={{ base: 'md', sm: 'xl' }}
     >
       <Stack gap="lg">
-        <Group gap="sm">
-          <Button
-            type="button"
-            radius="xl"
-            size="sm"
-            variant={tipo === 'INDIVIDUAL' ? 'filled' : 'default'}
-            aria-pressed={tipo === 'INDIVIDUAL'}
-            onClick={() => setTipo('INDIVIDUAL')}
-          >
-            Producto individual
-          </Button>
-
-          <Button
-            type="button"
-            radius="xl"
-            size="sm"
-            variant={tipo === 'COMBO' ? 'filled' : 'default'}
-            aria-pressed={tipo === 'COMBO'}
-            onClick={() => setTipo('COMBO')}
-          >
-            Canasta / Combo Ahorro
-          </Button>
-        </Group>
-
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
           <TextInput
             label="Título"

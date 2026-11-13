@@ -267,6 +267,10 @@ export function InicioClientePage() {
                         <span
                           className={`inicio-cliente__status ${local.abierto ? "is-open" : ""}`}
                         >
+                          <span
+                            className={`inicio-cliente__status-dot ${local.abierto ? "is-open" : "is-closed"}`}
+                            aria-hidden="true"
+                          />
                           {local.abierto ? "Abierto" : "Cerrado"}
                         </span>
                       </div>

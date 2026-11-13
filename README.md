@@ -86,9 +86,16 @@ Crea otro archivo llamado .env y pega lo siguiente (esto conecta Prisma con la b
 DATABASE_URL="postgresql://postgres:menorcostpassword@localhost:5433/menorcost?schema=public"
 
 C. En la carpeta del frontend (/frontend):
-Crea un tercer archivo llamado .env y pega lo siguiente (esto conecta React con la API de NestJS):
+Crea un archivo `frontend/.env.local` para conectar React con NestJS y configurar los mapas:
 
+```env
 VITE_API_URL=http://localhost:3000
+VITE_CARTO_BASEMAP_API_KEY=tu_clave_de_carto
+```
+
+La clave de CARTO se solicita en [CARTO Basemaps](https://www.carto.com/basemaps/apikey/index.html). Se usa para cargar los tiles del mapa de inicio y exploración. Vite expone las variables `VITE_*` al navegador; restringí la clave a los dominios de la aplicación desde CARTO y no la publiques en el repositorio. `frontend/.env.local` está excluido de Git.
+
+Después de crear o modificar este archivo, reiniciá el frontend (`npm run dev` dentro de `/frontend`) para que Vite vuelva a cargar las variables.
 
 ---
 
