@@ -343,7 +343,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .expect(201);
       });
 
-      it('rechaza reportar un pedido cancelado', async () => {
+      it('permite al cliente reportar un pedido cancelado', async () => {
         const cancelado = await crearPedido(cliente.id, comercioId, 'CANCEL');
         await prisma.pedido.update({
           where: { id_pedido: cancelado.id_pedido },
@@ -355,6 +355,72 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .set(auth(clienteToken))
           .send({
             idPedido: cancelado.id_pedido,
+            motivo: 'El local estaba cerrado',
+            tipo_destino: TipoDestinoReporte.COMERCIO,
+          })
+          .expect(201);
+      });
+
+      it('rechaza reportar un pedido pendiente de pago', async () => {
+        const pendiente = await crearPedido(
+          cliente.id,
+          comercioId,
+          'PENDIENTE-PAGO',
+        );
+        await prisma.pedido.update({
+          where: { id_pedido: pendiente.id_pedido },
+          data: { estado: EstadoPedido.PENDIENTE_PAGO },
+        });
+
+        await request(server())
+          .post('/reports')
+          .set(auth(clienteToken))
+          .send({
+            idPedido: pendiente.id_pedido,
+            motivo: 'El local estaba cerrado',
+            tipo_destino: TipoDestinoReporte.COMERCIO,
+          })
+          .expect(400);
+      });
+
+      it('permite al comerciante reportar un pedido cancelado por falta de retiro', async () => {
+        const pedido = await crearPedido(
+          cliente.id,
+          comercioId,
+          'NO-SHOW',
+        );
+        await prisma.pedido.update({
+          where: { id_pedido: pedido.id_pedido },
+          data: { estado: EstadoPedido.CANCELADO_POR_FALTA_RETIRO },
+        });
+
+        await request(server())
+          .post('/reports')
+          .set(auth(comercianteToken))
+          .send({
+            idPedido: pedido.id_pedido,
+            motivo: 'El cliente no se presentó a retirar el producto',
+            tipo_destino: TipoDestinoReporte.CLIENTE,
+          })
+          .expect(201);
+      });
+
+      it('rechaza al cliente reportar un pedido cancelado por falta de retiro', async () => {
+        const pedido = await crearPedido(
+          cliente.id,
+          comercioId,
+          'NO-SHOW-CLIENTE',
+        );
+        await prisma.pedido.update({
+          where: { id_pedido: pedido.id_pedido },
+          data: { estado: EstadoPedido.CANCELADO_POR_FALTA_RETIRO },
+        });
+
+        await request(server())
+          .post('/reports')
+          .set(auth(clienteToken))
+          .send({
+            idPedido: pedido.id_pedido,
             motivo: 'El local estaba cerrado',
             tipo_destino: TipoDestinoReporte.COMERCIO,
           })

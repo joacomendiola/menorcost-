@@ -7,6 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { compare } from 'bcryptjs';
+import type { Prisma } from '../../generated/prisma/client.js';
 import type { EstadoUsuario } from '../../generated/prisma/enums.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import {
@@ -19,6 +20,19 @@ import type { SolicitarBajaDto } from './dto/solicitar-baja.dto.js';
 
 const MSG_BLOQUEO =
   'No se puede dar de baja una cuenta con transacciones o reclamos en curso';
+
+function propagarConflictoSerializable(error: unknown): never {
+  const codigo =
+    error && typeof error === 'object' && 'code' in error
+      ? (error as { code?: string }).code
+      : undefined;
+  if (codigo === 'P2034') {
+    throw new ConflictException(
+      'La cuenta o sus reclamos cambiaron durante la operación. Actualiza la página e inténtalo nuevamente.',
+    );
+  }
+  throw error;
+}
 
 @Injectable()
 export class BajaService {
@@ -49,21 +63,38 @@ export class BajaService {
       throw new UnauthorizedException('La contraseña actual es incorrecta');
     }
 
-    await this.asegurarSinBloqueos(usuarioId);
+    try {
+      await this.prisma.$transaction(
+        async (tx) => {
+          await this.asegurarSinBloqueos(usuarioId, tx);
 
-    await this.prisma.$transaction([
-      this.prisma.solicitudBaja.create({
-        data: {
-          usuarioId,
-          motivo: dto.motivo,
-          estadoPrevioUsuario: usuario.estado,
+          const actualizado = await tx.usuario.updateMany({
+            where: {
+              id: usuarioId,
+              estado: usuario.estado,
+              deletedAt: null,
+            },
+            data: { estado: 'SOLICITUD_BAJA_PENDIENTE' },
+          });
+          if (actualizado.count !== 1) {
+            throw new ConflictException(
+              'El estado de la cuenta cambió. Actualiza la página e inténtalo nuevamente.',
+            );
+          }
+
+          await tx.solicitudBaja.create({
+            data: {
+              usuarioId,
+              motivo: dto.motivo,
+              estadoPrevioUsuario: usuario.estado,
+            },
+          });
         },
-      }),
-      this.prisma.usuario.update({
-        where: { id: usuarioId },
-        data: { estado: 'SOLICITUD_BAJA_PENDIENTE' },
-      }),
-    ]);
+        { isolationLevel: 'Serializable' },
+      );
+    } catch (error: unknown) {
+      propagarConflictoSerializable(error);
+    }
 
     if (usuario.rol === 'COMERCIANTE') {
       await this.bloqueos.pausarOfertas(usuarioId);
@@ -122,39 +153,44 @@ export class BajaService {
   ): Promise<{ message: string }> {
     const solicitud = await this.obtenerPendiente(solicitudId);
 
-    await this.asegurarSinBloqueos(solicitud.usuarioId);
+    try {
+      await this.prisma.$transaction(
+        async (tx) => {
+          await this.asegurarSinBloqueos(solicitud.usuarioId, tx);
 
-    await this.prisma.$transaction(async (tx) => {
-      // Reclamo atómico: solo un administrador puede resolver la solicitud.
-      const reclamo = await tx.solicitudBaja.updateMany({
-        where: { id: solicitudId, estado: 'PENDIENTE' },
-        data: {
-          estado: 'APROBADA',
-          resueltoPorId: adminId,
-          resueltoEn: new Date(),
+          const reclamo = await tx.solicitudBaja.updateMany({
+            where: { id: solicitudId, estado: 'PENDIENTE' },
+            data: {
+              estado: 'APROBADA',
+              resueltoPorId: adminId,
+              resueltoEn: new Date(),
+            },
+          });
+
+          if (reclamo.count !== 1) {
+            throw new ConflictException(
+              'La solicitud ya fue resuelta por otro administrador',
+            );
+          }
+
+          await tx.usuario.update({
+            where: { id: solicitud.usuarioId },
+            data: {
+              deletedAt: new Date(),
+              tokenVersion: { increment: 1 },
+            },
+          });
+
+          await tx.comercio.updateMany({
+            where: { userId: solicitud.usuarioId, estado: { not: 'ELIMINADO' } },
+            data: { estado: 'ELIMINADO' },
+          });
         },
-      });
-
-      if (reclamo.count !== 1) {
-        throw new ConflictException(
-          'La solicitud ya fue resuelta por otro administrador',
-        );
-      }
-
-      await tx.usuario.update({
-        where: { id: solicitud.usuarioId },
-        data: {
-          deletedAt: new Date(),
-          tokenVersion: { increment: 1 },
-        },
-      });
-
-      // Si el usuario tiene comercio, se marca como eliminado (no una sanción).
-      await tx.comercio.updateMany({
-        where: { userId: solicitud.usuarioId, estado: { not: 'ELIMINADO' } },
-        data: { estado: 'ELIMINADO' },
-      });
-    });
+        { isolationLevel: 'Serializable' },
+      );
+    } catch (error: unknown) {
+      propagarConflictoSerializable(error);
+    }
 
     // Las ofertas ya se pausaron al solicitar la baja; se reafirma por integridad.
     await this.bloqueos.pausarOfertas(solicitud.usuarioId);
@@ -218,9 +254,13 @@ export class BajaService {
     return solicitud;
   }
 
-  private async asegurarSinBloqueos(usuarioId: string): Promise<void> {
+  private async asegurarSinBloqueos(
+    usuarioId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     const bloqueos: BloqueoBaja[] = await this.bloqueos.obtenerBloqueos(
       usuarioId,
+      tx,
     );
 
     if (bloqueos.length > 0) {

@@ -127,10 +127,18 @@ describe('AuthService.validarSesion', () => {
   });
 
   it('devuelve el usuario si la sesión es válida', async () => {
-    const usuario = usuarioBase({ tokenVersion: 3 });
+    const usuario = usuarioBase({ tokenVersion: 3, estado: 'HABILITADO' });
     prismaMock.usuario.findFirst.mockResolvedValue(usuario);
 
     await expect(service.validarSesion('u1', 3)).resolves.toBe(usuario);
+  });
+
+  it('invalida sesiones existentes de cuentas que ya no están habilitadas', async () => {
+    prismaMock.usuario.findFirst.mockResolvedValue(
+      usuarioBase({ tokenVersion: 3, estado: 'BAJO_INVESTIGACION' }),
+    );
+
+    await expect(service.validarSesion('u1', 3)).resolves.toBeNull();
   });
 });
 
