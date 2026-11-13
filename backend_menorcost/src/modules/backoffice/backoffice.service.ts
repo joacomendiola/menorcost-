@@ -398,7 +398,7 @@ export class BackofficeService {
         const otrosReportesAbiertos = await tx.reporte.count({
           where: {
             id_denunciado: reporte.id_denunciado,
-            estado_reporte: 'BAJO_INVESTIGACION',
+            estado_reporte: { in: ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'] },
             id_reporte: { not: idReporte },
           },
         });

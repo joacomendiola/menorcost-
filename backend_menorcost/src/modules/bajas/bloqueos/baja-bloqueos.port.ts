@@ -1,3 +1,5 @@
+import type { Prisma } from '../../../generated/prisma/client.js';
+
 export interface BloqueoBaja {
   tipo: string;
   message: string;
@@ -20,7 +22,10 @@ export interface ResumenCuentaBaja {
  *  - `reactivarOfertas`: reactiva las ofertas si la solicitud es rechazada.
  */
 export interface BajaBloqueosPort {
-  obtenerBloqueos(usuarioId: string): Promise<BloqueoBaja[]>;
+  obtenerBloqueos(
+    usuarioId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<BloqueoBaja[]>;
   obtenerResumenesCuentas(
     usuarioIds: string[],
   ): Promise<Map<string, ResumenCuentaBaja>>;

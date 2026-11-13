@@ -13,7 +13,8 @@ const CLIENTE_ID = 'cliente-1';
 const COMERCIANTE_ID = 'comerciante-1';
 
 const prismaMock = {
-  pedido: { findUnique: vi.fn() },
+  pedido: { findUnique: vi.fn(), findMany: vi.fn() },
+  comercio: { findUnique: vi.fn() },
   reporte: {
     findFirst: vi.fn(),
     create: vi.fn(),
@@ -21,11 +22,12 @@ const prismaMock = {
     count: vi.fn(),
     findUnique: vi.fn(),
   },
-  usuario: { updateMany: vi.fn() },
+  usuario: { findUnique: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
   $transaction: vi.fn(),
 };
 
-const service = new ReportesService(prismaMock as never);
+const mailerMock = { enviar: vi.fn() };
+const service = new ReportesService(prismaMock as never, mailerMock as never);
 
 function pedidoBase(overrides: Record<string, unknown> = {}) {
   return {
@@ -56,6 +58,18 @@ function reporteCreado(overrides: Record<string, unknown> = {}) {
     tipo_destino: 'COMERCIO',
     id_emisor: CLIENTE_ID,
     id_denunciado: COMERCIANTE_ID,
+    emisor: {
+      id: CLIENTE_ID,
+      nombre: 'Cliente',
+      apellido: 'Prueba',
+      email: 'cliente@example.com',
+    },
+    denunciado: {
+      id: COMERCIANTE_ID,
+      nombre: 'Comerciante',
+      apellido: 'Prueba',
+      email: 'comerciante@example.com',
+    },
     fecha_reporte: new Date('2026-01-01T00:00:00.000Z'),
     ...overrides,
   };
@@ -70,12 +84,19 @@ beforeEach(() => {
   });
 
   prismaMock.pedido.findUnique.mockResolvedValue(pedidoBase());
+  prismaMock.usuario.findUnique.mockResolvedValue({
+    estado: 'HABILITADO',
+    deletedAt: null,
+  });
+  prismaMock.comercio.findUnique.mockResolvedValue({ idComercio: 'comercio-1' });
   prismaMock.reporte.findFirst.mockResolvedValue(null);
   prismaMock.reporte.create.mockResolvedValue(reporteCreado());
   prismaMock.reporte.findMany.mockResolvedValue([]);
   prismaMock.reporte.count.mockResolvedValue(0);
   prismaMock.reporte.findUnique.mockResolvedValue(null);
   prismaMock.usuario.updateMany.mockResolvedValue({ count: 1 });
+  prismaMock.usuario.findMany.mockResolvedValue([{ email: 'admin@example.com' }]);
+  mailerMock.enviar.mockResolvedValue(undefined);
 });
 
 describe('ReportesService.crearReporte', () => {
@@ -248,11 +269,40 @@ describe('ReportesService.crearReporte', () => {
     );
   });
 
-  it('crea el reporte y no activa el umbral con menos de 3 emisores', async () => {
-    prismaMock.reporte.findMany.mockResolvedValue([
-      { id_emisor: 'emisor-1' },
-      { id_emisor: 'emisor-2' },
-    ]);
+  it('notifica a los administradores activos al crear el reporte', async () => {
+    prismaMock.reporte.create.mockResolvedValue(
+      reporteCreado({ motivo: '<motivo>' }),
+    );
+
+    const resultado = await service.crearReporte(
+      CLIENTE_ID,
+      'CLIENTE',
+      dtoBase({ motivo: '<motivo>' }),
+    );
+
+    expect(prismaMock.usuario.findMany).toHaveBeenCalledWith({
+      where: {
+        rol: 'ADMINISTRADOR',
+        estado: 'HABILITADO',
+        deletedAt: null,
+      },
+      select: { email: true },
+    });
+    expect(mailerMock.enviar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'admin@example.com',
+        subject: 'Nuevo reporte #1',
+        html: expect.stringContaining('&lt;motivo&gt;'),
+      }),
+    );
+    expect(resultado.notificacionSoporte).toEqual({
+      enviada: true,
+      destinatarios: 1,
+    });
+  });
+
+  it('expone el fallo de notificación sin perder el reporte creado', async () => {
+    mailerMock.enviar.mockRejectedValueOnce(new Error('SMTP caído'));
 
     const resultado = await service.crearReporte(
       CLIENTE_ID,
@@ -260,13 +310,47 @@ describe('ReportesService.crearReporte', () => {
       dtoBase(),
     );
 
-    expect(prismaMock.reporte.findMany).toHaveBeenCalledWith({
+    expect(prismaMock.reporte.create).toHaveBeenCalled();
+    expect(resultado).toMatchObject({
+      id_reporte: 1,
+      notificacionSoporte: {
+        enviada: false,
+        destinatarios: 1,
+        aviso: expect.stringContaining('no se pudo notificar'),
+      },
+    });
+  });
+
+  it('indica cuando no hay administradores activos para notificar', async () => {
+    prismaMock.usuario.findMany.mockResolvedValue([]);
+
+    const resultado = await service.crearReporte(
+      CLIENTE_ID,
+      'CLIENTE',
+      dtoBase(),
+    );
+
+    expect(resultado.notificacionSoporte).toMatchObject({
+      enviada: false,
+      destinatarios: 0,
+    });
+    expect(mailerMock.enviar).not.toHaveBeenCalled();
+  });
+
+  it('crea el reporte y no investiga con hasta 3 reportes abiertos', async () => {
+    prismaMock.reporte.count.mockResolvedValue(3);
+
+    const resultado = await service.crearReporte(
+      CLIENTE_ID,
+      'CLIENTE',
+      dtoBase(),
+    );
+
+    expect(prismaMock.reporte.count).toHaveBeenCalledWith({
       where: {
         id_denunciado: COMERCIANTE_ID,
         estado_reporte: { in: ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'] },
       },
-      distinct: ['id_emisor'],
-      select: { id_emisor: true },
     });
     expect(prismaMock.usuario.updateMany).not.toHaveBeenCalled();
     expect(resultado).toMatchObject({
@@ -275,12 +359,8 @@ describe('ReportesService.crearReporte', () => {
     });
   });
 
-  it('activa BAJO_INVESTIGACION con 3 emisores distintos', async () => {
-    prismaMock.reporte.findMany.mockResolvedValue([
-      { id_emisor: 'emisor-1' },
-      { id_emisor: 'emisor-2' },
-      { id_emisor: 'emisor-3' },
-    ]);
+  it('activa BAJO_INVESTIGACION al superar 3 reportes abiertos', async () => {
+    prismaMock.reporte.count.mockResolvedValue(4);
 
     await service.crearReporte(CLIENTE_ID, 'CLIENTE', dtoBase());
 
@@ -290,12 +370,72 @@ describe('ReportesService.crearReporte', () => {
     });
   });
 
-  it('no activa el umbral si todos los reportes son del mismo emisor', async () => {
-    prismaMock.reporte.findMany.mockResolvedValue([{ id_emisor: 'emisor-1' }]);
+  it('rechaza reportes de cuentas que no están habilitadas', async () => {
+    prismaMock.usuario.findUnique.mockResolvedValue({
+      estado: 'SOLICITUD_BAJA_PENDIENTE',
+      deletedAt: null,
+    });
 
-    await service.crearReporte(CLIENTE_ID, 'CLIENTE', dtoBase());
+    await expect(
+      service.crearReporte(CLIENTE_ID, 'CLIENTE', dtoBase()),
+    ).rejects.toBeInstanceOf(ForbiddenException);
 
-    expect(prismaMock.usuario.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.reporte.create).not.toHaveBeenCalled();
+  });
+
+  it('convierte conflictos de serialización en respuesta recuperable', async () => {
+    prismaMock.$transaction.mockRejectedValueOnce({ code: 'P2034' });
+
+    await expect(
+      service.crearReporte(CLIENTE_ID, 'CLIENTE', dtoBase()),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+});
+
+describe('ReportesService.listarPedidosReportablesComerciante', () => {
+  it('limita pedidos y reportes abiertos al comercio y emisor autenticados', async () => {
+    prismaMock.pedido.findMany.mockResolvedValue([
+      {
+        id_pedido: PEDIDO_ID,
+        codigoAlfanumerico: 'MC-123',
+        estado: 'ENTREGADO',
+        fecha_pedido: new Date('2026-01-01T00:00:00.000Z'),
+        total: 250,
+        items: [],
+        reportes: [],
+      },
+    ]);
+
+    const resultado =
+      await service.listarPedidosReportablesComerciante(COMERCIANTE_ID);
+
+    expect(prismaMock.pedido.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          comercioId: 'comercio-1',
+          estado: {
+            in: [
+              'ENTREGADO',
+              'PENDIENTE_DE_RETIRO',
+              'CANCELADO',
+              'CANCELADO_POR_FALTA_RETIRO',
+            ],
+          },
+        },
+        select: expect.objectContaining({
+          reportes: expect.objectContaining({
+            where: {
+              id_emisor: COMERCIANTE_ID,
+              estado_reporte: {
+                in: ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'],
+              },
+            },
+            take: 1,
+          }),
+        }),
+      }),
+    );
+    expect(resultado[0]).toMatchObject({ reporteAbierto: null });
   });
 });
 

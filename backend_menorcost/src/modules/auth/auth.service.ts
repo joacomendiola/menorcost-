@@ -45,7 +45,11 @@ export class AuthService {
       where: { id, deletedAt: null },
     });
 
-    if (!usuario || usuario.tokenVersion !== tokenVersion) {
+    if (
+      !usuario ||
+      usuario.tokenVersion !== tokenVersion ||
+      usuario.estado !== EstadoUsuario.HABILITADO
+    ) {
       return null;
     }
 

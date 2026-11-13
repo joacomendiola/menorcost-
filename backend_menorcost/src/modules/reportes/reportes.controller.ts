@@ -40,6 +40,14 @@ export class ReportesController {
     return this.reportesService.listarMisReportes(user.id, query);
   }
 
+  @Get('merchant-orders')
+  @Roles('COMERCIANTE')
+  async listarPedidosReportablesComerciante(
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.reportesService.listarPedidosReportablesComerciante(user.id);
+  }
+
   @Get(':id')
   @Roles('CLIENTE', 'COMERCIANTE', 'ADMINISTRADOR')
   async obtenerDetalleReporte(

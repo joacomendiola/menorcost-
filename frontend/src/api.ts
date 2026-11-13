@@ -325,6 +325,21 @@ export interface PedidoTicket {
   }>;
 }
 
+export interface PedidoReportableComerciante {
+  id_pedido: string;
+  codigoAlfanumerico: string;
+  estado: EstadoPedido;
+  fecha_pedido: string;
+  total: number | string;
+  items: Array<{ cantidad: number; producto: { titulo: string } }>;
+  reporteAbierto: {
+    id_reporte: number;
+    motivo: string;
+    estado_reporte: string;
+    fecha_reporte: string;
+  } | null;
+}
+
 export const pedidosApi = {
   obtenerPorCodigo: (token: string, codigo: string) =>
     api<PedidoTicket>(`/pedidos/${encodeURIComponent(codigo)}`, { token }),
@@ -370,6 +385,11 @@ export interface ReporteCreado {
   estado_reporte: string;
   tipo_destino: 'COMERCIO' | 'CLIENTE';
   fecha_reporte: string;
+  notificacionSoporte?: {
+    enviada: boolean;
+    destinatarios: number;
+    aviso?: string;
+  };
 }
 
 export interface ReporteMio {
@@ -409,6 +429,9 @@ export interface MisReportesResponse {
 }
 
 export const reportesApi = {
+  pedidosComerciante: (token: string) =>
+    api<PedidoReportableComerciante[]>('/reports/merchant-orders', { token }),
+
   crear: (
     token: string,
     data: {

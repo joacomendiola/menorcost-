@@ -59,3 +59,38 @@ describe('reportesApi.misReportes', () => {
     expect(resultado).not.toHaveProperty('reportes');
   });
 });
+
+describe('reportesApi.pedidosComerciante', () => {
+  it('consulta solo la lista protegida de pedidos reportables del comerciante', async () => {
+    const payload = [
+      {
+        id_pedido: 'p1',
+        codigoAlfanumerico: 'MC-123',
+        estado: 'ENTREGADO',
+        fecha_pedido: '2026-01-01T00:00:00.000Z',
+        total: '150.00',
+        items: [],
+        reporteAbierto: null,
+      },
+    ];
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify(payload),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(reportesApi.pedidosComerciante('token')).resolves.toEqual(
+      payload,
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/reports/merchant-orders'),
+      expect.objectContaining({
+        method: 'GET',
+        headers: {
+          Authorization: expect.stringMatching(/^Bearer .+/),
+        },
+      }),
+    );
+  });
+});

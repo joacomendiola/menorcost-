@@ -272,6 +272,42 @@ describe('BackofficeService.cerrarReporte', () => {
   });
 });
 
+describe('BackofficeService.alternarInvestigacion', () => {
+  it('no habilita la cuenta mientras queden reportes abiertos pendientes', async () => {
+    prismaMock.reporte.findUnique.mockResolvedValue(
+      reporteBase({ estado_reporte: 'BAJO_INVESTIGACION' }),
+    );
+    prismaMock.reporte.count.mockResolvedValue(1);
+
+    await service.alternarInvestigacion(7);
+
+    expect(prismaMock.reporte.count).toHaveBeenCalledWith({
+      where: {
+        id_denunciado: DENUNCIADO.id,
+        estado_reporte: {
+          in: ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'],
+        },
+        id_reporte: { not: 7 },
+      },
+    });
+    expect(prismaMock.usuario.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('habilita la cuenta si ya no quedan reportes abiertos', async () => {
+    prismaMock.reporte.findUnique.mockResolvedValue(
+      reporteBase({ estado_reporte: 'BAJO_INVESTIGACION' }),
+    );
+    prismaMock.reporte.count.mockResolvedValue(0);
+
+    await service.alternarInvestigacion(7);
+
+    expect(prismaMock.usuario.updateMany).toHaveBeenCalledWith({
+      where: { id: DENUNCIADO.id, estado: 'BAJO_INVESTIGACION' },
+      data: { estado: 'HABILITADO' },
+    });
+  });
+});
+
 describe('BackofficeService.sancionar', () => {
   it('suspende la cuenta, cierra denuncias y notifica a ambas partes', async () => {
     prismaMock.reporte.updateMany
