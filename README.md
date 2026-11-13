@@ -90,7 +90,7 @@ Crea un archivo `frontend/.env.local` para conectar React con NestJS y configura
 
 ```env
 VITE_API_URL=http://localhost:3000
-VITE_CARTO_BASEMAP_API_KEY=tu_clave_de_carto
+VITE_CARTO_BASEMAP_API_KEY=cb1_58if_1_17b97274313cfc1418ddc767
 ```
 
 La clave de CARTO se solicita en [CARTO Basemaps](https://www.carto.com/basemaps/apikey/index.html). Se usa para cargar los tiles del mapa de inicio y exploración. Vite expone las variables `VITE_*` al navegador; restringí la clave a los dominios de la aplicación desde CARTO y no la publiques en el repositorio. `frontend/.env.local` está excluido de Git.
