@@ -8,6 +8,7 @@ export class CrearReporteDto {
 
   @IsNotEmpty()
   @IsString()
+  @MaxLength(120)
   motivo: string; // Categoría seleccionada en el select
 
   @IsOptional()

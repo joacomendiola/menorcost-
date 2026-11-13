@@ -372,6 +372,42 @@ export interface ReporteCreado {
   fecha_reporte: string;
 }
 
+export interface ReporteMio {
+  id_reporte: number;
+  motivo: string;
+  descripcion: string | null;
+  estado_reporte: string;
+  tipo_destino: string;
+  fecha_reporte: string;
+  fecha_resolucion: string | null;
+  id_pedido: string;
+  id_emisor: string;
+  id_denunciado: string;
+  id_admin: string | null;
+  pedido: {
+    id_pedido: string;
+    estado: string;
+    codigoAlfanumerico: string;
+    total: number | string;
+    formaPago: string;
+    comercio: {
+      idComercio: string;
+      usuario: { nombre: string; apellido: string };
+    } | null;
+  } | null;
+  denunciado: { id: string; nombre: string; apellido: string };
+}
+
+export interface MisReportesResponse {
+  data: ReporteMio[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 export const reportesApi = {
   crear: (
     token: string,
@@ -393,20 +429,10 @@ export const reportesApi = {
     if (query?.limit) params.set('limit', String(query.limit));
     if (query?.estado) params.set('estado', query.estado);
     const qs = params.toString();
-    return api<{
-      total: number;
-      page: number;
-      limit: number;
-      reportes: Array<{
-        id: number;
-        motivo: string;
-        descripcion: string | null;
-        estado: string;
-        tipo_destino: string;
-        fecha: string;
-        comercio: string | null;
-      }>;
-    }>(`/reports/my-reports${qs ? `?${qs}` : ''}`, { token });
+    return api<MisReportesResponse>(
+      `/reports/my-reports${qs ? `?${qs}` : ''}`,
+      { token },
+    );
   },
 };
 
