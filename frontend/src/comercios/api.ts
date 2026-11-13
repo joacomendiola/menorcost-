@@ -69,7 +69,7 @@ export interface ProductoTienda {
   descripcion: string;
   imagen: string;
   precioLista: string | number;
-  precioMenorcost: string | number;
+  precioPublico: string | number;
   fechaVencimiento: string;
   stock: number;
   categoria: {
@@ -153,7 +153,7 @@ export interface PlacesDetalle {
   longitud: number;
 }
 
-type Metodo = 'GET' | 'POST' | 'PATCH' | 'PUT';
+type Metodo = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
 interface Opciones {
   method?: Metodo;

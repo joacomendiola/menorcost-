@@ -11,15 +11,18 @@ import {
   OFFER_CATEGORIES,
   OFFER_REPOSITORY,
   OFFER_RESERVATIONS,
-  type ManageableOfferStatus,
-  type OfferAccess,
-  type OfferCategories,
-  type OfferDetails,
-  type OfferImage,
-  type OfferRecord,
-  type OfferRepository,
-  type OfferReservations,
-  type OfferDashboardSummary,
+} from './ofertas-creation.ports.js';
+import type {
+  CalculatedOfferPrices,
+  ManageableOfferStatus,
+  OfferAccess,
+  OfferCategories,
+  OfferDashboardSummary,
+  OfferDetails,
+  OfferImage,
+  OfferRecord,
+  OfferRepository,
+  OfferReservations,
 } from './ofertas-creation.ports.js';
 import { CreateOfferDto } from './dto/create-oferta.dto.js';
 import type { UpdateOfferDto } from './dto/update-oferta.dto.js';
@@ -27,7 +30,11 @@ import { ImageStorageService } from './image-store.service.js';
 import {
   todayInArgentina,
   validateOfferRules,
+  validatePublicPrice,
 } from './ofertas-rules.js';
+import { SimuladorPreciosService } from '../simulador-precios/simulador-precios.service.js';
+
+type PriceCalculator = Pick<SimuladorPreciosService, 'calcular'>;
 
 const OFFER_HAS_PENDING_RESERVATIONS =
   'Esta oferta no puede eliminarse porque existen reservas pendientes de entrega. Debe completar o gestionar los retiros antes de darla de baja.';
@@ -47,6 +54,8 @@ export class OffersService {
     private readonly imageStorage: ImageStorageService,
     @Inject(OFFER_RESERVATIONS)
     private readonly reservations: OfferReservations,
+    @Inject(SimuladorPreciosService)
+    private readonly simuladorPrecios: PriceCalculator,
   ) {}
 
   async create(
@@ -60,6 +69,16 @@ export class OffersService {
 
     validateOfferRules(dto);
 
+    const calculo = await this.simuladorPrecios.calcular({
+      precioLista: dto.precioLista,
+      precioBaseNeto: dto.precioBaseNeto,
+    });
+
+    validatePublicPrice(
+      dto.precioLista,
+      calculo.precioPublico,
+    );
+
     const imageUrl = await this.imageStorage.save(
       image.buffer,
       image.mimetype,
@@ -68,6 +87,11 @@ export class OffersService {
     try {
       return await this.repository.create({
         ...dto,
+        precioBaseNeto: calculo.precioBaseNeto,
+        precioPublico: calculo.precioPublico,
+        comisionMenorcostTasaAplicada:
+          calculo.comisionMenorcostTasa,
+        tasaMpEstimadaAplicada: calculo.tasaMpEstimada,
         imagen: imageUrl,
         estado: 'ACTIVO',
       });
@@ -140,7 +164,7 @@ export class OffersService {
 
     if (
       dto.precioLista === undefined &&
-      dto.precioMenorcost === undefined &&
+      dto.precioBaseNeto === undefined &&
       dto.stock === undefined &&
       image === undefined
     ) {
@@ -149,9 +173,35 @@ export class OffersService {
       );
     }
 
-    const precioLista = dto.precioLista ?? current.precioLista;
-    const precioMenorcost = dto.precioMenorcost ?? current.precioMenorcost;
-    this.validatePrices(precioLista, precioMenorcost);
+    const cambiaPrecio =
+      dto.precioLista !== undefined ||
+      dto.precioBaseNeto !== undefined;
+
+    let preciosCalculados: Partial<CalculatedOfferPrices> = {};
+
+    if (cambiaPrecio) {
+      const calculo = await this.simuladorPrecios.calcular({
+        precioLista: dto.precioLista ?? current.precioLista,
+        precioBaseNeto:
+          dto.precioBaseNeto ?? current.precioBaseNeto,
+      });
+
+      const precioLista =
+        dto.precioLista ?? current.precioLista;
+
+      validatePublicPrice(
+        precioLista,
+        calculo.precioPublico,
+      );
+
+      preciosCalculados = {
+        precioBaseNeto: calculo.precioBaseNeto,
+        precioPublico: calculo.precioPublico,
+        comisionMenorcostTasaAplicada:
+          calculo.comisionMenorcostTasa,
+        tasaMpEstimadaAplicada: calculo.tasaMpEstimada,
+      };
+    }
 
     if (dto.stock !== undefined && dto.stock < current.stock) {
       const reservedUnits = await this.reservations.getReservedUnitsForOffer(
@@ -175,7 +225,11 @@ export class OffersService {
 
     try {
       updated = await this.repository.updateForOwner(userId, offerId, {
-        ...dto,
+        ...(dto.precioLista !== undefined
+          ? { precioLista: dto.precioLista }
+          : {}),
+        ...(dto.stock !== undefined ? { stock: dto.stock } : {}),
+        ...preciosCalculados,
         ...(newImageUrl ? { imagen: newImageUrl } : {}),
       });
     } catch (error) {
@@ -267,33 +321,6 @@ export class OffersService {
     }
 
     return updated;
-  }
-
-  private validatePrices(
-    precioLista: string,
-    precioMenorcost: string,
-  ): void {
-    const listaEnCentavos = this.toCents(precioLista);
-    const promoEnCentavos = this.toCents(precioMenorcost);
-
-    if (listaEnCentavos <= 0n || promoEnCentavos <= 0n) {
-      throw new BadRequestException('Los precios deben ser mayores que cero');
-    }
-
-    if (promoEnCentavos >= listaEnCentavos) {
-      throw new BadRequestException(
-        'El precio promocional debe ser menor que el precio de lista',
-      );
-    }
-  }
-
-  private toCents(value: string): bigint {
-    if (!/^\d+(\.\d{1,2})?$/.test(value)) {
-      throw new BadRequestException('El formato de precio no es válido');
-    }
-
-    const [whole, fraction = ''] = value.split('.');
-    return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'));
   }
 
   private async deleteImageAfterFailure(
