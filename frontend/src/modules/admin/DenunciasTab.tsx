@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { Button } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { adminApi, type AdminDenuncia, type EstadoUsuario } from '../../api';
+import {
+  adminApi,
+  type AdminDenuncia,
+  type AdminNotificacion,
+  type EstadoUsuario,
+} from '../../api';
 import { useAuth } from '../../auth/contexto';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { useAdminContext } from './adminContext';
@@ -54,7 +59,25 @@ const ESTADO_CUENTA: Record<EstadoUsuario, string> = {
   DOCUMENTACION_RECHAZADA: 'Documentación rechazada',
 };
 
-type Accion = 'investigacion' | 'resolver' | 'sancionar' | 'rehabilitar';
+function describirNotificaciones(notificaciones: {
+  emisor: AdminNotificacion;
+  denunciado: AdminNotificacion;
+}) {
+  const fallidos: string[] = [];
+  if (!notificaciones.emisor.enviada) fallidos.push('emisor');
+  if (!notificaciones.denunciado.enviada) fallidos.push('denunciado');
+
+  return fallidos.length === 0
+    ? 'Se notificó a ambas partes por correo.'
+    : `No se pudo notificar a: ${fallidos.join(' y ')}.`;
+}
+
+type Accion =
+  | 'investigacion'
+  | 'desestimar'
+  | 'resolver'
+  | 'sancionar'
+  | 'rehabilitar';
 
 export function DenunciasTab() {
   const { token, cerrarSesion } = useAuth();
@@ -73,6 +96,7 @@ export function DenunciasTab() {
 
   const [procesando, setProcesando] = useState<number | null>(null);
   const [sancionando, setSancionando] = useState<AdminDenuncia | null>(null);
+  const [desestimando, setDesestimando] = useState<AdminDenuncia | null>(null);
   const [rehabilitando, setRehabilitando] = useState<AdminDenuncia | null>(null);
   const [resultado, setResultado] = useState<{ tone: 'ok' | 'warn'; texto: string } | null>(null);
 
@@ -90,11 +114,26 @@ export function DenunciasTab() {
               ? `Denuncia #${d.id_reporte}: investigación abierta. La cuenta de ${objetivo} queda bajo investigación.`
               : `Denuncia #${d.id_reporte}: investigación cerrada. Vuelve a estado En revisión.`,
         });
-      } else if (accion === 'resolver') {
-        await adminApi.resolverDenuncia(token, d.id_reporte);
+      } else if (accion === 'desestimar') {
+        const resp = await adminApi.desestimarDenuncia(token, d.id_reporte);
         setResultado({
-          tone: 'ok',
-          texto: `Denuncia #${d.id_reporte} resuelta. No se aplicaron sanciones a ${objetivo}.`,
+          tone:
+            resp.notificaciones.emisor.enviada &&
+            resp.notificaciones.denunciado.enviada
+              ? 'ok'
+              : 'warn',
+          texto: `Denuncia #${d.id_reporte} desestimada. ${describirNotificaciones(resp.notificaciones)}`,
+        });
+        setDesestimando(null);
+      } else if (accion === 'resolver') {
+        const resp = await adminApi.resolverDenuncia(token, d.id_reporte);
+        setResultado({
+          tone:
+            resp.notificaciones.emisor.enviada &&
+            resp.notificaciones.denunciado.enviada
+              ? 'ok'
+              : 'warn',
+          texto: `Denuncia #${d.id_reporte} resuelta. No se aplicaron sanciones a ${objetivo}. ${describirNotificaciones(resp.notificaciones)}`,
         });
       } else if (accion === 'rehabilitar') {
         await adminApi.rehabilitarUsuario(token, d.denunciado.id);
@@ -109,15 +148,21 @@ export function DenunciasTab() {
           resp.denunciasCerradas > 0
             ? ` También se cerraron ${resp.denunciasCerradas} denuncia(s) abierta(s) del mismo usuario.`
             : '';
+        const correosOk =
+          resp.notificacion.enviada && resp.notificacionEmisor.enviada;
+        const avisos = [resp.notificacion.aviso, resp.notificacionEmisor.aviso]
+          .filter(Boolean)
+          .join(' ');
+
         setResultado(
-          resp.notificacion.enviada
+          correosOk
             ? {
                 tone: 'ok',
-                texto: `La cuenta de ${objetivo} pasó a SUSPENDIDO y se le notificó por correo.${cierre}`,
+                texto: `La cuenta de ${objetivo} pasó a SUSPENDIDO y se notificó a ambas partes por correo.${cierre}`,
               }
             : {
                 tone: 'warn',
-                texto: `${objetivo} fue suspendido. ${resp.notificacion.aviso ?? 'No se pudo enviar el correo.'}${cierre}`,
+                texto: `${objetivo} fue suspendido. ${avisos || 'No se pudo enviar uno de los correos.'}${cierre}`,
               },
         );
         setSancionando(null);
@@ -131,6 +176,7 @@ export function DenunciasTab() {
       }
       notifications.show({ message: mensajeError(err), color: 'bad' });
       setSancionando(null);
+      setDesestimando(null);
       setRehabilitando(null);
       void recargar();
     } finally {
@@ -258,6 +304,14 @@ export function DenunciasTab() {
                               : 'Abrir investigación'}
                           </Button>
                           <Button
+                            variant="default"
+                            className="btn-compact"
+                            disabled={bloqueado}
+                            onClick={() => setDesestimando(d)}
+                          >
+                            Desestimar
+                          </Button>
+                          <Button
                             variant="subtle"
                             className="btn-compact"
                             disabled={bloqueado}
@@ -294,6 +348,20 @@ export function DenunciasTab() {
           })}
         </AdminLista>
       )}
+
+      <ConfirmDialog
+        open={desestimando !== null}
+        title="Desestimar denuncia"
+        confirmLabel="Desestimar denuncia"
+        loading={procesando !== null}
+        onClose={() => setDesestimando(null)}
+        onConfirm={() => desestimando && void ejecutar(desestimando, 'desestimar')}
+      >
+        La denuncia <strong>#{desestimando?.id_reporte ?? ''}</strong> quedará{' '}
+        <strong>DESESTIMADA</strong>. Si la cuenta denunciada estaba{' '}
+        <strong>BAJO_INVESTIGACION</strong> y no tiene otros reportes abiertos, volverá a{' '}
+        <strong>HABILITADO</strong>. Se notificará por correo al emisor y al denunciado.
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={sancionando !== null}
