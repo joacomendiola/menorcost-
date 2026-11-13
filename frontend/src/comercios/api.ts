@@ -153,7 +153,7 @@ export interface PlacesDetalle {
   longitud: number;
 }
 
-type Metodo = 'GET' | 'POST' | 'PATCH' | 'PUT';
+type Metodo = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
 interface Opciones {
   method?: Metodo;

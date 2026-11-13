@@ -31,8 +31,57 @@ export function CanastaPage() {
   const [canasta, setCanasta] = useState<CanastaResumen | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  const [actualizandoProducto, setActualizandoProducto] = useState<string | null>(null);
 
   const parametrosInvalidos = !comercioId || !token;
+
+  async function actualizarCantidad(
+    productoId: string,
+    cantidad: number,
+  ) {
+    if (!token || !comercioId || cantidad < 1) return;
+
+    setActualizandoProducto(productoId);
+
+    try {
+      const actualizada =
+        await detalleOfertaApi.actualizarCantidad(
+          token,
+          comercioId,
+          productoId,
+          cantidad,
+        );
+
+      setCanasta(actualizada);
+      setError('');
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setActualizandoProducto(null);
+    }
+  }
+
+  async function eliminarProducto(productoId: string) {
+    if (!token || !comercioId) return;
+
+    setActualizandoProducto(productoId);
+
+    try {
+      const actualizada =
+        await detalleOfertaApi.eliminarDeCanasta(
+          token,
+          comercioId,
+          productoId,
+        );
+
+      setCanasta(actualizada);
+      setError('');
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setActualizandoProducto(null);
+    }
+  }
 
   useEffect(() => {
     if (parametrosInvalidos) return;
@@ -192,6 +241,62 @@ export function CanastaPage() {
                       Cantidad: <strong>{item.cantidad}</strong>
                     </p>
                   </div>
+                      
+                    <div className="canasta-item__acciones">
+                      <Button
+                        size="compact-sm"
+                        variant="default"
+                        aria-label={`Disminuir cantidad de ${item.producto.titulo}`}
+                        disabled={
+                          actualizandoProducto === item.productoId ||
+                          item.cantidad <= 1
+                        }
+                        loading={actualizandoProducto === item.productoId}
+                        onClick={() =>
+                          void actualizarCantidad(
+                            item.productoId,
+                            item.cantidad - 1,
+                          )
+                        }
+                      >
+                        −
+                      </Button>
+
+                      <span aria-live="polite">
+                        {item.cantidad}
+                      </span>
+
+                      <Button
+                        size="compact-sm"
+                        variant="default"
+                        aria-label={`Aumentar cantidad de ${item.producto.titulo}`}
+                        disabled={
+                          actualizandoProducto === item.productoId ||
+                          item.cantidad >= item.producto.stock
+                        }
+                        onClick={() =>
+                          void actualizarCantidad(
+                            item.productoId,
+                            item.cantidad + 1,
+                          )
+                        }
+                      >
+                        +
+                      </Button>
+
+                      <Button
+                        size="compact-sm"
+                        color="red"
+                        variant="subtle"
+                        aria-label={`Eliminar ${item.producto.titulo}`}
+                        disabled={actualizandoProducto === item.productoId}
+                        onClick={() =>
+                          void eliminarProducto(item.productoId)
+                        }
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
 
                   <strong className="canasta-item__subtotal">
                     {moneda.format(Number(item.subtotal))}

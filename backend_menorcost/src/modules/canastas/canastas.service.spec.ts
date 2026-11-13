@@ -51,6 +51,7 @@ describe('CanastasService', () => {
     canasta: {
       findUnique: vi.fn(),
       upsert: vi.fn(),
+      update: vi.fn(),
     },
     producto: {
       findFirst: vi.fn(),
@@ -58,6 +59,8 @@ describe('CanastasService', () => {
     canastaItem: {
       findUnique: vi.fn(),
       upsert: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
     },
     $transaction: vi.fn(),
   };
@@ -436,4 +439,211 @@ describe('CanastasService', () => {
 
     expect(transaction.canasta.upsert).not.toHaveBeenCalled();
   });
+
+    it('actualiza la cantidad de un producto en la canasta', async () => {
+    const canasta = {
+      idCanasta: canastaId,
+    };
+
+    const transaction = {
+      canasta: {
+        findUnique: vi
+          .fn()
+          .mockResolvedValueOnce(canasta)
+          .mockResolvedValueOnce(canastaSerializada(4)),
+        update: vi.fn(),
+      },
+      producto: {
+        findFirst: vi.fn().mockResolvedValue(producto),
+      },
+      canastaItem: {
+        findUnique: vi.fn().mockResolvedValue({
+          idCanastaItem: canastaItemId,
+          cantidad: 2,
+        }),
+        update: vi.fn(),
+        delete: vi.fn(),
+      },
+    };
+
+    prisma.$transaction.mockImplementation(
+      async (
+        callback: (
+          transactionClient: typeof transaction,
+        ) => Promise<unknown>,
+      ) => callback(transaction),
+    );
+
+    const resultado = await service.actualizarProducto(
+      usuarioId,
+      comercioId,
+      productoId,
+      { cantidad: 4 },
+    );
+
+    expect(resultado.items[0]).toMatchObject({
+      productoId,
+      cantidad: 4,
+      precioUnitario: '1250.50',
+      subtotal: '5002.00',
+    });
+
+    expect(transaction.canastaItem.update).toHaveBeenCalledWith({
+      where: {
+        idCanastaItem: canastaItemId,
+      },
+      data: {
+        cantidad: 4,
+      },
+    });
+
+    expect(transaction.canasta.update).toHaveBeenCalledWith({
+      where: {
+        idCanasta: canastaId,
+      },
+      data: {
+        updatedAt: expect.any(Date),
+      },
+    });
+  });
+
+    it('rechaza actualizar una cantidad superior al stock', async () => {
+    const transaction = {
+      canasta: {
+        findUnique: vi.fn().mockResolvedValue({
+          idCanasta: canastaId,
+        }),
+        update: vi.fn(),
+      },
+      producto: {
+        findFirst: vi.fn().mockResolvedValue({
+          ...producto,
+          stock: 3,
+        }),
+      },
+      canastaItem: {
+        findUnique: vi.fn().mockResolvedValue({
+          idCanastaItem: canastaItemId,
+          cantidad: 2,
+        }),
+        update: vi.fn(),
+      },
+    };
+
+    prisma.$transaction.mockImplementation(
+      async (
+        callback: (
+          transactionClient: typeof transaction,
+        ) => Promise<unknown>,
+      ) => callback(transaction),
+    );
+
+    await expect(
+      service.actualizarProducto(
+        usuarioId,
+        comercioId,
+        productoId,
+        { cantidad: 4 },
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(transaction.canastaItem.update).not.toHaveBeenCalled();
+    expect(transaction.canasta.update).not.toHaveBeenCalled();
+  });
+
+    it('elimina un producto de la canasta y actualiza la fecha de modificación', async () => {
+    const transaction = {
+      canasta: {
+        findUnique: vi
+          .fn()
+          .mockResolvedValueOnce({
+            idCanasta: canastaId,
+          })
+          .mockResolvedValueOnce({
+            ...canastaSerializada(1),
+            items: [],
+          }),
+        update: vi.fn(),
+      },
+      canastaItem: {
+        findUnique: vi.fn().mockResolvedValue({
+          idCanastaItem: canastaItemId,
+          cantidad: 2,
+        }),
+        delete: vi.fn(),
+      },
+    };
+
+    prisma.$transaction.mockImplementation(
+      async (
+        callback: (
+          transactionClient: typeof transaction,
+        ) => Promise<unknown>,
+      ) => callback(transaction),
+    );
+
+    const resultado = await service.eliminarProducto(
+      usuarioId,
+      comercioId,
+      productoId,
+    );
+
+    expect(resultado).toEqual({
+      idCanasta: canastaId,
+      comercioId,
+      comercio,
+      subtotal: '0.00',
+      items: [],
+    });
+
+    expect(transaction.canastaItem.delete).toHaveBeenCalledWith({
+      where: {
+        idCanastaItem: canastaItemId,
+      },
+    });
+
+    expect(transaction.canasta.update).toHaveBeenCalledWith({
+      where: {
+        idCanasta: canastaId,
+      },
+      data: {
+        updatedAt: expect.any(Date),
+      },
+    });
+  });
+
+    it('rechaza eliminar un producto que no está en la canasta', async () => {
+    const transaction = {
+      canasta: {
+        findUnique: vi.fn().mockResolvedValue({
+          idCanasta: canastaId,
+        }),
+        update: vi.fn(),
+      },
+      canastaItem: {
+        findUnique: vi.fn().mockResolvedValue(null),
+        delete: vi.fn(),
+      },
+    };
+
+    prisma.$transaction.mockImplementation(
+      async (
+        callback: (
+          transactionClient: typeof transaction,
+        ) => Promise<unknown>,
+      ) => callback(transaction),
+    );
+
+    await expect(
+      service.eliminarProducto(
+        usuarioId,
+        comercioId,
+        productoId,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(transaction.canastaItem.delete).not.toHaveBeenCalled();
+    expect(transaction.canasta.update).not.toHaveBeenCalled();
+  });
+
 });

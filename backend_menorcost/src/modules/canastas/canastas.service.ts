@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AgregarCanastaItemDto } from './dto/agregar-canasta-item.dto.js';
+import type { ActualizarCanastaItemDto } from './dto/actualizar-canasta-item.dto.js';
 
 @Injectable()
 export class CanastasService {
@@ -288,6 +289,167 @@ export class CanastasService {
     });
   }
 
+    async actualizarProducto(
+    usuarioId: string,
+    comercioId: string,
+    productoId: string,
+    dto: ActualizarCanastaItemDto,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const canasta = await tx.canasta.findUnique({
+        where: {
+          usuarioId_comercioId: {
+            usuarioId,
+            comercioId,
+          },
+        },
+      });
+
+      if (!canasta) {
+        throw new NotFoundException(
+          'La canasta no existe.',
+        );
+      }
+
+      const producto = await tx.producto.findFirst({
+        where: {
+          idProducto: productoId,
+          comercioId,
+        },
+        select: {
+          stock: true,
+          estado: true,
+          fechaVencimiento: true,
+          titulo: true,
+        },
+      });
+
+      if (!producto) {
+        throw new NotFoundException(
+          'El producto no existe o no pertenece a este comercio.',
+        );
+      }
+
+      if (producto.estado !== 'ACTIVO') {
+        throw new BadRequestException(
+          'El producto no está disponible actualmente.',
+        );
+      }
+
+      const hoy = this.obtenerFechaActualArgentina();
+
+      if (
+        this.obtenerFechaProducto(producto.fechaVencimiento) < hoy
+      ) {
+        throw new BadRequestException(
+          'El producto está vencido.',
+        );
+      }
+
+      if (dto.cantidad > producto.stock) {
+        throw new BadRequestException(
+          `La cantidad solicitada supera el stock disponible de "${producto.titulo}".`,
+        );
+      }
+
+      const item = await tx.canastaItem.findUnique({
+        where: {
+          canastaId_productoId: {
+            canastaId: canasta.idCanasta,
+            productoId,
+          },
+        },
+      });
+
+      if (!item) {
+        throw new NotFoundException(
+          'El producto no está en la canasta.',
+        );
+      }
+
+      await tx.canastaItem.update({
+        where: {
+          idCanastaItem: item.idCanastaItem,
+        },
+        data: {
+          cantidad: dto.cantidad,
+        },
+      });
+
+      await tx.canasta.update({
+        where: {
+          idCanasta: canasta.idCanasta,
+        },
+        data: {
+          updatedAt: new Date(),
+        },
+      });
+
+      return this.obtenerCanastaEnTransaccion(
+        tx,
+        canasta.idCanasta,
+      );
+    });
+  }
+
+  async eliminarProducto(
+    usuarioId: string,
+    comercioId: string,
+    productoId: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const canasta = await tx.canasta.findUnique({
+        where: {
+          usuarioId_comercioId: {
+            usuarioId,
+            comercioId,
+          },
+        },
+      });
+
+      if (!canasta) {
+        throw new NotFoundException(
+          'La canasta no existe.',
+        );
+      }
+
+      const item = await tx.canastaItem.findUnique({
+        where: {
+          canastaId_productoId: {
+            canastaId: canasta.idCanasta,
+            productoId,
+          },
+        },
+      });
+
+      if (!item) {
+        throw new NotFoundException(
+          'El producto no está en la canasta.',
+        );
+      }
+
+      await tx.canastaItem.delete({
+        where: {
+          idCanastaItem: item.idCanastaItem,
+        },
+      });
+
+      await tx.canasta.update({
+        where: {
+          idCanasta: canasta.idCanasta,
+        },
+        data: {
+          updatedAt: new Date(),
+        },
+      });
+
+      return this.obtenerCanastaEnTransaccion(
+        tx,
+        canasta.idCanasta,
+      );
+    });
+  }
+
   private obtenerFechaActualArgentina(): string {
     const partes = new Intl.DateTimeFormat('en-US', {
       timeZone: 'America/Argentina/Ushuaia',
@@ -315,6 +477,51 @@ export class CanastasService {
     const dia = String(fecha.getUTCDate()).padStart(2, '0');
 
     return `${año}-${mes}-${dia}`;
+  }
+
+    private async obtenerCanastaEnTransaccion(
+    tx: Parameters<Parameters<PrismaService['$transaction']>[0]>[0],
+    canastaId: string,
+  ) {
+    const canasta = await tx.canasta.findUnique({
+      where: {
+        idCanasta: canastaId,
+      },
+      include: {
+        comercio: {
+          select: {
+            idComercio: true,
+            nombreFantasia: true,
+          },
+        },
+        items: {
+          include: {
+            producto: {
+              select: {
+                idProducto: true,
+                titulo: true,
+                imagen: true,
+                stock: true,
+                precioPublico: true,
+                estado: true,
+                fechaVencimiento: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+      },
+    });
+
+    if (!canasta) {
+      throw new NotFoundException(
+        'No se pudo recuperar la canasta actualizada.',
+      );
+    }
+
+    return this.serializarCanasta(canasta);
   }
 
   private serializarCanasta(canasta: {

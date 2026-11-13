@@ -76,7 +76,7 @@ export const detalleOfertaApi = {
       },
     ),
 
-  agregarACanasta: (
+    agregarACanasta: (
     token: string,
     comercioId: string,
     productoId: string,
@@ -92,5 +92,35 @@ export const detalleOfertaApi = {
           cantidad,
         },
       },
+    ),
+
+    actualizarCantidad: (
+    token: string,
+    comercioId: string,
+    productoId: string,
+    cantidad: number,
+    ) =>
+    api<CanastaResumen>(
+        `/canastas/${encodeURIComponent(comercioId)}/items/${encodeURIComponent(productoId)}`,
+        {
+        method: 'PATCH',
+        token,
+        body: {
+        cantidad,
+        },
+        },
+    ),
+    
+    eliminarDeCanasta: (
+    token: string,
+    comercioId: string,
+    productoId: string,
+    ) =>
+    api<CanastaResumen>(
+        `/canastas/${encodeURIComponent(comercioId)}/items/${encodeURIComponent(productoId)}`,
+        {
+        method: 'DELETE',
+        token,
+        },
     ),
 };
