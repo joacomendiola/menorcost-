@@ -17,7 +17,6 @@ export class CatalogoService {
     const productos = await this.prisma.producto.findMany({
       where: {
         estado: 'ACTIVO', fechaVencimiento: { gte: new Date(new Date().toDateString()) },
-        stock: filtros.soloConStock === false ? undefined : { gt: 0 },
         categoriaId: filtros.categoriaId,
         precioPublico: { gte: filtros.precioMin, lte: filtros.precioMax },
         OR: filtros.q?.trim() ? [
@@ -35,8 +34,12 @@ export class CatalogoService {
       const distanciaKm = filtros.latitud === undefined ? null : calcularDistanciaKm(
         filtros.latitud, filtros.longitud!, Number(comercio.latitud), Number(comercio.longitud),
       );
-      const { latitud: _lat, longitud: _lon, ...comercioPublico } = comercio;
-      return { id: idProducto, ...producto, comercio: { id: comercio.idComercio, ...comercioPublico }, distanciaKm };
+      return {
+        id: idProducto,
+        ...producto,
+        comercio: { id: comercio.idComercio, ...comercio },
+        distanciaKm,
+      };
     }).filter((producto) => filtros.radioKm === undefined || (producto.distanciaKm !== null && producto.distanciaKm <= filtros.radioKm));
     if (filtros.latitud !== undefined) resultados.sort((a, b) => a.distanciaKm! - b.distanciaKm!);
     return resultados;
@@ -44,9 +47,9 @@ export class CatalogoService {
 
   async buscarComercios({ q }: BuscarComerciosDto) {
     const texto = q.trim();
-    if (texto.length < 2) throw new BadRequestException('Ingresá al menos 2 caracteres');
+    if (!texto) throw new BadRequestException('Ingresá una palabra clave');
     const comercios = await this.prisma.comercio.findMany({
-      where: { estado: 'HABILITADO', nombreFantasia: { contains: texto, mode: 'insensitive' }, productos: { some: { estado: 'ACTIVO', stock: { gt: 0 }, fechaVencimiento: { gte: new Date(new Date().toDateString()) } } } },
+      where: { estado: 'HABILITADO', nombreFantasia: { contains: texto, mode: 'insensitive' }, productos: { some: { estado: 'ACTIVO', fechaVencimiento: { gte: new Date(new Date().toDateString()) } } } },
       select: { idComercio: true, nombreFantasia: true, descripcion: true, logoUrl: true, localidad: true, abierto: true },
       orderBy: { nombreFantasia: 'asc' }, take: 50,
     });

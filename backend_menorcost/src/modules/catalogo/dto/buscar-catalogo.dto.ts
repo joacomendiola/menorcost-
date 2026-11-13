@@ -13,7 +13,6 @@ export class BuscarCatalogoDto {
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) precioMin?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) precioMax?: number;
   @IsOptional() @Transform(booleano) @IsBoolean() abierto?: boolean;
-  @IsOptional() @Transform(booleano) @IsBoolean() soloConStock?: boolean;
 }
 
 export class BuscarComerciosDto {

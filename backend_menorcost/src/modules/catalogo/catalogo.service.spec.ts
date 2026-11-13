@@ -24,5 +24,6 @@ describe('CatalogoService', () => {
     }));
     expect(resultado[0].id).toBe('cerca');
     expect(resultado[0].distanciaKm).toBe(0);
+    expect(resultado[0].comercio.latitud).toBe(-34.6);
   });
 });
