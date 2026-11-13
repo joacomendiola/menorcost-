@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -91,9 +92,10 @@ describe('Adaptadores Prisma de ofertas', () => {
       rol: 'COMERCIANTE',
       estado: 'HABILITADO',
     });
-    prismaMock.comercio.findFirst.mockResolvedValue({ idComercio: comercioId });
+    prismaMock.comercio.findFirst.mockResolvedValue({ idComercio: comercioId, estado: 'HABILITADO' });
     prismaMock.categoria.findUnique.mockResolvedValue({
       idCategoria: categoriaId,
+      activa: true,
     });
 
     prismaMock.producto.create.mockResolvedValue({
@@ -143,7 +145,7 @@ describe('Adaptadores Prisma de ofertas', () => {
 
     expect(prismaMock.comercio.findFirst).toHaveBeenCalledWith({
       where: { idComercio: comercioId, userId },
-      select: { idComercio: true },
+      select: { idComercio: true, estado: true },
     });
   });
 
@@ -181,6 +183,17 @@ describe('Adaptadores Prisma de ofertas', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('rechaza publicar ofertas en un comercio suspendido', async () => {
+    prismaMock.comercio.findFirst.mockResolvedValueOnce({
+      idComercio: comercioId,
+      estado: 'SUSPENDIDO',
+    });
+
+    await expect(
+      access.assertCanPublish(userId, comercioId),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('rechaza si Mercado Pago no está marcado como vinculado', async () => {
     prismaMock.comercio.findFirst.mockResolvedValueOnce({
       mercadoPagoVinculado: false,
@@ -208,7 +221,7 @@ describe('Adaptadores Prisma de ofertas', () => {
 
     expect(prismaMock.categoria.findUnique).toHaveBeenCalledWith({
       where: { idCategoria: categoriaId },
-      select: { idCategoria: true },
+      select: { idCategoria: true, activa: true },
     });
   });
 
@@ -218,6 +231,17 @@ describe('Adaptadores Prisma de ofertas', () => {
     await expect(
       categories.assertExists(categoriaId),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rechaza publicar ofertas en una categoría inactiva', async () => {
+    prismaMock.categoria.findUnique.mockResolvedValueOnce({
+      idCategoria: categoriaId,
+      activa: false,
+    });
+
+    await expect(
+      categories.assertExists(categoriaId),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('persiste el producto y devuelve su identificador e imagen', async () => {

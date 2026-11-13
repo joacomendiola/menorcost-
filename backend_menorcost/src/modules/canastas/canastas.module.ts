@@ -7,5 +7,6 @@ import { CanastasService } from './canastas.service.js';
   imports: [AuthModule],
   controllers: [CanastasController],
   providers: [CanastasService],
+  exports: [CanastasService],
 })
 export class CanastasModule {}
