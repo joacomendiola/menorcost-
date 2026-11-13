@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -33,10 +34,11 @@ const prismaMock = {
   },
   usuario: {
     findUnique: vi.fn(),
+    findUniqueOrThrow: vi.fn(),
     update: vi.fn(),
     updateMany: vi.fn(),
   },
-  comercio: { updateMany: vi.fn() },
+  comercio: { findUnique: vi.fn(), updateMany: vi.fn() },
   $transaction: vi.fn(),
 };
 
@@ -59,6 +61,16 @@ function reporteBase(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function comercioBase(overrides: Record<string, unknown> = {}) {
+  return {
+    idComercio: 'comercio-1',
+    userId: DENUNCIADO.id,
+    estado: 'PENDIENTE_VERIFICACION',
+    usuario: { ...DENUNCIADO, deletedAt: null },
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
@@ -77,10 +89,115 @@ beforeEach(() => {
   prismaMock.usuario.findUnique.mockResolvedValue({
     estado: 'BAJO_INVESTIGACION',
   });
+  prismaMock.usuario.findUniqueOrThrow.mockResolvedValue(DENUNCIADO);
   prismaMock.usuario.update.mockResolvedValue(DENUNCIADO);
   prismaMock.usuario.updateMany.mockResolvedValue({ count: 1 });
+  prismaMock.comercio.findUnique.mockResolvedValue(null);
   prismaMock.comercio.updateMany.mockResolvedValue({ count: 1 });
   mailerMock.enviar.mockResolvedValue(undefined);
+});
+
+describe('BackofficeService.aprobarAlta', () => {
+  it('habilita usuario y comercio y envía el correo de bienvenida', async () => {
+    prismaMock.comercio.findUnique.mockResolvedValue(comercioBase());
+    prismaMock.usuario.findUniqueOrThrow.mockResolvedValue({
+      ...DENUNCIADO,
+      estado: 'HABILITADO',
+    });
+
+    const resultado = await service.aprobarAlta('comercio-1');
+
+    expect(prismaMock.usuario.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: DENUNCIADO.id,
+        estado: 'PENDIENTE_VERIFICACION',
+        deletedAt: null,
+      },
+      data: { estado: 'HABILITADO' },
+    });
+    expect(prismaMock.comercio.updateMany).toHaveBeenCalledWith({
+      where: {
+        idComercio: 'comercio-1',
+        estado: 'PENDIENTE_VERIFICACION',
+      },
+      data: { estado: 'HABILITADO' },
+    });
+    expect(mailerMock.enviar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: DENUNCIADO.email,
+        subject: expect.stringContaining('Bienvenido'),
+      }),
+    );
+    expect(resultado.notificacion).toEqual({ enviada: true });
+  });
+
+  it('revierte la aprobación si otro administrador ya procesó la solicitud', async () => {
+    prismaMock.comercio.findUnique.mockResolvedValue(comercioBase());
+    prismaMock.usuario.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.aprobarAlta('comercio-1'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(mailerMock.enviar).not.toHaveBeenCalled();
+  });
+
+  it('rechaza comercios eliminados', async () => {
+    prismaMock.comercio.findUnique.mockResolvedValue(
+      comercioBase({ usuario: { ...DENUNCIADO, deletedAt: new Date() } }),
+    );
+
+    await expect(
+      service.aprobarAlta('comercio-1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('BackofficeService.rechazarAlta', () => {
+  it('marca usuario y comercio como documentación rechazada y envía el motivo', async () => {
+    prismaMock.comercio.findUnique.mockResolvedValue(comercioBase());
+    prismaMock.usuario.findUniqueOrThrow.mockResolvedValue({
+      ...DENUNCIADO,
+      estado: 'DOCUMENTACION_RECHAZADA',
+    });
+
+    const resultado = await service.rechazarAlta(
+      'comercio-1',
+      'CUIT inexistente',
+    );
+
+    expect(prismaMock.usuario.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: DENUNCIADO.id,
+        estado: 'PENDIENTE_VERIFICACION',
+        deletedAt: null,
+      },
+      data: { estado: 'DOCUMENTACION_RECHAZADA' },
+    });
+    expect(prismaMock.comercio.updateMany).toHaveBeenCalledWith({
+      where: {
+        idComercio: 'comercio-1',
+        estado: 'PENDIENTE_VERIFICACION',
+      },
+      data: { estado: 'DOCUMENTACION_RECHAZADA' },
+    });
+    expect(mailerMock.enviar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: DENUNCIADO.email,
+        html: expect.stringContaining('CUIT inexistente'),
+      }),
+    );
+    expect(resultado.notificacion).toEqual({ enviada: true });
+  });
+
+  it('revierte el rechazo si otro administrador ya procesó la solicitud', async () => {
+    prismaMock.comercio.findUnique.mockResolvedValue(comercioBase());
+    prismaMock.usuario.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.rechazarAlta('comercio-1', 'Motivo'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(mailerMock.enviar).not.toHaveBeenCalled();
+  });
 });
 
 describe('BackofficeService.cerrarReporte', () => {
