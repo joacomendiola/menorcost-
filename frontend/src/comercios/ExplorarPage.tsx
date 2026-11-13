@@ -4,6 +4,7 @@ import { Button, Loader, Modal, Select, TextInput } from '@mantine/core';
 import { api, direccionesApi, type Direccion } from '../api';
 import { useAuth } from '../auth/contexto';
 import { resolverImagen } from './api';
+import { obtenerMensajeErrorCatalogo } from './catalogo-errores';
 import type { OfertaMapa } from './mapaCatalogo';
 import './explorar.css';
 
@@ -53,8 +54,6 @@ const moneda = new Intl.NumberFormat('es-AR', {
   currency: 'ARS',
   maximumFractionDigits: 0,
 });
-const ERROR_CONEXION =
-  'Error de conexión: No se pudo actualizar el catálogo por cercanía. Comprueba tu conexión a Internet e inténtalo nuevamente';
 const BUSQUEDA_VACIA = 'Por favor, ingresa una palabra clave para buscar';
 const SIN_RESULTADOS =
   'No encontramos resultados coincidentes. Intentá buscando por categoría o revisá la ortografía';
@@ -100,17 +99,13 @@ export function ExplorarPage() {
     ])
       .then(([cats, direcciones]) => {
         if (!activo) return;
-        setCategorias(
-          cats.flatMap((cat) =>
-            cat.subcategorias.length ? cat.subcategorias : [cat],
-          ),
-        );
+        setCategorias(cats);
         setDireccion(
           direcciones.find((item) => item.esPredeterminada) ?? null,
         );
       })
-      .catch(() => {
-        if (activo) setError(ERROR_CONEXION);
+      .catch((error: unknown) => {
+        if (activo) setError(obtenerMensajeErrorCatalogo(error));
       });
     return () => {
       activo = false;
@@ -146,8 +141,8 @@ export function ExplorarPage() {
         setComercios(locales);
         setError('');
       })
-      .catch(() => {
-        if (activo) setError(ERROR_CONEXION);
+      .catch((error: unknown) => {
+        if (activo) setError(obtenerMensajeErrorCatalogo(error));
       })
       .finally(() => {
         if (activo) setCargando(false);

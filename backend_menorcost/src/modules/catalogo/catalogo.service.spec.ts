@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CatalogoService } from './catalogo.service.js';
 
 describe('CatalogoService', () => {
@@ -7,6 +7,7 @@ describe('CatalogoService', () => {
   const service = new CatalogoService(prisma as never);
 
   beforeEach(() => vi.clearAllMocks());
+  afterEach(() => vi.useRealTimers());
 
   it('rechaza coordenadas incompletas', async () => {
     await expect(service.listar({ latitud: -34 })).rejects.toBeInstanceOf(BadRequestException);
@@ -25,5 +26,30 @@ describe('CatalogoService', () => {
     expect(resultado[0].id).toBe('cerca');
     expect(resultado[0].distanciaKm).toBe(0);
     expect(resultado[0].comercio.latitud).toBe(-34.6);
+  });
+
+  it('incluye productos de las subcategorías al filtrar por categoría raíz', async () => {
+    prisma.producto.findMany.mockResolvedValue([]);
+    await service.listar({ categoriaId: 'raiz-1' });
+    expect(prisma.producto.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        AND: [{ OR: [
+          { categoriaId: 'raiz-1' },
+          { categoria: { is: { categoriaPadreId: 'raiz-1' } } },
+        ] }],
+      }),
+    }));
+  });
+
+  it('calcula la fecha mínima de vigencia según el día de Argentina', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-14T02:00:00.000Z'));
+    prisma.producto.findMany.mockResolvedValue([]);
+    await service.listar({});
+    expect(prisma.producto.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        fechaVencimiento: { gte: new Date('2026-11-13T00:00:00.000Z') },
+      }),
+    }));
   });
 });

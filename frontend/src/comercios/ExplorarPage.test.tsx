@@ -49,11 +49,14 @@ describe('ExplorarPage', () => {
   it('muestra el texto del CU para una categoría sin ofertas', async () => {
     mocks.api.mockImplementation((path: string) =>
       path === '/categorias'
-        ? Promise.resolve([{ id: 'cat-1', nombre: 'Almacén', slug: 'almacen', subcategorias: [] }])
+        ? Promise.resolve([{ id: 'cat-1', nombre: 'Almacén', slug: 'almacen', subcategorias: [
+            { id: 'cat-2', nombre: 'Lácteos', slug: 'lacteos', subcategorias: [] },
+          ] }])
         : Promise.resolve([]),
     );
     render(<MantineProvider><MemoryRouter><ExplorarPage /></MemoryRouter></MantineProvider>);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Almacén' })).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'Lácteos' })).not.toBeInTheDocument();
     screen.getByRole('button', { name: 'Almacén' }).click();
     expect(await screen.findByText('Actualmente no hay ofertas disponibles en esta categoría. Explorá otros rubros cercanos')).toBeInTheDocument();
   });

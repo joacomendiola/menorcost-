@@ -24,7 +24,7 @@ export class OffersExpirationService {
       where: {
         estado: 'ACTIVO',
         fechaVencimiento: {
-          lte: expirationDate,
+          lt: expirationDate,
         },
       },
       select: {
