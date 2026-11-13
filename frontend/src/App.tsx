@@ -9,6 +9,7 @@ import { ListaCanastasPage } from './comercios/ListaCanastasPage';
 import { RegistroComercioPage } from './comercios/RegistroComercioPage';
 import { TiendaPublicaPage } from './comercios/TiendaPublicaPage';
 import { ExplorarPage } from './comercios/ExplorarPage';
+import { InicioClientePage } from './comercios/InicioClientePage';
 import { TopBar } from './components/TopBar';
 import { AltasTab } from './modules/admin/AltasTab';
 import { Backoffice } from './modules/admin/Backoffice';
@@ -34,10 +35,11 @@ import { MisOfertasPage } from './ofertas/MisOfertasPage';
 export default function App() {
   const { pathname } = useLocation();
   const esPanelComerciante = pathname.startsWith('/panel');
+  const esInicioCliente = pathname === '/inicio';
 
   return (
     <>
-      {!esPanelComerciante && <TopBar />}
+      {!esPanelComerciante && !esInicioCliente && <TopBar />}
 
       <Routes>
         <Route element={<RutaPublica />}>
@@ -70,6 +72,8 @@ export default function App() {
         </Route>
 
         <Route element={<RutaCliente />}>
+          <Route path="/inicio" element={<InicioClientePage />} />
+
           <Route
             path="/comercios/:comercioId/productos/:productoId"
             element={<DetalleOfertaPage />}

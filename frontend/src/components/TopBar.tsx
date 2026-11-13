@@ -15,17 +15,36 @@ export function TopBar() {
         (usuario ? (
           <nav
             className="topbar__nav"
-            aria-label="Navegación principal del comerciante"
+            aria-label="Navegación principal"
           >
             {usuario.rol === 'CLIENTE' && (
-              <NavLink
-                to="/buscar"
-                className={({ isActive }) =>
-                  `pill${isActive ? ' pill--active' : ''}`
-                }
-              >
-                Explorar ofertas
-              </NavLink>
+              <>
+                <NavLink
+                  to="/inicio"
+                  end
+                  className={({ isActive }) =>
+                    `pill${isActive ? ' pill--active' : ''}`
+                  }
+                >
+                  Inicio
+                </NavLink>
+                <NavLink
+                  to="/buscar"
+                  className={({ isActive }) =>
+                    `pill${isActive ? ' pill--active' : ''}`
+                  }
+                >
+                  Explorar ofertas
+                </NavLink>
+                <NavLink
+                  to="/canastas"
+                  className={({ isActive }) =>
+                    `pill${isActive ? ' pill--active' : ''}`
+                  }
+                >
+                  Mis canastas
+                </NavLink>
+              </>
             )}
             {usuario.rol === 'COMERCIANTE' && (
               <>
