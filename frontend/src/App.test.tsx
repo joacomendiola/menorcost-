@@ -38,14 +38,12 @@ function renderizar(entrada: string) {
 }
 
 describe('Rutas de cliente pendientes', () => {
-  it.each([
-    ['/mis-pedidos', 'Mis pedidos'],
-    ['/buscar', 'Buscar ofertas'],
-  ])('%s muestra el componente EnConstruccion', (ruta, titulo) => {
+  it('/mis-pedidos muestra el componente EnConstruccion', () => {
+    const ruta = '/mis-pedidos';
     renderizar(ruta);
 
     expect(
-      screen.getByRole('heading', { level: 1, name: titulo }),
+      screen.getByRole('heading', { level: 1, name: 'Mis pedidos' }),
     ).toBeInTheDocument();
 
     expect(

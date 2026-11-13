@@ -17,6 +17,16 @@ export function TopBar() {
             className="topbar__nav"
             aria-label="Navegación principal del comerciante"
           >
+            {usuario.rol === 'CLIENTE' && (
+              <NavLink
+                to="/buscar"
+                className={({ isActive }) =>
+                  `pill${isActive ? ' pill--active' : ''}`
+                }
+              >
+                Explorar ofertas
+              </NavLink>
+            )}
             {usuario.rol === 'COMERCIANTE' && (
               <>
                 <NavLink

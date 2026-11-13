@@ -8,6 +8,7 @@ import { CanastaPage } from './comercios/CanastaPage';
 import { ListaCanastasPage } from './comercios/ListaCanastasPage';
 import { RegistroComercioPage } from './comercios/RegistroComercioPage';
 import { TiendaPublicaPage } from './comercios/TiendaPublicaPage';
+import { ExplorarPage } from './comercios/ExplorarPage';
 import { TopBar } from './components/TopBar';
 import { AltasTab } from './modules/admin/AltasTab';
 import { Backoffice } from './modules/admin/Backoffice';
@@ -95,15 +96,7 @@ export default function App() {
             }
           />
          
-          <Route
-            path="/buscar"
-            element={
-              <EnConstruccion
-                titulo="Buscar ofertas"
-                descripcion="Encontrá ofertas cerca tuyo por producto, categoría o comercio."
-              />
-            }
-          />
+          <Route path="/buscar" element={<ExplorarPage />} />
         </Route>
 
         {/* RUTAS COMERCIANTE */}
