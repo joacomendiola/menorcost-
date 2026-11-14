@@ -133,6 +133,8 @@ export function AltasTab() {
                     <Badge tone={alta.mercadoPagoVinculado ? 'blue' : 'neutro'}>
                       {alta.mercadoPagoVinculado ? 'Mercado Pago vinculado' : 'Mercado Pago sin vincular'}
                     </Badge>
+                    <Badge tone="neutro">CUIT registrado</Badge>
+                    <Badge tone="neutro">Documentación por correo</Badge>
                   </>
                 }
                 subtitulo={`CUIT ${alta.cuit} · DNI ${u.dni} · Solicitado ${formatFechaCorta(u.createdAt)}`}
@@ -157,6 +159,22 @@ export function AltasTab() {
                         ),
                       },
                       { label: 'Correo (para la documentación)', value: u.email },
+                      {
+                        label: 'Constancia AFIP',
+                        value: 'Revisión externa por correo',
+                      },
+                      {
+                        label: 'Habilitación municipal',
+                        value: 'Revisión externa por correo',
+                      },
+                      {
+                        label: 'Estado AFIP',
+                        value: 'No disponible en el sistema',
+                      },
+                      {
+                        label: 'Documentos adjuntos',
+                        value: 'No se almacenan en el sistema',
+                      },
                       { label: 'Contacto', value: alta.telefono || u.telefono || '—' },
                       {
                         label: 'Reputación',
