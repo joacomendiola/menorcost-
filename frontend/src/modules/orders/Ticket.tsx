@@ -11,9 +11,18 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge';
 const MOTIVO_OTRO = 'Otro';
 
 const MOTIVOS = [
-  { value: 'Mal estado del producto', label: 'Mal estado del producto' },
-  { value: 'Local cerrado', label: 'Local cerrado' },
-  { value: 'No respetó el precio', label: 'No respetó el precio' },
+  {
+    value: 'El producto estaba en mal estado/era diferente',
+    label: 'El producto estaba en mal estado/era diferente',
+  },
+  {
+    value: 'El comercio estaba cerrado al ir a retirar',
+    label: 'El comercio estaba cerrado al ir a retirar',
+  },
+  {
+    value: 'El comercio no respetó el precio',
+    label: 'El comercio no respetó el precio',
+  },
   { value: MOTIVO_OTRO, label: 'Otro motivo' },
 ];
 
@@ -218,11 +227,21 @@ export function Ticket() {
           : previo,
       );
 
-      notifications.show({
-        color: 'green',
-        title: 'Reporte enviado',
-        message: 'El reporte quedó en revisión (PENDIENTE_REVISION).',
-      });
+      notifications.show(
+        reporte.notificacionSoporte?.enviada === false
+          ? {
+              color: 'yellow',
+              title: 'Reporte enviado; soporte no notificado',
+              message:
+                reporte.notificacionSoporte?.aviso ??
+                'El reporte se guardó, pero no se pudo notificar al soporte.',
+            }
+          : {
+              color: 'green',
+              title: 'Reporte enviado',
+              message: 'El reporte quedó en revisión (PENDIENTE_REVISION).',
+            },
+      );
       setMotivo(null);
       setDescripcion('');
       setDescripcion('');
@@ -306,7 +325,14 @@ export function Ticket() {
     tone: 'neutro' as BadgeTone,
   };
   const valorEstrellas = hover || puntaje;
-  const yaReportado = pedido.misReportes.length > 0;
+  const reporteAbierto = pedido.misReportes.find((reporte) =>
+    ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'].includes(reporte.estado),
+  );
+  const puedeReportar = [
+    'ENTREGADO',
+    'PENDIENTE_DE_RETIRO',
+    'CANCELADO',
+  ].includes(pedido.estado);
 
   return (
     <main className="ticket-wrap">
@@ -464,70 +490,60 @@ export function Ticket() {
           </section>
         )}
 
-        {pedido.estado === 'PENDIENTE_DE_RETIRO' && (
+        {puedeReportar && (
           <section className="ticket-section">
-            <p className="ticket-note">
-              Podrás calificar y reportar cuando el pedido esté{' '}
-              <strong>ENTREGADO</strong>.
-            </p>
+            <h2>Reportar problema</h2>
+
+            {reporteAbierto ? (
+              <p className="ticket-note">
+                Ya enviaste un reporte para este pedido. Estado:{' '}
+                <strong>{reporteAbierto.estado}</strong>
+              </p>
+            ) : (
+              <form className="ticket-form" onSubmit={enviarReporte}>
+                <Select
+                  label="Motivo"
+                  placeholder="Elegí un motivo"
+                  data={MOTIVOS}
+                  value={motivo}
+                  onChange={setMotivo}
+                  withAsterisk
+                />
+
+                <div>
+                  <Textarea
+                    label={
+                      motivo === MOTIVO_OTRO
+                        ? 'Descripción del problema'
+                        : 'Descripción (opcional)'
+                    }
+                    placeholder="Contanos qué pasó"
+                    value={descripcion}
+                    onChange={(evento) =>
+                      setDescripcion(evento.currentTarget.value)
+                    }
+                    maxLength={300}
+                    autosize
+                    minRows={3}
+                    maxRows={6}
+                    required={motivo === MOTIVO_OTRO}
+                  />
+                  <p className="ticket-counter">{descripcion.length}/300</p>
+                </div>
+
+                <div className="ticket-form__actions">
+                  <Button
+                    type="submit"
+                    variant="default"
+                    loading={enviandoReporte}
+                  >
+                    Enviar reporte
+                  </Button>
+                </div>
+              </form>
+            )}
           </section>
         )}
-
-        {pedido.estado !== 'CANCELADO' &&
-          pedido.estado !== 'CANCELADO_POR_FALTA_RETIRO' && (
-            <section className="ticket-section">
-              <h2>Reportar problema</h2>
-
-              {yaReportado ? (
-                <p className="ticket-note">
-                  Ya enviaste un reporte para este pedido. Estado:{' '}
-                  <strong>{pedido.misReportes[0].estado}</strong>
-                </p>
-              ) : (
-                <form className="ticket-form" onSubmit={enviarReporte}>
-                  <Select
-                    label="Motivo"
-                    placeholder="Elegí un motivo"
-                    data={MOTIVOS}
-                    value={motivo}
-                    onChange={setMotivo}
-                    withAsterisk
-                  />
-
-                  <div>
-                    <Textarea
-                      label={
-                        motivo === MOTIVO_OTRO
-                          ? 'Descripción del problema'
-                          : 'Descripción (opcional)'
-                      }
-                      placeholder="Contanos qué pasó"
-                      value={descripcion}
-                      onChange={(evento) =>
-                        setDescripcion(evento.currentTarget.value)
-                      }
-                      maxLength={300}
-                      autosize
-                      minRows={3}
-                      maxRows={6}
-                      required={motivo === MOTIVO_OTRO}
-                    />
-                    <p className="ticket-counter">{descripcion.length}/300</p>
-                  </div>
-
-                  <div className="ticket-form__actions">
-                    <Button
-                      type="submit"
-                      variant="default"
-                      loading={enviandoReporte}
-                    >
-                      Enviar reporte
-                    </Button>
-                  </div>
-                </form>
-              )}
-            </section>
-          )}
 
         <div className="ticket-footer">
           <Link to="/" className="ticket-footer__link">

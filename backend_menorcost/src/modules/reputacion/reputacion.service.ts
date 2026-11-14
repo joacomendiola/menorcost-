@@ -103,9 +103,9 @@ export class ReputacionService {
     const limit = Math.min(Math.max(query?.limit ?? 10, 1), 50);
     const cursor = query?.cursor;
     const filtroComercio: Prisma.PedidoWhereInput = {
-    comercioId: id_comercio,
-    estado: EstadoPedido.ENTREGADO,
- };
+      comercioId: id_comercio,
+      estado: EstadoPedido.ENTREGADO,
+    };
     const [gruposPuntaje, calificacionesPagina] = await Promise.all([
       this.prisma.calificacion.groupBy({
         by: ['puntaje'],
@@ -205,7 +205,10 @@ export class ReputacionService {
     );
   }
 
-  private async recalcularReputacionTx(tx: any, id_comercio: string) {
+  private async recalcularReputacionTx(
+    tx: Prisma.TransactionClient,
+    id_comercio: string,
+  ) {
     const agregacion = await tx.calificacion.aggregate({
       _avg: { puntaje: true },
       _count: { id_calificacion: true },

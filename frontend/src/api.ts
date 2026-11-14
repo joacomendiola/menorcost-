@@ -325,6 +325,21 @@ export interface PedidoTicket {
   }>;
 }
 
+export interface PedidoReportableComerciante {
+  id_pedido: string;
+  codigoAlfanumerico: string;
+  estado: EstadoPedido;
+  fecha_pedido: string;
+  total: number | string;
+  items: Array<{ cantidad: number; producto: { titulo: string } }>;
+  reporteAbierto: {
+    id_reporte: number;
+    motivo: string;
+    estado_reporte: string;
+    fecha_reporte: string;
+  } | null;
+}
+
 export const pedidosApi = {
   obtenerPorCodigo: (token: string, codigo: string) =>
     api<PedidoTicket>(`/pedidos/${encodeURIComponent(codigo)}`, { token }),
@@ -370,9 +385,53 @@ export interface ReporteCreado {
   estado_reporte: string;
   tipo_destino: 'COMERCIO' | 'CLIENTE';
   fecha_reporte: string;
+  notificacionSoporte?: {
+    enviada: boolean;
+    destinatarios: number;
+    aviso?: string;
+  };
+}
+
+export interface ReporteMio {
+  id_reporte: number;
+  motivo: string;
+  descripcion: string | null;
+  estado_reporte: string;
+  tipo_destino: string;
+  fecha_reporte: string;
+  fecha_resolucion: string | null;
+  id_pedido: string;
+  id_emisor: string;
+  id_denunciado: string;
+  id_admin: string | null;
+  pedido: {
+    id_pedido: string;
+    estado: string;
+    codigoAlfanumerico: string;
+    total: number | string;
+    formaPago: string;
+    comercio: {
+      idComercio: string;
+      usuario: { nombre: string; apellido: string };
+    } | null;
+  } | null;
+  denunciado: { id: string; nombre: string; apellido: string };
+}
+
+export interface MisReportesResponse {
+  data: ReporteMio[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export const reportesApi = {
+  pedidosComerciante: (token: string) =>
+    api<PedidoReportableComerciante[]>('/reports/merchant-orders', { token }),
+
   crear: (
     token: string,
     data: {
@@ -393,20 +452,10 @@ export const reportesApi = {
     if (query?.limit) params.set('limit', String(query.limit));
     if (query?.estado) params.set('estado', query.estado);
     const qs = params.toString();
-    return api<{
-      total: number;
-      page: number;
-      limit: number;
-      reportes: Array<{
-        id: number;
-        motivo: string;
-        descripcion: string | null;
-        estado: string;
-        tipo_destino: string;
-        fecha: string;
-        comercio: string | null;
-      }>;
-    }>(`/reports/my-reports${qs ? `?${qs}` : ''}`, { token });
+    return api<MisReportesResponse>(
+      `/reports/my-reports${qs ? `?${qs}` : ''}`,
+      { token },
+    );
   },
 };
 
@@ -522,9 +571,14 @@ export interface AdminDenuncia {
   };
 }
 
-interface AdminNotificacion {
+export interface AdminNotificacion {
   enviada: boolean;
   aviso?: string;
+}
+
+export interface AdminNotificacionesCierre {
+  emisor: AdminNotificacion;
+  denunciado: AdminNotificacion;
 }
 
 function construirQuery(query: Record<string, string | undefined>): string {
@@ -583,16 +637,16 @@ export const adminApi = {
     ),
 
   desestimarDenuncia: (token: string, id: number) =>
-    api<{ success: true }>(`/admin/denuncias/${id}/desestimar`, {
-      method: 'PATCH',
-      token,
-    }),
+    api<{ success: true; notificaciones: AdminNotificacionesCierre }>(
+      `/admin/denuncias/${id}/desestimar`,
+      { method: 'PATCH', token },
+    ),
 
   resolverDenuncia: (token: string, id: number) =>
-    api<{ success: true }>(`/admin/denuncias/${id}/resolver`, {
-      method: 'PATCH',
-      token,
-    }),
+    api<{ success: true; notificaciones: AdminNotificacionesCierre }>(
+      `/admin/denuncias/${id}/resolver`,
+      { method: 'PATCH', token },
+    ),
 
   sancionarDenuncia: (token: string, id: number) =>
     api<{
@@ -600,6 +654,7 @@ export const adminApi = {
       usuario: AdminUsuario;
       denunciasCerradas: number;
       notificacion: AdminNotificacion;
+      notificacionEmisor: AdminNotificacion;
     }>(`/admin/denuncias/${id}/sancionar`, { method: 'PATCH', token }),
 
   rehabilitarUsuario: (token: string, idUsuario: string) =>

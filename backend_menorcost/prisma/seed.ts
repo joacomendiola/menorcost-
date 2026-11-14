@@ -195,6 +195,40 @@ async function main(): Promise<void> {
 
     console.log(`Cliente demo sincronizado: ${clienteDemo.email}`);
 
+    const adminDemo =
+      process.env.NODE_ENV === 'production'
+        ? null
+        : await prisma.usuario.upsert({
+            where: { email: 'admin@test.com' },
+            update: {
+              dni: '20999999',
+              nombre: 'Admin',
+              apellido: 'Demo',
+              telefono: '+54 2901 555555',
+              fechaNacimiento: new Date('1990-01-01T00:00:00.000Z'),
+              passwordHash: await hash('Password123', 10),
+              rol: 'ADMINISTRADOR',
+              estado: 'HABILITADO',
+              deletedAt: null,
+            },
+            create: {
+              id: '00000000-0000-4000-8000-000000000121',
+              dni: '20999999',
+              nombre: 'Admin',
+              apellido: 'Demo',
+              email: 'admin@test.com',
+              telefono: '+54 2901 555555',
+              fechaNacimiento: new Date('1990-01-01T00:00:00.000Z'),
+              passwordHash: await hash('Password123', 10),
+              rol: 'ADMINISTRADOR',
+              estado: 'HABILITADO',
+            },
+          });
+
+    if (adminDemo) {
+      console.log(`Administrador demo sincronizado: ${adminDemo.email}`);
+    }
+
     // Garantiza una única configuración activa y carga la tasa inicial (10 %).
     await prisma.configComision.updateMany({
       where: {
