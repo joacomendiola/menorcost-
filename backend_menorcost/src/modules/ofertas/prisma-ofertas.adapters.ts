@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -21,7 +22,6 @@ const offerDetailsSelect = {
   idProducto: true,
   comercioId: true,
   categoriaId: true,
-  tipo: true,
   titulo: true,
   descripcion: true,
   fechaVencimiento: true,
@@ -39,7 +39,6 @@ type OfferProjection = {
   idProducto: string;
   comercioId: string;
   categoriaId: string;
-  tipo: OfferDetails['tipo'];
   titulo: string;
   descripcion: string;
   fechaVencimiento: Date;
@@ -58,7 +57,6 @@ function toOfferDetails(producto: OfferProjection): OfferDetails {
     id: producto.idProducto,
     comercioId: producto.comercioId,
     categoriaId: producto.categoriaId,
-    tipo: producto.tipo,
     titulo: producto.titulo,
     descripcion: producto.descripcion,
     fechaVencimiento: producto.fechaVencimiento
@@ -105,12 +103,12 @@ export class PrismaOfferAccessAdapter implements OfferAccess {
         idComercio: comercioId,
         userId,
       },
-      select: { idComercio: true },
+      select: { idComercio: true, estado: true },
     });
 
-    if (!comercio) {
+    if (!comercio || comercio.estado !== 'HABILITADO') {
       throw new ForbiddenException(
-        'El comercio no existe o no pertenece al usuario autenticado',
+        'El comercio no existe, no pertenece al usuario autenticado o no está habilitado',
       );
     }
   }
@@ -145,15 +143,17 @@ export class PrismaOfferCategoriesAdapter implements OfferCategories {
   async assertExists(categoriaId: string): Promise<void> {
     const categoria = await this.prisma.categoria.findUnique({
       where: { idCategoria: categoriaId },
-      select: { idCategoria: true },
+      select: { idCategoria: true, activa: true },
     });
 
     if (!categoria) {
       throw new NotFoundException('La categoría indicada no existe');
     }
 
-    // TODO integración: comprobar también que la categoría esté activa
-    // cuando el modelo real incluya ese estado.
+    if (!categoria.activa) {
+      throw new BadRequestException('La categoría indicada no está activa');
+    }
+
   }
 }
 
@@ -170,7 +170,6 @@ export class PrismaOfferRepositoryAdapter implements OfferRepository {
   ): Promise<OfferRecord> {
     const producto = await this.prisma.producto.create({
       data: {
-        tipo: data.tipo,
         comercioId: data.comercioId,
         categoriaId: data.categoriaId,
         titulo: data.titulo,

@@ -8,5 +8,5 @@ export function rutaInicio(rol: Rol, estado?: EstadoUsuario): string {
     return estado === 'HABILITADO' ? '/panel' : '/comercio/estado';
   }
 
-  return '/perfil';
+  return '/inicio';
 }

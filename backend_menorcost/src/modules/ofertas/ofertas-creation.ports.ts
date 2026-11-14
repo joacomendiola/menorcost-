@@ -41,7 +41,6 @@ export interface OfferDetails {
   id: string;
   comercioId: string;
   categoriaId: string;
-  tipo: 'INDIVIDUAL' | 'COMBO';
   titulo: string;
   descripcion: string;
   fechaVencimiento: string;

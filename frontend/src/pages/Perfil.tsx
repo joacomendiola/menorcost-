@@ -61,12 +61,6 @@ const DIRECCION_INICIAL: FormularioDireccion = {
   longitud: '-68.308400',
 };
 
-function formatearFecha(valor: string): string {
-  const [anio, mes, dia] = valor.slice(0, 10).split('-');
-  if (!anio || !mes || !dia) return valor;
-  return `${dia}/${mes}/${anio}`;
-}
-
 function aFormulario(direccion: Direccion): FormularioDireccion {
   return {
     etiqueta: direccion.etiqueta,
@@ -469,78 +463,17 @@ export function Perfil() {
       ? longitudNumero
       : -68.3084;
 
-  const accesos: Array<{ icono: string; texto: string; ruta?: string }> =
-    perfil.rol === 'ADMINISTRADOR'
-      ? [{ icono: '🛡', texto: 'Backoffice', ruta: '/admin/altas' }]
-      : perfil.rol === 'COMERCIANTE'
-        ? [
-            ...(perfil.estado !== 'HABILITADO'
-              ? [
-                  {
-                    icono: '⏳',
-                    texto: 'Estado de mi cuenta',
-                    ruta: '/comercio/estado',
-                  },
-                ]
-              : []),
-            { icono: '📊', texto: 'Mi panel', ruta: '/panel' },
-            { icono: '📦', texto: 'Mis ofertas', ruta: '/panel/productos' },
-            { icono: '➕', texto: 'Nueva oferta', ruta: '/ofertas/nueva' },
-            { icono: '🏪', texto: 'Mi local', ruta: '/panel/mi-local' },
-            { icono: '⭐', texto: 'Reputación', ruta: '/panel/reputacion' },
-          ]
-        : [
-            { icono: '📦', texto: 'Mis pedidos', ruta: '/mis-pedidos' },
-            { icono: '🧺', texto: 'Mis canastas', ruta: '/canastas' },
-            { icono: '🔎', texto: 'Buscar ofertas', ruta: '/buscar' },
-            {
-              icono: '🏪',
-              texto: 'Mi comercio',
-              ruta: '/comercios/registro',
-            },
-          ];
-
   return (
     <PageShell variant="profile">
       <button type="button" className="chip" onClick={() => navigate(-1)}>
         ← Volver
       </button>
 
-      <h1 style={{ margin: '14px 0 16px' }}>👤 Mi Perfil y Configuración</h1>
-
-      <div className="card card--left">
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 8,
-            alignItems: 'center',
-          }}
-        >
-          {accesos.map((acceso) => (
-            <button
-              key={acceso.texto}
-              type="button"
-              className="chip chip--active"
-              onClick={() =>
-                acceso.ruta
-                  ? navigate(acceso.ruta)
-                  : notificar('Disponible en el próximo módulo')
-              }
-            >
-              <span aria-hidden="true">{acceso.icono}</span>
-              {acceso.texto}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="chip chip--danger"
-            style={{ marginLeft: 'auto' }}
-            onClick={salir}
-          >
-            Cerrar sesión
-          </button>
-        </div>
+      <div className="perfil-encabezado">
+        <h1>👤 Mi Perfil y Configuración</h1>
+        <button type="button" className="chip chip--danger" onClick={salir}>
+          Cerrar sesión
+        </button>
       </div>
 
       {datosGuardados && (
@@ -587,15 +520,7 @@ export function Perfil() {
               }
             />
 
-            <div className="grid-3">
-              <TextInput label="Correo electrónico" value={perfil.email} disabled />
-              <TextInput label="DNI" value={perfil.dni} disabled />
-              <TextInput
-                label="Fecha de nacimiento"
-                value={formatearFecha(perfil.fechaNacimiento)}
-                disabled
-              />
-            </div>
+            <TextInput label="Correo electrónico" value={perfil.email} disabled />
 
             <div>
               <Button type="submit" loading={guardandoDatos}>
@@ -672,58 +597,63 @@ export function Perfil() {
                   onChange={campoDireccion('descripcion')}
                 />
 
-                <BuscadorDireccion
-                  token={token}
-                  onSeleccion={(sugerencia) =>
-                    setFormDireccion((prev) => ({
-                      ...prev,
-                      calle: sugerencia.calle || prev.calle,
-                      numero: sugerencia.numero || prev.numero,
-                      localidad: sugerencia.localidad || prev.localidad,
-                      latitud: sugerencia.latitud.toFixed(6),
-                      longitud: sugerencia.longitud.toFixed(6),
-                    }))
-                  }
-                />
+                <details className="perfil-ubicacion-avanzada">
+                  <summary>Ajustar ubicación en el mapa</summary>
+                  <div className="perfil-ubicacion-avanzada__contenido">
+                    <BuscadorDireccion
+                      token={token}
+                      onSeleccion={(sugerencia) =>
+                        setFormDireccion((prev) => ({
+                          ...prev,
+                          calle: sugerencia.calle || prev.calle,
+                          numero: sugerencia.numero || prev.numero,
+                          localidad: sugerencia.localidad || prev.localidad,
+                          latitud: sugerencia.latitud.toFixed(6),
+                          longitud: sugerencia.longitud.toFixed(6),
+                        }))
+                      }
+                    />
 
-                <MapaUbicacion
-                  latitud={latitudMapa}
-                  longitud={longitudMapa}
-                  onChange={(latitud, longitud) =>
-                    setFormDireccion((prev) => ({
-                      ...prev,
-                      latitud: latitud.toFixed(6),
-                      longitud: longitud.toFixed(6),
-                    }))
-                  }
-                />
+                    <MapaUbicacion
+                      latitud={latitudMapa}
+                      longitud={longitudMapa}
+                      onChange={(latitud, longitud) =>
+                        setFormDireccion((prev) => ({
+                          ...prev,
+                          latitud: latitud.toFixed(6),
+                          longitud: longitud.toFixed(6),
+                        }))
+                      }
+                    />
 
-                <div className="row">
-                  <button
-                    type="button"
-                    className="chip"
-                    onClick={usarUbicacion}
-                    disabled={ubicando}
-                  >
-                    {ubicando ? 'Ubicando…' : '📍 Usar mi ubicación'}
-                  </button>
-                  <span className="help">
-                    Arrastrá el pin o tocá el mapa para ajustar la ubicación.
-                  </span>
-                </div>
+                    <div className="row">
+                      <button
+                        type="button"
+                        className="chip"
+                        onClick={usarUbicacion}
+                        disabled={ubicando}
+                      >
+                        {ubicando ? 'Ubicando…' : '📍 Usar mi ubicación'}
+                      </button>
+                      <span className="help">
+                        Arrastrá el pin o tocá el mapa para ajustar la ubicación.
+                      </span>
+                    </div>
 
-                <div className="grid-2">
-                  <TextInput
-                    label="Latitud"
-                    value={formDireccion.latitud}
-                    onChange={campoDireccion('latitud')}
-                  />
-                  <TextInput
-                    label="Longitud"
-                    value={formDireccion.longitud}
-                    onChange={campoDireccion('longitud')}
-                  />
-                </div>
+                    <div className="grid-2">
+                      <TextInput
+                        label="Latitud"
+                        value={formDireccion.latitud}
+                        onChange={campoDireccion('latitud')}
+                      />
+                      <TextInput
+                        label="Longitud"
+                        value={formDireccion.longitud}
+                        onChange={campoDireccion('longitud')}
+                      />
+                    </div>
+                  </div>
+                </details>
 
                 <Group justify="flex-end">
                   <Button
@@ -807,9 +737,6 @@ export function Perfil() {
 
       <div className="card card--left">
         <h3>Seguridad</h3>
-        <p className="muted" style={{ margin: '4px 0 14px' }}>
-          Podés cambiar tu contraseña desde el flujo seguro de recuperación.
-        </p>
         <Button variant="default" onClick={solicitarCambioPassword}>
           Cambiar contraseña
         </Button>

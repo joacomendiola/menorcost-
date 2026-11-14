@@ -427,15 +427,6 @@ export function DetalleOfertaPage() {
 
           <div className="detalle-oferta__acciones">
             <Button
-              onClick={() =>
-                navigate(`/comercios/${oferta.comercio.id}`)
-              }
-              variant="default"
-            >
-              Ver Tienda Completa
-            </Button>
-
-            <Button
               onClick={() => void agregarACanasta()}
               loading={agregando}
               disabled={!hayStock}
@@ -443,6 +434,15 @@ export function DetalleOfertaPage() {
               {hayStock
                 ? 'Agregar a la canasta'
                 : 'Producto sin stock'}
+            </Button>
+
+            <Button
+              onClick={() =>
+                navigate(`/comercios/${oferta.comercio.id}`)
+              }
+              variant="default"
+            >
+              Ver Tienda Completa
             </Button>
 
             <Button

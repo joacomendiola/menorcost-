@@ -86,9 +86,16 @@ Crea otro archivo llamado .env y pega lo siguiente (esto conecta Prisma con la b
 DATABASE_URL="postgresql://postgres:menorcostpassword@localhost:5433/menorcost?schema=public"
 
 C. En la carpeta del frontend (/frontend):
-Crea un tercer archivo llamado .env y pega lo siguiente (esto conecta React con la API de NestJS):
+Crea un archivo `frontend/.env.local` para conectar React con NestJS y configurar los mapas:
 
+```env
 VITE_API_URL=http://localhost:3000
+VITE_CARTO_BASEMAP_API_KEY=cb1_58if_1_17b97274313cfc1418ddc767
+```
+
+La clave de CARTO se solicita en [CARTO Basemaps](https://www.carto.com/basemaps/apikey/index.html). Se usa para cargar los tiles del mapa de inicio y exploración. Vite expone las variables `VITE_*` al navegador; restringí la clave a los dominios de la aplicación desde CARTO y no la publiques en el repositorio. `frontend/.env.local` está excluido de Git.
+
+Después de crear o modificar este archivo, reiniciá el frontend (`npm run dev` dentro de `/frontend`) para que Vite vuelva a cargar las variables.
 
 ---
 
@@ -139,7 +146,7 @@ El backend ejecuta diariamente, a las 00:00, una tarea programada con la zona ho
 
 America/Argentina/Ushuaia
 
-La tarea busca ofertas en estado `ACTIVO` cuya fecha de vencimiento sea igual o anterior al día actual. Luego:
+La tarea busca ofertas en estado `ACTIVO` cuya fecha de vencimiento sea anterior al día actual, por lo que siguen vigentes durante todo el día indicado como vencimiento. Luego:
 
 - Cambia el estado a `VENCIDO_ELIMINADO`.
 - Registra la operación en `auditoria_vencimiento_oferta`.
@@ -160,12 +167,11 @@ Este comando utiliza el mismo servicio que ejecuta el cron automático y muestra
 
 ### Datos de prueba del CU-2.07
 
-Para crear las categorías y los datos de prueba:
+La seed general crea las categorías y todos los datos de prueba, incluido el caso de CU-2.07. Para prepararlos y ejecutar la depuración:
 
 ```powershell
 cd backend_menorcost
 npm run seed
-npm run seed:cu-2-07
 npm run vencimiento:ofertas
 ```
 

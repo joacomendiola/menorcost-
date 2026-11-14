@@ -12,7 +12,6 @@ type Offer = {
   id: string;
   comercioId: string;
   categoriaId: string;
-  tipo: 'INDIVIDUAL' | 'COMBO';
   titulo: string;
   descripcion: string;
   fechaVencimiento: string;
@@ -566,12 +565,6 @@ export function MisOfertasPage() {
                     <p>{offer.descripcion}</p>
 
                     <div className="offer-card__details">
-                      <p>
-                        <span>Tipo</span>
-                        <strong>
-                          {offer.tipo === 'COMBO' ? 'Combo' : 'Individual'}
-                        </strong>
-                      </p>
                       <p>
                         <span>Vencimiento</span>
                         <strong>{formatDate(offer.fechaVencimiento)}</strong>

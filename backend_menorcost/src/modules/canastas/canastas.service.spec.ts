@@ -44,6 +44,21 @@ describe('CanastasService', () => {
     ],
   });
 
+  const canastaParaCheckout = (overrides: Record<string, unknown> = {}) => ({
+    idCanasta: canastaId,
+    comercioId,
+    comercio: { ...comercio, estado: 'HABILITADO' },
+    items: [
+      {
+        idCanastaItem: canastaItemId,
+        productoId,
+        cantidad: 2,
+        producto,
+      },
+    ],
+    ...overrides,
+  });
+
   const prisma = {
     comercio: {
       findFirst: vi.fn(),
@@ -68,6 +83,78 @@ describe('CanastasService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     service = new CanastasService(prisma as never);
+  });
+
+  it('valida y devuelve los productos de la canasta para checkout', async () => {
+    prisma.canasta.findUnique.mockResolvedValue(canastaParaCheckout());
+
+    const resultado = await service.obtenerCanastaParaCheckout(canastaId);
+
+    expect(resultado.items).toHaveLength(1);
+    expect(resultado.items[0].cantidad).toBe(2);
+    expect(prisma.canasta.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { idCanasta: canastaId } }),
+    );
+  });
+
+  it('rechaza preparar checkout con una canasta inexistente o vacía', async () => {
+    prisma.canasta.findUnique.mockResolvedValueOnce(null);
+    await expect(
+      service.obtenerCanastaParaCheckout(canastaId),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    prisma.canasta.findUnique.mockResolvedValueOnce(
+      canastaParaCheckout({ items: [] }),
+    );
+    await expect(
+      service.obtenerCanastaParaCheckout(canastaId),
+    ).rejects.toThrow('La canasta está vacía.');
+  });
+
+  it('rechaza checkout si el comercio está deshabilitado', async () => {
+    prisma.canasta.findUnique.mockResolvedValueOnce(
+      canastaParaCheckout({
+        comercio: { ...comercio, estado: 'SUSPENDIDO' },
+      }),
+    );
+
+    await expect(
+      service.obtenerCanastaParaCheckout(canastaId),
+    ).rejects.toThrow('El comercio no está habilitado.');
+  });
+
+  it.each([
+    [{ estado: 'PAUSADO' }, 10, 'ya no está disponible'],
+    [{ estado: 'ACTIVO', fechaVencimiento: new Date('2000-01-01T00:00:00.000Z') }, 10, 'está vencido'],
+    [{ estado: 'ACTIVO' }, 1, 'stock disponible'],
+  ])('rechaza checkout con productos no disponibles', async (productoPatch, stock, mensaje) => {
+    prisma.canasta.findUnique.mockResolvedValueOnce(
+      canastaParaCheckout({
+        items: [
+          {
+            idCanastaItem: canastaItemId,
+            productoId,
+            cantidad: 2,
+            producto: { ...producto, ...productoPatch, stock },
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      service.obtenerCanastaParaCheckout(canastaId),
+    ).rejects.toThrow(mensaje);
+  });
+
+  it('permite leer la canasta usando el cliente de una transacción externa', async () => {
+    const transaction = {
+      canasta: { findUnique: vi.fn().mockResolvedValue(canastaParaCheckout()) },
+    };
+
+    await service.obtenerCanastaParaCheckout(canastaId, transaction as never);
+
+    expect(transaction.canasta.findUnique).toHaveBeenCalled();
+    expect(prisma.canasta.findUnique).not.toHaveBeenCalled();
   });
 
   it('devuelve una canasta vacía cuando el comercio está habilitado y no existe canasta', async () => {

@@ -65,7 +65,7 @@ describe('OffersExpirationService', () => {
       where: {
         estado: 'ACTIVO',
         fechaVencimiento: {
-          lte: new Date('2026-11-03T00:00:00.000Z'),
+          lt: new Date('2026-11-03T00:00:00.000Z'),
         },
       },
       select: {
@@ -113,6 +113,16 @@ describe('OffersExpirationService', () => {
           'La oferta "Canasta de verduras" fue retirada automáticamente por alcanzar su fecha de vencimiento.',
       },
     });
+  });
+
+  it('mantiene vigente durante todo el día indicado como vencimiento', async () => {
+    prisma.producto.findMany.mockResolvedValue([]);
+    await service.expireOffers(now);
+    expect(prisma.producto.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        fechaVencimiento: { lt: new Date('2026-11-03T00:00:00.000Z') },
+      }),
+    }));
   });
 
   it('no procesa ofertas si no existen ofertas vencidas', async () => {

@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AgregarCanastaItemDto } from './dto/agregar-canasta-item.dto.js';
 import type { ActualizarCanastaItemDto } from './dto/actualizar-canasta-item.dto.js';
@@ -10,6 +11,71 @@ import type { ActualizarCanastaItemDto } from './dto/actualizar-canasta-item.dto
 @Injectable()
 export class CanastasService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async obtenerCanastaParaCheckout(
+    canastaId: string,
+    tx: Pick<Prisma.TransactionClient, 'canasta'> = this.prisma,
+  ) {
+    const canasta = await tx.canasta.findUnique({
+      where: { idCanasta: canastaId },
+      include: {
+        comercio: {
+          select: {
+            idComercio: true,
+            nombreFantasia: true,
+            estado: true,
+          },
+        },
+        items: {
+          include: {
+            producto: {
+              select: {
+                idProducto: true,
+                titulo: true,
+                imagen: true,
+                stock: true,
+                precioPublico: true,
+                estado: true,
+                fechaVencimiento: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
+    if (!canasta) {
+      throw new NotFoundException('La canasta no existe.');
+    }
+    if (canasta.comercio.estado !== 'HABILITADO') {
+      throw new BadRequestException('El comercio no está habilitado.');
+    }
+    if (canasta.items.length === 0) {
+      throw new BadRequestException('La canasta está vacía.');
+    }
+
+    const hoy = this.obtenerFechaActualArgentina();
+    for (const item of canasta.items) {
+      if (item.producto.estado !== 'ACTIVO') {
+        throw new BadRequestException(
+          `El producto "${item.producto.titulo}" ya no está disponible.`,
+        );
+      }
+      if (this.obtenerFechaProducto(item.producto.fechaVencimiento) < hoy) {
+        throw new BadRequestException(
+          `El producto "${item.producto.titulo}" está vencido.`,
+        );
+      }
+      if (item.cantidad > item.producto.stock) {
+        throw new BadRequestException(
+          `El stock disponible de "${item.producto.titulo}" es insuficiente.`,
+        );
+      }
+    }
+
+    return this.serializarCanasta(canasta);
+  }
 
   async obtenerTodas(usuarioId: string) {
     const canastas = await this.prisma.canasta.findMany({

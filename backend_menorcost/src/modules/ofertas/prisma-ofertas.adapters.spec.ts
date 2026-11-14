@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -19,7 +20,6 @@ describe('Adaptadores Prisma de ofertas', () => {
   const categoriaId = '22222222-2222-4222-8222-222222222222';
 
   const dto: CreateOfferDto = {
-    tipo: 'INDIVIDUAL',
     comercioId,
     categoriaId,
     titulo: 'Yogur',
@@ -41,7 +41,6 @@ describe('Adaptadores Prisma de ofertas', () => {
     idProducto: '33333333-3333-4333-8333-333333333333',
     comercioId,
     categoriaId,
-    tipo: 'INDIVIDUAL' as const,
     titulo: 'Yogur',
     descripcion: 'Pack de yogures',
     fechaVencimiento: new Date('2099-12-31T00:00:00.000Z'),
@@ -91,9 +90,10 @@ describe('Adaptadores Prisma de ofertas', () => {
       rol: 'COMERCIANTE',
       estado: 'HABILITADO',
     });
-    prismaMock.comercio.findFirst.mockResolvedValue({ idComercio: comercioId });
+    prismaMock.comercio.findFirst.mockResolvedValue({ idComercio: comercioId, estado: 'HABILITADO' });
     prismaMock.categoria.findUnique.mockResolvedValue({
       idCategoria: categoriaId,
+      activa: true,
     });
 
     prismaMock.producto.create.mockResolvedValue({
@@ -143,7 +143,7 @@ describe('Adaptadores Prisma de ofertas', () => {
 
     expect(prismaMock.comercio.findFirst).toHaveBeenCalledWith({
       where: { idComercio: comercioId, userId },
-      select: { idComercio: true },
+      select: { idComercio: true, estado: true },
     });
   });
 
@@ -181,6 +181,17 @@ describe('Adaptadores Prisma de ofertas', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('rechaza publicar ofertas en un comercio suspendido', async () => {
+    prismaMock.comercio.findFirst.mockResolvedValueOnce({
+      idComercio: comercioId,
+      estado: 'SUSPENDIDO',
+    });
+
+    await expect(
+      access.assertCanPublish(userId, comercioId),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('rechaza si Mercado Pago no está marcado como vinculado', async () => {
     prismaMock.comercio.findFirst.mockResolvedValueOnce({
       mercadoPagoVinculado: false,
@@ -208,7 +219,7 @@ describe('Adaptadores Prisma de ofertas', () => {
 
     expect(prismaMock.categoria.findUnique).toHaveBeenCalledWith({
       where: { idCategoria: categoriaId },
-      select: { idCategoria: true },
+      select: { idCategoria: true, activa: true },
     });
   });
 
@@ -218,6 +229,17 @@ describe('Adaptadores Prisma de ofertas', () => {
     await expect(
       categories.assertExists(categoriaId),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rechaza publicar ofertas en una categoría inactiva', async () => {
+    prismaMock.categoria.findUnique.mockResolvedValueOnce({
+      idCategoria: categoriaId,
+      activa: false,
+    });
+
+    await expect(
+      categories.assertExists(categoriaId),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('persiste el producto y devuelve su identificador e imagen', async () => {
@@ -236,7 +258,6 @@ describe('Adaptadores Prisma de ofertas', () => {
 
     expect(prismaMock.producto.create).toHaveBeenCalledWith({
       data: {
-        tipo: dto.tipo,
         comercioId: dto.comercioId,
         categoriaId: dto.categoriaId,
         titulo: dto.titulo,
@@ -265,7 +286,6 @@ describe('Adaptadores Prisma de ofertas', () => {
         id: productoProyectado.idProducto,
         comercioId,
         categoriaId,
-        tipo: 'INDIVIDUAL',
         titulo: 'Yogur',
         descripcion: 'Pack de yogures',
         fechaVencimiento: '2099-12-31',

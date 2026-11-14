@@ -56,7 +56,6 @@ export interface Perfil {
 }
 
 export interface Bloqueo {
-  tipo: string;
   message: string;
 }
 

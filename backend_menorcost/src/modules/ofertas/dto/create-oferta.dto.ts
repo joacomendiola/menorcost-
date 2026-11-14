@@ -1,6 +1,5 @@
 import { Type } from 'class-transformer';
 import {
-  IsIn,
   IsInt,
   IsNotEmpty,
   IsString,
@@ -11,9 +10,6 @@ import {
 } from 'class-validator';
 
 export class CreateOfferDto {
-  @IsIn(['INDIVIDUAL', 'COMBO'])
-  tipo!: 'INDIVIDUAL' | 'COMBO';
-
   @IsUUID()
   comercioId!: string;
 
