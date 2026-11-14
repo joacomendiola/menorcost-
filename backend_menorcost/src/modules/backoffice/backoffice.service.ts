@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
+import type { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { MailerService } from '../auth/mailer/mailer.service.js';
 import type { EnvioCorreo } from '../auth/mailer/mailer.interface.js';
@@ -81,15 +82,18 @@ export class BackofficeService {
 
   // --- 2. SOLICITUDES DE ALTA ---
   async listarAltas(search?: string, estado?: string) {
-    const whereUsuario: any = { rol: 'COMERCIANTE', deletedAt: null };
+    const whereUsuario: Prisma.UsuarioWhereInput = {
+      rol: 'COMERCIANTE',
+      deletedAt: null,
+    };
 
     if (estado && estado !== 'todos') {
-      whereUsuario.estado = estado;
+      whereUsuario.estado = estado as Prisma.UsuarioWhereInput['estado'];
     }
 
     // La búsqueda de altas permite matchear por datos del usuario o por CUIT.
     // El filtro de estado se respeta en ambas ramas.
-    const where: any = search
+    const where: Prisma.ComercioWhereInput = search
       ? {
           OR: [
             {
@@ -253,10 +257,11 @@ export class BackofficeService {
 
   // --- 3. DENUNCIAS Y MODERACIÓN ---
   async listarDenuncias(search?: string, estado?: string) {
-    const whereClause: any = {};
+    const whereClause: Prisma.ReporteWhereInput = {};
 
     if (estado && estado !== 'todos') {
-      whereClause.estado_reporte = estado;
+      whereClause.estado_reporte =
+        estado as Prisma.ReporteWhereInput['estado_reporte'];
     }
 
     if (search) {
@@ -398,7 +403,7 @@ export class BackofficeService {
         const otrosReportesAbiertos = await tx.reporte.count({
           where: {
             id_denunciado: reporte.id_denunciado,
-            estado_reporte: 'BAJO_INVESTIGACION',
+            estado_reporte: { in: ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'] },
             id_reporte: { not: idReporte },
           },
         });
@@ -437,7 +442,10 @@ export class BackofficeService {
   ) {
     const reporte = await this.prisma.reporte.findUnique({
       where: { id_reporte: idReporte },
-      include: { denunciado: { select: USUARIO_PUBLICO_SELECT } },
+      include: {
+        denunciado: { select: USUARIO_PUBLICO_SELECT },
+        emisor: { select: USUARIO_PUBLICO_SELECT },
+      },
     });
     if (!reporte) throw new NotFoundException('Reporte no encontrado');
 
@@ -445,7 +453,7 @@ export class BackofficeService {
       throw new BadRequestException('El reporte ya fue cerrado previamente');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const resultado = await this.prisma.$transaction(async (tx) => {
       const actualizados = await tx.reporte.updateMany({
         where: {
           id_reporte: idReporte,
@@ -466,11 +474,51 @@ export class BackofficeService {
 
       return { success: true };
     });
+
+    const notificaciones = await this.notificarCierreReporte(
+      reporte.emisor,
+      reporte.denunciado,
+      idReporte,
+      estadoFinal,
+    );
+
+    return { ...resultado, notificaciones };
+  }
+
+  private async notificarCierreReporte(
+    emisor: { email: string; nombre: string; apellido: string },
+    denunciado: { email: string; nombre: string; apellido: string },
+    idReporte: number,
+    estadoFinal: 'RESUELTO' | 'DESESTIMADO',
+  ) {
+    const resultado =
+      estadoFinal === 'DESESTIMADO' ? 'desestimado' : 'resuelto';
+    const subject = `Resolución del reporte #${idReporte}`;
+
+    const [notificacionEmisor, notificacionDenunciado] = await Promise.all([
+      this.enviarCorreoSeguro({
+        to: emisor.email,
+        subject,
+        html: `<p>Hola ${emisor.nombre},</p>
+               <p>Tu reporte #${idReporte} fue <strong>${resultado}</strong> por la administración de Menorcost.</p>`,
+      }),
+      this.enviarCorreoSeguro({
+        to: denunciado.email,
+        subject,
+        html: `<p>Hola ${denunciado.nombre},</p>
+               <p>El reporte #${idReporte} fue <strong>${resultado}</strong> por la administración de Menorcost.</p>`,
+      }),
+    ]);
+
+    return {
+      emisor: notificacionEmisor,
+      denunciado: notificacionDenunciado,
+    };
   }
 
   // Restaura a HABILITADO si el denunciado ya no tiene reportes abiertos.
   private async restaurarSiCorresponde(
-    tx: any,
+    tx: Prisma.TransactionClient,
     idDenunciado: string,
     idReporteExcluido: number,
   ) {
@@ -499,7 +547,10 @@ export class BackofficeService {
   async sancionar(idReporte: number, idAdmin: string) {
     const reporte = await this.prisma.reporte.findUnique({
       where: { id_reporte: idReporte },
-      include: { denunciado: { select: USUARIO_PUBLICO_SELECT } },
+      include: {
+        denunciado: { select: USUARIO_PUBLICO_SELECT },
+        emisor: { select: USUARIO_PUBLICO_SELECT },
+      },
     });
 
     if (!reporte) throw new NotFoundException('Reporte no encontrado');
@@ -576,12 +627,20 @@ export class BackofficeService {
       };
     });
 
-    const notificacion = await this.enviarCorreoSeguro({
-      to: reporte.denunciado.email,
-      subject: 'Notificación Importante: Suspensión de Cuenta',
-      html: `<p>Estimado usuario,</p>
-             <p>Le informamos que, tras investigar el reporte #${idReporte}, la administración ha resuelto <strong>SUSPENDER</strong> su cuenta por incumplimiento de las políticas de Menorcost.</p>`,
-    });
+    const [notificacion, notificacionEmisor] = await Promise.all([
+      this.enviarCorreoSeguro({
+        to: reporte.denunciado.email,
+        subject: 'Notificación Importante: Suspensión de Cuenta',
+        html: `<p>Estimado usuario,</p>
+               <p>Le informamos que, tras investigar el reporte #${idReporte}, la administración ha resuelto <strong>SUSPENDER</strong> su cuenta por incumplimiento de las políticas de Menorcost.</p>`,
+      }),
+      this.enviarCorreoSeguro({
+        to: reporte.emisor.email,
+        subject: `Resolución del reporte #${idReporte}`,
+        html: `<p>Hola ${reporte.emisor.nombre},</p>
+               <p>Tu reporte #${idReporte} fue <strong>RESUELTO</strong> y la cuenta denunciada fue <strong>SUSPENDIDA</strong> por la administración de Menorcost.</p>`,
+      }),
+    ]);
 
     return {
       reporte: reporteActualizado,
@@ -589,6 +648,7 @@ export class BackofficeService {
       comercioSuspendido,
       denunciasCerradas,
       notificacion,
+      notificacionEmisor,
     };
   }
 
@@ -603,6 +663,21 @@ export class BackofficeService {
       throw new BadRequestException(
         'El usuario no está suspendido ni bajo investigación',
       );
+    }
+
+    if (usuario.estado === 'BAJO_INVESTIGACION') {
+      const reportesAbiertos = await this.prisma.reporte.count({
+        where: {
+          id_denunciado: idUsuario,
+          estado_reporte: { in: ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'] },
+        },
+      });
+
+      if (reportesAbiertos > 0) {
+        throw new BadRequestException(
+          'No se puede rehabilitar una cuenta bajo investigación con reportes abiertos',
+        );
+      }
     }
 
     return this.prisma.$transaction(async (tx) => {

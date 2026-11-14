@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '../../../generated/prisma/client.js';
 import { PrismaService } from '../../../prisma/prisma.service.js';
 import type {
   BajaBloqueosPort,
@@ -14,15 +15,19 @@ import type {
 export class PrismaBajaBloqueosProvider implements BajaBloqueosPort {
   constructor(private readonly prisma: PrismaService) {}
 
-  async obtenerBloqueos(usuarioId: string): Promise<BloqueoBaja[]> {
+  async obtenerBloqueos(
+    usuarioId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<BloqueoBaja[]> {
+    const prisma = tx ?? this.prisma;
     const [pedidosPendientes, reportesAbiertos] = await Promise.all([
-      this.prisma.pedido.count({
+      prisma.pedido.count({
         where: {
           estado: { in: ['PENDIENTE_PAGO', 'PENDIENTE_DE_RETIRO'] },
           OR: [{ usuarioId }, { comercio: { userId: usuarioId } }],
         },
       }),
-      this.prisma.reporte.count({
+      prisma.reporte.count({
         where: {
           estado_reporte: { in: ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'] },
           OR: [{ id_emisor: usuarioId }, { id_denunciado: usuarioId }],

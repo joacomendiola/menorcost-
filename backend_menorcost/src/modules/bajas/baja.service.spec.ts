@@ -9,7 +9,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BajaService } from './baja.service.js';
 
 const prismaMock = {
-  usuario: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+  usuario: {
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    update: vi.fn(),
+    updateMany: vi.fn(),
+  },
   solicitudBaja: {
     create: vi.fn(),
     findMany: vi.fn(),
@@ -48,6 +53,7 @@ beforeEach(() => {
     return Promise.all(arg);
   });
   prismaMock.solicitudBaja.updateMany.mockResolvedValue({ count: 1 });
+  prismaMock.usuario.updateMany.mockResolvedValue({ count: 1 });
   prismaMock.comercio.updateMany.mockResolvedValue({ count: 0 });
   prismaMock.usuario.findUnique.mockResolvedValue({
     rol: 'CLIENTE',
@@ -91,15 +97,15 @@ describe('BajaService.solicitar', () => {
         bloqueos: [expect.objectContaining({ tipo: 'PEDIDOS' })],
       }),
     });
-    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).toHaveBeenCalled();
+    expect(prismaMock.solicitudBaja.create).not.toHaveBeenCalled();
   });
 
   it('registra la baja y pausa ofertas si es comerciante', async () => {
     prismaMock.usuario.findFirst.mockResolvedValue(
       await usuarioBase({ rol: 'COMERCIANTE' }),
     );
-    prismaMock.solicitudBaja.create.mockReturnValue('crear-solicitud');
-    prismaMock.usuario.update.mockReturnValue('actualizar-usuario');
+    prismaMock.solicitudBaja.create.mockResolvedValue({ id: 's1' });
 
     const resultado = await service.solicitar('u1', {
       motivo: 'Ya no la uso',
@@ -113,12 +119,28 @@ describe('BajaService.solicitar', () => {
         estadoPrevioUsuario: 'HABILITADO',
       },
     });
-    expect(prismaMock.$transaction).toHaveBeenCalledWith([
-      'crear-solicitud',
-      'actualizar-usuario',
-    ]);
+    expect(prismaMock.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { isolationLevel: 'Serializable' },
+    );
+    expect(prismaMock.usuario.updateMany).toHaveBeenCalledWith({
+      where: { id: 'u1', estado: 'HABILITADO', deletedAt: null },
+      data: { estado: 'SOLICITUD_BAJA_PENDIENTE' },
+    });
     expect(bloqueosMock.pausarOfertas).toHaveBeenCalledWith('u1');
     expect(resultado.message).toMatch(/Solicitud de baja registrada/);
+  });
+
+  it('reporta conflictos serializables al solicitar una baja', async () => {
+    prismaMock.usuario.findFirst.mockResolvedValue(await usuarioBase());
+    prismaMock.$transaction.mockRejectedValueOnce({ code: 'P2034' });
+
+    await expect(
+      service.solicitar('u1', {
+        motivo: 'Ya no la uso',
+        password: 'Password123',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });
 
@@ -171,7 +193,7 @@ describe('BajaService.aprobar', () => {
     await expect(service.aprobar('admin', 's1')).rejects.toBeInstanceOf(
       BadRequestException,
     );
-    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).toHaveBeenCalled();
   });
 
   it('inactiva la cuenta y cierra sesiones al aprobar', async () => {
@@ -200,6 +222,14 @@ describe('BajaService.aprobar', () => {
       data: { estado: 'ELIMINADO' },
     });
     expect(resultado.message).toMatch(/Baja aprobada/);
+    expect(prismaMock.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { isolationLevel: 'Serializable' },
+    );
+    expect(bloqueosMock.obtenerBloqueos).toHaveBeenCalledWith(
+      'u1',
+      prismaMock,
+    );
   });
 
   it('no toca la cuenta si otro administrador ya resolvió la solicitud', async () => {
@@ -209,6 +239,21 @@ describe('BajaService.aprobar', () => {
       estado: 'PENDIENTE',
     });
     prismaMock.solicitudBaja.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.aprobar('admin-1', 's1')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(prismaMock.usuario.update).not.toHaveBeenCalled();
+    expect(prismaMock.comercio.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('reporta conflictos serializables al aprobar una baja', async () => {
+    prismaMock.solicitudBaja.findUnique.mockResolvedValue({
+      id: 's1',
+      usuarioId: 'u1',
+      estado: 'PENDIENTE',
+    });
+    prismaMock.$transaction.mockRejectedValueOnce({ code: 'P2034' });
 
     await expect(service.aprobar('admin-1', 's1')).rejects.toBeInstanceOf(
       ConflictException,

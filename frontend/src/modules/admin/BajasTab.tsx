@@ -138,7 +138,7 @@ export function BajasTab() {
                         label: 'Saldo de tarifas',
                         value:
                           baja.saldoTarifas === 0
-                            ? '$0 (sin deudas)'
+                            ? 'No disponible'
                             : formatPesos(baja.saldoTarifas),
                       },
                       ...(u.comercio
