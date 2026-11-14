@@ -86,15 +86,18 @@ vi.mock('./AdminUI', () => ({
   AdminEmpty: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   AdminItem: ({
     titulo,
+    badges,
     detalle,
     acciones,
   }: {
     titulo: ReactNode;
+    badges?: ReactNode;
     detalle?: ReactNode;
     acciones?: ReactNode;
   }) => (
     <section>
       <h2>{titulo}</h2>
+      {badges}
       {detalle}
       {acciones}
     </section>
@@ -149,6 +152,21 @@ beforeEach(() => {
 });
 
 describe('AltasTab', () => {
+  it('muestra los indicadores disponibles y aclara que la documentación se revisa por correo', () => {
+    render(
+      <MantineProvider>
+        <AltasTab />
+      </MantineProvider>,
+    );
+
+    expect(screen.getByText('CUIT registrado')).toBeTruthy();
+    expect(screen.getByText('Documentación por correo')).toBeTruthy();
+    expect(screen.getByText('Constancia AFIP')).toBeTruthy();
+    expect(screen.getByText('Habilitación municipal')).toBeTruthy();
+    expect(screen.getByText('Estado AFIP')).toBeTruthy();
+    expect(screen.getByText('Documentos adjuntos')).toBeTruthy();
+  });
+
   it('aprueba un alta y refresca los indicadores', async () => {
     render(
       <MantineProvider>

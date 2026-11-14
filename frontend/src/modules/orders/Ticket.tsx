@@ -244,7 +244,6 @@ export function Ticket() {
       );
       setMotivo(null);
       setDescripcion('');
-      setDescripcion('');
     } catch (err) {
       notifications.show({
         color: 'red',

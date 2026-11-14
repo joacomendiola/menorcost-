@@ -209,6 +209,11 @@ export function DenunciasTab() {
               d.estado_reporte === 'PENDIENTE_REVISION' ||
               d.estado_reporte === 'BAJO_INVESTIGACION';
             const suspendido = d.denunciado.estado === 'SUSPENDIDO';
+            const bajoInvestigacion =
+              d.denunciado.estado === 'BAJO_INVESTIGACION';
+            const puedeRehabilitar =
+              suspendido ||
+              (bajoInvestigacion && d.registro.abiertas === 0);
             const ocupado = procesando === d.id_reporte;
             const bloqueado = procesando !== null;
             const pedido = d.pedido;
@@ -285,7 +290,7 @@ export function DenunciasTab() {
                   />
                 }
                 acciones={
-                  abierta || suspendido ? (
+                  abierta || puedeRehabilitar ? (
                     <>
                       {abierta && (
                         <>
@@ -326,7 +331,7 @@ export function DenunciasTab() {
                           </Button>
                         </>
                       )}
-                      {suspendido && (
+                      {puedeRehabilitar && (
                         <Button
                           variant="default"
                           className="btn-compact"
@@ -378,14 +383,15 @@ export function DenunciasTab() {
       <ConfirmDialog
         open={rehabilitando !== null}
         title="Rehabilitar cuenta"
-        confirmLabel="Rehabilitar cuenta"
+        confirmLabel="Confirmar rehabilitación"
         loading={procesando !== null}
         onClose={() => setRehabilitando(null)}
         onConfirm={() => rehabilitando && void ejecutar(rehabilitando, 'rehabilitar')}
       >
         La cuenta de{' '}
         <strong>{rehabilitando ? nombreCompleto(rehabilitando.denunciado) : ''}</strong> volverá a
-        estado <strong>HABILITADO</strong>. Si es comerciante, su comercio también se reactiva.
+        estado <strong>HABILITADO</strong>. Si es comerciante, su comercio también se reactiva. Si
+        está bajo investigación, solo puede rehabilitarse cuando no tenga reportes abiertos.
       </ConfirmDialog>
     </>
   );

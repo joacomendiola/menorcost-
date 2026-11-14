@@ -75,9 +75,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
 
-  prismaMock.$transaction.mockImplementation(async (arg: any) => {
-    if (typeof arg === 'function') return arg(prismaMock);
-    return Promise.all(arg);
+  prismaMock.$transaction.mockImplementation(async (arg: unknown) => {
+    if (typeof arg === 'function') {
+      return (arg as (tx: typeof prismaMock) => unknown)(prismaMock);
+    }
+    return Promise.all(arg as Promise<unknown>[]);
   });
 
   prismaMock.reporte.findUnique.mockResolvedValue(reporteBase());
@@ -399,6 +401,47 @@ describe('BackofficeService.rehabilitarUsuario', () => {
     await expect(
       service.rehabilitarUsuario(DENUNCIADO.id),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rechaza rehabilitar una cuenta bajo investigación con reportes abiertos', async () => {
+    prismaMock.usuario.findUnique.mockResolvedValue({
+      ...DENUNCIADO,
+      estado: 'BAJO_INVESTIGACION',
+    });
+    prismaMock.reporte.count.mockResolvedValue(1);
+
+    await expect(
+      service.rehabilitarUsuario(DENUNCIADO.id),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('rehabilita una cuenta bajo investigación cuando ya no tiene reportes abiertos', async () => {
+    prismaMock.usuario.findUnique.mockResolvedValue({
+      ...DENUNCIADO,
+      estado: 'BAJO_INVESTIGACION',
+    });
+    prismaMock.reporte.count.mockResolvedValue(0);
+    prismaMock.usuario.update.mockResolvedValue({
+      ...DENUNCIADO,
+      estado: 'HABILITADO',
+    });
+
+    await service.rehabilitarUsuario(DENUNCIADO.id);
+
+    expect(prismaMock.reporte.count).toHaveBeenCalledWith({
+      where: {
+        id_denunciado: DENUNCIADO.id,
+        estado_reporte: {
+          in: ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'],
+        },
+      },
+    });
+    expect(prismaMock.usuario.update).toHaveBeenCalledWith({
+      where: { id: DENUNCIADO.id },
+      data: { estado: 'HABILITADO' },
+      select: expect.anything(),
+    });
   });
 
   it('reactiva el comercio asociado al rehabilitar un comerciante', async () => {

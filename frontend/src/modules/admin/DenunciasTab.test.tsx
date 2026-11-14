@@ -11,15 +11,62 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DenunciasTab } from './DenunciasTab';
 
-const mocks = vi.hoisted(() => ({
-  recargar: vi.fn(),
-  refrescarKpis: vi.fn(),
-  desestimarDenuncia: vi.fn(),
-  resolverDenuncia: vi.fn(),
-  sancionarDenuncia: vi.fn(),
-  toggleInvestigacion: vi.fn(),
-  rehabilitarUsuario: vi.fn(),
-}));
+const mocks = vi.hoisted(() => {
+  const usuario = {
+    id: 'u1',
+    nombre: 'Ana',
+    apellido: 'Pérez',
+    email: 'ana@example.com',
+    dni: '12345678',
+    telefono: '123',
+    rol: 'CLIENTE',
+    estado: 'HABILITADO',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    comercio: null,
+  };
+
+  return {
+    recargar: vi.fn(),
+    refrescarKpis: vi.fn(),
+    desestimarDenuncia: vi.fn(),
+    resolverDenuncia: vi.fn(),
+    sancionarDenuncia: vi.fn(),
+    toggleInvestigacion: vi.fn(),
+    rehabilitarUsuario: vi.fn(),
+    items: [
+      {
+        id_reporte: 7,
+        motivo: 'Producto en mal estado',
+        descripcion: null,
+        estado_reporte: 'PENDIENTE_REVISION',
+        tipo_destino: 'COMERCIO',
+        fecha_reporte: '2026-01-01T00:00:00.000Z',
+        fecha_resolucion: null,
+        id_pedido: 'p1',
+        id_emisor: 'u1',
+        id_denunciado: 'u2',
+        id_admin: null,
+        pedido: null,
+        emisor: usuario,
+        denunciado: {
+          ...usuario,
+          id: 'u2',
+          nombre: 'Luis',
+          apellido: 'Gómez',
+          estado: 'BAJO_INVESTIGACION',
+        },
+        admin: null,
+        registro: {
+          total: 1,
+          abiertas: 1,
+          resueltas: 0,
+          desestimadas: 0,
+        },
+      },
+    ],
+  };
+});
 
 vi.mock('../../api', () => ({
   adminApi: mocks,
@@ -38,60 +85,14 @@ vi.mock('./adminContext', () => ({
   }),
 }));
 
-vi.mock('./useAdminList', () => {
-  const usuario = {
-    id: 'u1',
-    nombre: 'Ana',
-    apellido: 'Pérez',
-    email: 'ana@example.com',
-    dni: '12345678',
-    telefono: '123',
-    rol: 'CLIENTE',
-    estado: 'HABILITADO',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-    comercio: null,
-  };
-
-  return {
-    useAdminList: () => ({
-      items: [
-        {
-          id_reporte: 7,
-          motivo: 'Producto en mal estado',
-          descripcion: null,
-          estado_reporte: 'PENDIENTE_REVISION',
-          tipo_destino: 'COMERCIO',
-          fecha_reporte: '2026-01-01T00:00:00.000Z',
-          fecha_resolucion: null,
-          id_pedido: 'p1',
-          id_emisor: 'u1',
-          id_denunciado: 'u2',
-          id_admin: null,
-          pedido: null,
-          emisor: usuario,
-          denunciado: {
-            ...usuario,
-            id: 'u2',
-            nombre: 'Luis',
-            apellido: 'Gómez',
-            estado: 'BAJO_INVESTIGACION',
-          },
-          admin: null,
-          registro: {
-            total: 1,
-            abiertas: 1,
-            resueltas: 0,
-            desestimadas: 0,
-          },
-        },
-      ],
-      cargando: false,
-      error: null,
-      recargar: mocks.recargar,
-    }),
-  };
-});
+vi.mock('./useAdminList', () => ({
+  useAdminList: () => ({
+    items: mocks.items,
+    cargando: false,
+    error: null,
+    recargar: mocks.recargar,
+  }),
+}));
 
 vi.mock('@mantine/notifications', () => ({
   notifications: { show: vi.fn() },
@@ -142,6 +143,9 @@ afterEach(cleanup);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.items[0].estado_reporte = 'PENDIENTE_REVISION';
+  mocks.items[0].denunciado.estado = 'BAJO_INVESTIGACION';
+  mocks.items[0].registro.abiertas = 1;
   mocks.desestimarDenuncia.mockResolvedValue({
     success: true,
     notificaciones: {
@@ -149,6 +153,7 @@ beforeEach(() => {
       denunciado: { enviada: true },
     },
   });
+  mocks.rehabilitarUsuario.mockResolvedValue({ success: true });
 });
 
 describe('DenunciasTab', () => {
@@ -176,6 +181,43 @@ describe('DenunciasTab', () => {
     );
     expect(mocks.refrescarKpis).toHaveBeenCalled();
     expect(mocks.recargar).toHaveBeenCalled();
+  });
+
+  it('oculta la rehabilitación de una cuenta bajo investigación con reportes abiertos', () => {
+    render(
+      <MantineProvider>
+        <DenunciasTab />
+      </MantineProvider>,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Rehabilitar cuenta' }),
+    ).toBeNull();
+  });
+
+  it('rehabilita una cuenta bajo investigación cuando ya no tiene reportes abiertos', async () => {
+    mocks.items[0].estado_reporte = 'RESUELTO';
+    mocks.items[0].registro.abiertas = 0;
+
+    render(
+      <MantineProvider>
+        <DenunciasTab />
+      </MantineProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rehabilitar cuenta' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Confirmar rehabilitación' }),
+    );
+
+    await waitFor(() =>
+      expect(mocks.rehabilitarUsuario).toHaveBeenCalledWith('token', 'u2'),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText(/volvió a estado HABILITADO/),
+      ).toBeTruthy(),
+    );
   });
 
   it('advierte cuando no se pudo notificar al emisor', async () => {
