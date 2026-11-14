@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface.js';
 import { CategoriasController } from './categorias.controller.js';
 import { ComerciosPublicosController } from './comercios-publicos.controller.js';
+import { DetalleOfertaPublicaService } from './detalle-oferta-publica.service.js';
 import { ComerciosController } from './comercios.controller.js';
 import { ComerciosService } from './comercios.service.js';
 import type { CrearComercioDto } from './dto/crear-comercio.dto.js';
@@ -34,6 +35,7 @@ describe('Controladores de comercios', () => {
     obtenerPublico: vi.fn(),
     subirImagen: vi.fn(),
     obtenerMio: vi.fn(),
+    obtener: vi.fn(),
     crear: vi.fn(),
     actualizarMio: vi.fn(),
     actualizarApertura: vi.fn(),
@@ -61,6 +63,12 @@ describe('Controladores de comercios', () => {
         {
           provide: ComerciosService,
           useValue: serviceMock,
+        },
+        {
+          provide: DetalleOfertaPublicaService,
+          useValue: {
+            obtener: serviceMock.obtener,
+          },
         },
       ],
     }).compile();

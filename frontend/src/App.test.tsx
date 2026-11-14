@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { MantineProvider } from '@mantine/core';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import App from './App';
@@ -28,16 +29,17 @@ vi.mock('./components/TopBar', () => ({
 
 function renderizar(entrada: string) {
   return render(
-    <MemoryRouter initialEntries={[entrada]}>
-      <App />
-    </MemoryRouter>,
+    <MantineProvider>
+      <MemoryRouter initialEntries={[entrada]}>
+        <App />
+      </MemoryRouter>
+    </MantineProvider>,
   );
 }
 
 describe('Rutas de cliente pendientes', () => {
   it.each([
     ['/mis-pedidos', 'Mis pedidos'],
-    ['/canastas', 'Mis canastas'],
     ['/buscar', 'Buscar ofertas'],
   ])('%s muestra el componente EnConstruccion', (ruta, titulo) => {
     renderizar(ruta);
@@ -45,8 +47,11 @@ describe('Rutas de cliente pendientes', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: titulo }),
     ).toBeInTheDocument();
+
     expect(
-      screen.getByText('Esta sección estará disponible en el próximo módulo.'),
+      screen.getByText(
+        'Esta sección estará disponible en el próximo módulo.',
+      ),
     ).toBeInTheDocument();
   });
 });

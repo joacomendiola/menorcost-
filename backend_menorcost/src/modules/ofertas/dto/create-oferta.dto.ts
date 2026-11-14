@@ -42,5 +42,5 @@ export class CreateOfferDto {
   precioLista!: string;
 
   @Matches(/^\d+(\.\d{1,2})?$/)
-  precioMenorcost!: string;
+  precioBaseNeto!: string;
 }

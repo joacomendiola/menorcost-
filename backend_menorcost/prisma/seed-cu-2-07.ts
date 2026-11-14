@@ -17,6 +17,12 @@ const usuarioId = '00000000-0000-4000-8000-000000000201';
 const comercioId = '00000000-0000-4000-8000-000000000202';
 const productoId = '00000000-0000-4000-8000-000000000203';
 
+const precioLista = '100.00';
+const precioBaseNeto = '75.00';
+const precioPublico = '88.24';
+const comisionMenorcostTasaAplicada = '0.1000';
+const tasaMpEstimadaAplicada = '0.0650';
+
 async function main(): Promise<void> {
   const categoria = await prisma.categoria.findFirst({
     where: {
@@ -121,8 +127,11 @@ async function main(): Promise<void> {
       descripcion: 'Oferta creada para probar la depuración automática.',
       fechaVencimiento: new Date('2026-11-02T00:00:00.000Z'),
       stock: 5,
-      precioLista: '100.00',
-      precioMenorcost: '75.00',
+      precioLista,
+      precioBaseNeto,
+      precioPublico,
+      comisionMenorcostTasaAplicada,
+      tasaMpEstimadaAplicada,
       imagen: '/uploads/producto-test.png',
       estado: 'ACTIVO',
     },
@@ -135,8 +144,11 @@ async function main(): Promise<void> {
       descripcion: 'Oferta creada para probar la depuración automática.',
       fechaVencimiento: new Date('2026-11-02T00:00:00.000Z'),
       stock: 5,
-      precioLista: '100.00',
-      precioMenorcost: '75.00',
+      precioLista,
+      precioBaseNeto,
+      precioPublico,
+      comisionMenorcostTasaAplicada,
+      tasaMpEstimadaAplicada,
       imagen: '/uploads/producto-test.png',
       estado: 'ACTIVO',
     },

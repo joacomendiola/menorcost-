@@ -42,7 +42,13 @@ model Producto {
   fechaVencimiento DateTime       @map("fecha_vencimiento") @db.Date
   stock            Int
   precioLista      Decimal        @map("precio_lista") @db.Decimal(10, 2)
-  precioMenorcost  Decimal        @map("precio_menorcost") @db.Decimal(10, 2)
+  precioBaseNeto   Decimal        @map("precio_base_neto") @db.Decimal(10, 2)
+  precioPublico    Decimal        @map("precio_publico") @db.Decimal(10, 2)
+
+  comisionMenorcostTasaAplicada Decimal @map("comision_menorcost_tasa_aplicada") @db.Decimal(6, 4)
+
+  tasaMpEstimadaAplicada Decimal @map("tasa_mp_estimada_aplicada") @db.Decimal(6, 4)
+
   imagen           String         @db.VarChar(500)
   estado           EstadoProducto @default(ACTIVO)
   pausadoPorBaja   Boolean        @default(false) @map("pausado_por_baja")
@@ -50,8 +56,11 @@ model Producto {
   comercio              Comercio                     @relation(fields: [comercioId], references: [idComercio])
   categoria             Categoria                    @relation(fields: [categoriaId], references: [idCategoria])
   pedidoItems           PedidoItem[]
+  canastaItems          CanastaItem[]
   auditoriasVencimiento AuditoriaVencimientoOferta[]
 
+  @@index([comercioId, estado])
+  @@index([fechaVencimiento, estado])
   @@map("producto")
 }
 
@@ -85,6 +94,7 @@ model Comercio {
   usuario               Usuario                      @relation(fields: [userId], references: [id])
   productos             Producto[]
   pedidos               Pedido[]
+  canastas              Canasta[]
   credencialMp          CredencialMp?
   horarios              HorarioAtencion[]
   franjas               FranjaRetiro[]
@@ -194,6 +204,7 @@ model Usuario {
   direcciones Direccion[]
   codigos     CodigoSeguridad[]
   pedidos     Pedido[]
+  canastas    Canasta[]
 
   comercio Comercio?
 
@@ -269,15 +280,15 @@ model SolicitudBaja {
 
 model AuditoriaVencimientoOferta {
   id               String         @id @default(uuid()) @db.Uuid
-  productoId       String         @unique @map("producto_id") @db.Uuid
+  productoId       String         @map("producto_id") @db.Uuid
   comercioId       String         @map("comercio_id") @db.Uuid
   estadoAnterior   EstadoProducto @map("estado_anterior")
   estadoNuevo      EstadoProducto @map("estado_nuevo")
   fechaVencimiento DateTime       @map("fecha_vencimiento") @db.Date
   ejecutadoEn      DateTime       @default(now()) @map("ejecutado_en")
 
-  producto     Producto      @relation(fields: [productoId], references: [idProducto])
-  comercio     Comercio      @relation(fields: [comercioId], references: [idComercio])
+  producto     Producto      @relation(fields: [productoId], references: [idProducto], onDelete: Restrict)
+  comercio     Comercio      @relation(fields: [comercioId], references: [idComercio], onDelete: Restrict)
   notificacion Notificacion?
 
   @@index([comercioId, ejecutadoEn])
@@ -355,6 +366,39 @@ model Reporte {
   @@map("reporte")
 }
 
+model Canasta {
+  idCanasta  String   @id @default(uuid()) @map("id_canasta") @db.Uuid
+  usuarioId  String   @map("usuario_id")
+  comercioId String   @map("comercio_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  usuario  Usuario       @relation(fields: [usuarioId], references: [id])
+  comercio Comercio      @relation(fields: [comercioId], references: [idComercio])
+  items    CanastaItem[]
+
+  @@unique([usuarioId, comercioId])
+  @@index([usuarioId, updatedAt])
+  @@index([comercioId])
+  @@map("canasta")
+}
+
+model CanastaItem {
+  idCanastaItem String   @id @default(uuid()) @map("id_canasta_item") @db.Uuid
+  canastaId     String   @map("canasta_id") @db.Uuid
+  productoId    String   @map("producto_id") @db.Uuid
+  cantidad      Int
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  canasta  Canasta  @relation(fields: [canastaId], references: [idCanasta], onDelete: Cascade)
+  producto Producto @relation(fields: [productoId], references: [idProducto], onDelete: Restrict)
+
+  @@unique([canastaId, productoId])
+  @@index([productoId])
+  @@map("canasta_item")
+}
+
 model Pedido {
   id_pedido           String       @id @default(uuid()) @map("id_pedido") @db.Uuid
   nroPedido           String       @unique @map("nro_pedido") @db.VarChar(30)
@@ -389,8 +433,8 @@ model Pedido {
   items         PedidoItem[]
   pagos         Pago[]
 
-  @@index([usuarioId])
-  @@index([comercioId])
+  @@index([usuarioId, estado])
+  @@index([comercioId, estado])
   @@index([estado])
   @@map("pedido")
 }
@@ -411,10 +455,11 @@ model PedidoItem {
   nombreHistorico           String   @map("nombre_historico") @db.VarChar(120)
   fechaVencimientoHistorica DateTime @map("fecha_vencimiento_historica") @db.Date
 
-  pedido   Pedido   @relation(fields: [pedidoId], references: [id_pedido])
-  producto Producto @relation(fields: [productoId], references: [idProducto])
+  pedido   Pedido   @relation(fields: [pedidoId], references: [id_pedido], onDelete: Cascade)
+  producto Producto @relation(fields: [productoId], references: [idProducto], onDelete: Restrict)
 
   @@unique([pedidoId, nroLinea])
+  @@unique([pedidoId, productoId])
   @@index([productoId])
   @@map("pedido_item")
 }

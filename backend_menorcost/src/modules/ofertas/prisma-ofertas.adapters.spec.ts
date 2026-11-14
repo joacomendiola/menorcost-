@@ -5,7 +5,7 @@ import {
 import { Test } from '@nestjs/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { CreateOfferDto } from './dto/create-oferta.dto.js';
+import type { CreateOfferDto } from './dto/create-oferta.dto.js';
 import {
   PrismaOfferAccessAdapter,
   PrismaOfferCategoriesAdapter,
@@ -27,7 +27,14 @@ describe('Adaptadores Prisma de ofertas', () => {
     fechaVencimiento: '2099-12-31',
     stock: 5,
     precioLista: '100.00',
-    precioMenorcost: '75.00',
+    precioBaseNeto: '75.00',
+  };
+
+  const preciosCalculados = {
+    precioBaseNeto: '75.00',
+    precioPublico: '88.24',
+    comisionMenorcostTasaAplicada: '0.1000',
+    tasaMpEstimadaAplicada: '0.0650',
   };
 
   const productoProyectado = {
@@ -40,7 +47,10 @@ describe('Adaptadores Prisma de ofertas', () => {
     fechaVencimiento: new Date('2099-12-31T00:00:00.000Z'),
     stock: 5,
     precioLista: '100.00',
-    precioMenorcost: '75.00',
+    precioBaseNeto: '75.00',
+    precioPublico: '88.24',
+    comisionMenorcostTasaAplicada: '0.1000',
+    tasaMpEstimadaAplicada: '0.0650',
     imagen: '/uploads/yogur.webp',
     estado: 'ACTIVO' as const,
   };
@@ -85,9 +95,11 @@ describe('Adaptadores Prisma de ofertas', () => {
     prismaMock.categoria.findUnique.mockResolvedValue({
       idCategoria: categoriaId,
     });
+
     prismaMock.producto.create.mockResolvedValue({
       idProducto: '33333333-3333-4333-8333-333333333333',
       imagen: '/uploads/yogur.png',
+      estado: 'ACTIVO',
     });
     prismaMock.producto.findMany.mockResolvedValue([productoProyectado]);
     prismaMock.producto.findFirst.mockResolvedValue(productoProyectado);
@@ -212,6 +224,7 @@ describe('Adaptadores Prisma de ofertas', () => {
     await expect(
       repository.create({
         ...dto,
+        ...preciosCalculados,
         imagen: '/uploads/yogur.png',
         estado: 'ACTIVO',
       }),
@@ -231,13 +244,17 @@ describe('Adaptadores Prisma de ofertas', () => {
         fechaVencimiento: new Date('2099-12-31T00:00:00.000Z'),
         stock: dto.stock,
         precioLista: dto.precioLista,
-        precioMenorcost: dto.precioMenorcost,
+        precioBaseNeto: '75.00',
+        precioPublico: '88.24',
+        comisionMenorcostTasaAplicada: '0.1000',
+        tasaMpEstimadaAplicada: '0.0650',
         imagen: '/uploads/yogur.png',
         estado: 'ACTIVO',
       },
       select: {
         idProducto: true,
         imagen: true,
+        estado: true,
       },
     });
   });
@@ -254,7 +271,10 @@ describe('Adaptadores Prisma de ofertas', () => {
         fechaVencimiento: '2099-12-31',
         stock: 5,
         precioLista: '100.00',
-        precioMenorcost: '75.00',
+        precioBaseNeto: '75.00',
+        precioPublico: '88.24',
+        comisionMenorcostTasaAplicada: '0.1000',
+        tasaMpEstimadaAplicada: '0.0650',
         imagen: '/uploads/yogur.webp',
         estado: 'ACTIVO',
       },
@@ -273,6 +293,8 @@ describe('Adaptadores Prisma de ofertas', () => {
     ).resolves.toMatchObject({
       id: productoProyectado.idProducto,
       titulo: 'Yogur',
+      precioBaseNeto: '75.00',
+      precioPublico: '88.24',
     });
 
     expect(prismaMock.producto.findFirst).toHaveBeenCalledWith(
@@ -286,15 +308,23 @@ describe('Adaptadores Prisma de ofertas', () => {
   });
 
   it('actualiza una oferta propia usando una actualización parcial', async () => {
+    const actualizacion = {
+      precioBaseNeto: '70.00',
+      precioPublico: '82.90',
+      comisionMenorcostTasaAplicada: '0.1000',
+      tasaMpEstimadaAplicada: '0.0650',
+    };
+
     await expect(
       repository.updateForOwner(
         userId,
         productoProyectado.idProducto,
-        { precioMenorcost: '70.00' },
+        actualizacion,
       ),
     ).resolves.toMatchObject({
       id: productoProyectado.idProducto,
-      precioMenorcost: '75.00',
+      precioBaseNeto: '75.00',
+      precioPublico: '88.24',
     });
 
     expect(prismaMock.producto.updateMany).toHaveBeenCalledWith({
@@ -302,7 +332,7 @@ describe('Adaptadores Prisma de ofertas', () => {
         idProducto: productoProyectado.idProducto,
         comercio: { is: { userId } },
       },
-      data: { precioMenorcost: '70.00' },
+      data: actualizacion,
     });
   });
 
@@ -399,47 +429,53 @@ describe('Adaptadores Prisma de ofertas', () => {
     ).rejects.toBe(databaseError);
   });
   it('suma las unidades pendientes de retiro de todas las ofertas del comerciante', async () => {
-  prismaMock.pedidoItem.aggregate.mockResolvedValueOnce({
-    _sum: { cantidad: 7 },
-  });
-
-  await expect(
-    reservations.getReservedUnitsForOwner(userId),
-  ).resolves.toBe(7);
-
-  expect(prismaMock.pedidoItem.aggregate).toHaveBeenCalledWith({
-    where: {
-      producto: {
-        is: {
-          comercio: {
-            is: { userId },
-          },
-        },
-      },
-      pedido: {
-        is: { estado: 'PENDIENTE_DE_RETIRO' },
-      },
-    },
-    _sum: { cantidad: true },
-    });
-    });
-
-    it('devuelve cero si el comerciante no tiene unidades reservadas', async () => {
     prismaMock.pedidoItem.aggregate.mockResolvedValueOnce({
-        _sum: { cantidad: null },
+      _sum: { cantidad: 7 },
     });
 
     await expect(
-        reservations.getReservedUnitsForOwner(userId),
-    ).resolves.toBe(0);
+      reservations.getReservedUnitsForOwner(userId),
+    ).resolves.toBe(7);
+
+    expect(
+      prismaMock.pedidoItem.aggregate,
+    ).toHaveBeenCalledWith({
+      where: {
+        producto: {
+          is: {
+            comercio: {
+              is: { userId },
+            },
+          },
+        },
+        pedido: {
+          is: {
+            estado: 'PENDIENTE_DE_RETIRO',
+          },
+        },
+      },
+      _sum: {
+        cantidad: true,
+      },
+    });
+  });
+
+  it('devuelve cero si el comerciante no tiene unidades reservadas', async () => {
+    prismaMock.pedidoItem.aggregate.mockResolvedValueOnce({
+      _sum: { cantidad: null },
     });
 
-    it('propaga el error si falla la consulta agregada del comerciante', async () => {
+    await expect(
+      reservations.getReservedUnitsForOwner(userId),
+    ).resolves.toBe(0);
+  });
+
+  it('propaga el error si falla la consulta agregada del comerciante', async () => {
     const databaseError = new Error('Fallo al consultar reservas');
     prismaMock.pedidoItem.aggregate.mockRejectedValueOnce(databaseError);
 
     await expect(
-        reservations.getReservedUnitsForOwner(userId),
+      reservations.getReservedUnitsForOwner(userId),
     ).rejects.toBe(databaseError);
-    });
-});
+  });
+})

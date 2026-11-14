@@ -73,7 +73,7 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
   async function crearPedido(usuarioId: string, comercioId: string) {
     const pedido = await prisma.pedido.create({
       data: {
-        nroPedido: `NP-${crypto.randomUUID().slice(0, 20)}`,
+        nroPedido: `PED-${crypto.randomUUID().slice(0, 8)}`,
         usuarioId,
         comercioId,
         estado: 'ENTREGADO',
@@ -81,8 +81,8 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
         codigoAlfanumerico: `BO-${crypto.randomUUID().slice(0, 8)}`,
         subtotal: 1000,
         tarifa_servicio: 100,
-        comisionMenorcostTasa: '0.1000',
-        tasaMpEstimada: '0.0650',
+        comisionMenorcostTasa: 0.1,
+        tasaMpEstimada: 0.065,
         total: 1100,
       },
     });
@@ -223,7 +223,10 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
           fechaVencimiento: new Date(Date.now() + 86400000 * 30),
           stock: 5,
           precioLista: 1000,
-          precioMenorcost: 800,
+          precioBaseNeto: 800,
+          precioPublico: 941.18,
+          comisionMenorcostTasaAplicada: 0.1,
+          tasaMpEstimadaAplicada: 0.065,
           imagen: 'https://example.com/img.jpg',
           estado: 'ACTIVO',
         },

@@ -19,6 +19,7 @@ import type {
   OfferReservations,
 } from './ofertas-creation.ports.js';
 import { OffersService } from './ofertas.service.js';
+import type { SimuladorPreciosService } from '../simulador-precios/simulador-precios.service.js';
 
 describe('OffersService', () => {
   let service: OffersService;
@@ -27,6 +28,7 @@ describe('OffersService', () => {
   let repository: OfferRepository;
   let imageStorage: ImageStorageService;
   let reservations: OfferReservations;
+  let simuladorPrecios: Pick<SimuladorPreciosService, 'calcular'>;
 
   const dto: CreateOfferDto = {
     tipo: 'INDIVIDUAL',
@@ -37,7 +39,7 @@ describe('OffersService', () => {
     fechaVencimiento: '2099-12-31',
     stock: 5,
     precioLista: '100.00',
-    precioMenorcost: '75.00',
+    precioBaseNeto: '75.00',
   };
 
   const image: OfferImage = {
@@ -61,7 +63,10 @@ describe('OffersService', () => {
     fechaVencimiento: '2099-12-31',
     stock: 5,
     precioLista: '100.00',
-    precioMenorcost: '75.00',
+    precioBaseNeto: '75.00',
+    precioPublico: '88.24',
+    comisionMenorcostTasaAplicada: '0.1000',
+    tasaMpEstimadaAplicada: '0.0650',
     imagen: '/uploads/yogur.webp',
     estado: 'ACTIVO',
   };
@@ -96,12 +101,26 @@ describe('OffersService', () => {
       getReservedUnitsForOwner: vi.fn().mockResolvedValue(0),
     };
 
+    simuladorPrecios = {
+      calcular: vi.fn().mockResolvedValue({
+        precioBaseNeto: '75.00',
+        comisionMenorcostTasa: '0.1000',
+        comisionMenorcostMonto: '7.50',
+        tasaMpEstimada: '0.0650',
+        comisionMpEstimada: '5.57',
+        precioPublico: '88.24',
+        netoEstimadoComerciante: '75.17',
+        advertenciaNeto: '',
+      }),
+    };
+
     service = new OffersService(
       access,
       categories,
       repository,
       imageStorage,
       reservations,
+      simuladorPrecios,
     );
   });
 
@@ -142,13 +161,18 @@ describe('OffersService', () => {
     expect(repository.create).not.toHaveBeenCalled();
   });
 
-  it('rechaza el precio promocional igual al precio de lista', async () => {
-    const invalidDto = { ...dto, precioMenorcost: dto.precioLista };
-
-    await expect(service.create('user-1', invalidDto, image)).rejects.toThrow(
-      'El precio promocional debe ofrecer un descuento real',
+  it('rechaza un precio público igual o superior al precio de lista', async () => {
+    const invalidDto = {
+      ...dto,
+      precioLista: '80.00',
+    };
+  
+    await expect(
+      service.create('user-1', invalidDto, image),
+    ).rejects.toThrow(
+      'El precio público debe ser menor que el precio de lista',
     );
-
+  
     expect(imageStorage.save).not.toHaveBeenCalled();
     expect(repository.create).not.toHaveBeenCalled();
   });
@@ -170,6 +194,10 @@ describe('OffersService', () => {
     expect(imageStorage.save).toHaveBeenCalledWith(image.buffer, image.mimetype);
     expect(repository.create).toHaveBeenCalledWith({
       ...dto,
+      precioBaseNeto: '75.00',
+      precioPublico: '88.24',
+      comisionMenorcostTasaAplicada: '0.1000',
+      tasaMpEstimadaAplicada: '0.0650',
       imagen: '/uploads/test.webp',
       estado: 'ACTIVO',
     });
@@ -325,7 +353,7 @@ describe('OffersService', () => {
     expect(repository.updateForOwner).not.toHaveBeenCalled();
   });
 
-  it('rechaza precios promocionales que no sean inferiores al precio de lista actual', async () => {
+  it('rechaza un precio público que no sea inferior al precio de lista actual', async () => {
     const update: UpdateOfferDto = { precioLista: '70.00' };
 
     await expect(
@@ -336,13 +364,29 @@ describe('OffersService', () => {
   });
 
   it('actualiza los campos permitidos de la oferta', async () => {
-    const update: UpdateOfferDto = {
-      precioMenorcost: '70.00',
-      stock: 8,
-    };
-    const updatedOffer = { ...offerDetails, ...update };
+  const update: UpdateOfferDto = {
+    precioBaseNeto: '70.00',
+    stock: 8,
+  };
+  const updatedOffer = {
+    ...offerDetails,
+    precioBaseNeto: '70.00',
+    precioPublico: '82.90',
+    stock: 8,
+  };
 
     vi.mocked(repository.updateForOwner).mockResolvedValueOnce(updatedOffer);
+
+    vi.mocked(simuladorPrecios.calcular).mockResolvedValueOnce({
+      precioBaseNeto: '70.00',
+      comisionMenorcostTasa: '0.1000',
+      comisionMenorcostMonto: '7.00',
+      tasaMpEstimada: '0.0650',
+      comisionMpEstimada: '5.20',
+      precioPublico: '82.90',
+      netoEstimadoComerciante: '70.70',
+      advertenciaNeto: '',
+    });
 
     await expect(
       service.update('user-1', offerDetails.id, update),
@@ -351,7 +395,13 @@ describe('OffersService', () => {
     expect(repository.updateForOwner).toHaveBeenCalledWith(
       'user-1',
       offerDetails.id,
-      update,
+      {
+        precioBaseNeto: '70.00',
+        precioPublico: '82.90',
+        comisionMenorcostTasaAplicada: '0.1000',
+        tasaMpEstimadaAplicada: '0.0650',
+        stock: 8,
+      },
     );
     expect(reservations.getReservedUnitsForOffer).not.toHaveBeenCalled();
     expect(repository.create).not.toHaveBeenCalled();

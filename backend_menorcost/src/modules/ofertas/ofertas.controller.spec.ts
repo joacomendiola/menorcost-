@@ -1,9 +1,9 @@
 import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface.js';
-import { CreateOfferDto } from './dto/create-oferta.dto.js';
-import { UpdateOfferDto } from './dto/update-oferta.dto.js';
-import { UpdateOfertaStatusDto } from './dto/update-oferta-status.dto.js';
+import type { CreateOfferDto } from './dto/create-oferta.dto.js';
+import type { UpdateOfferDto } from './dto/update-oferta.dto.js';
+import type { UpdateOfertaStatusDto } from './dto/update-oferta-status.dto.js';
 import type {
   OfferDetails,
   OfferRecord,
@@ -29,7 +29,7 @@ describe('OffersController', () => {
     fechaVencimiento: '2099-12-31',
     stock: 5,
     precioLista: '100.00',
-    precioMenorcost: '75.00',
+    precioBaseNeto: '75.00',
   };
 
   const usuario: AuthenticatedUser = {
@@ -60,7 +60,10 @@ describe('OffersController', () => {
     fechaVencimiento: '2099-12-31',
     stock: 5,
     precioLista: '100.00',
-    precioMenorcost: '75.00',
+    precioBaseNeto: '75.00',
+    precioPublico: '88.24',
+    comisionMenorcostTasaAplicada: '0.1000',
+    tasaMpEstimadaAplicada: '0.0650',
     imagen: '/uploads/test.webp',
     estado: 'ACTIVO',
   };
@@ -74,7 +77,7 @@ describe('OffersController', () => {
       ...offerDetails,
       estado: 'PAUSADO',
     });
-    getDashboardSummary = vi.fn().mockResolvedValue({offerDetails});
+    getDashboardSummary = vi.fn().mockResolvedValue(offerDetails);
 
     const moduleRef = await Test.createTestingModule({
       controllers: [OffersController],
@@ -87,7 +90,7 @@ describe('OffersController', () => {
             getByIdForOwner: getOffer,
             update: updateOffer,
             updateStatus: updateStatusOffer,
-            getDashboardSummary: getDashboardSummary,
+            getDashboardSummary,
           },
         },
       ],
@@ -97,9 +100,9 @@ describe('OffersController', () => {
   });
 
   it('envía los datos, el usuario y la imagen al servicio al crear', async () => {
-    await expect(controller.create(usuario, dto, image)).resolves.toEqual(
-      offer,
-    );
+    await expect(
+      controller.create(usuario, dto, image),
+    ).resolves.toEqual(offer);
 
     expect(createOffer).toHaveBeenCalledWith('user-1', dto, {
       buffer: image.buffer,
@@ -108,7 +111,9 @@ describe('OffersController', () => {
   });
 
   it('lista las ofertas del usuario autenticado', async () => {
-    await expect(controller.list(usuario)).resolves.toEqual([offerDetails]);
+    await expect(
+      controller.list(usuario),
+    ).resolves.toEqual([offerDetails]);
 
     expect(listOffers).toHaveBeenCalledWith('user-1');
   });
@@ -116,9 +121,9 @@ describe('OffersController', () => {
   it('busca una oferta para el usuario autenticado', async () => {
     const offerId = offerDetails.id;
 
-    await expect(controller.getById(usuario, offerId)).resolves.toEqual(
-      offerDetails,
-    );
+    await expect(
+      controller.getById(usuario, offerId),
+    ).resolves.toEqual(offerDetails);
 
     expect(getOffer).toHaveBeenCalledWith('user-1', offerId);
   });
@@ -126,7 +131,7 @@ describe('OffersController', () => {
   it('envía los cambios y la imagen opcional al servicio', async () => {
     const offerId = offerDetails.id;
     const updateDto: UpdateOfferDto = {
-      precioMenorcost: '70.00',
+      precioBaseNeto: '70.00',
       stock: 8,
     };
 
@@ -134,16 +139,21 @@ describe('OffersController', () => {
       controller.update(usuario, offerId, updateDto, image),
     ).resolves.toEqual(offerDetails);
 
-    expect(updateOffer).toHaveBeenCalledWith('user-1', offerId, updateDto, {
-      buffer: image.buffer,
-      mimetype: image.mimetype,
-    });
+    expect(updateOffer).toHaveBeenCalledWith(
+      'user-1',
+      offerId,
+      updateDto,
+      {
+        buffer: image.buffer,
+        mimetype: image.mimetype,
+      },
+    );
   });
 
   it('permite solicitar una actualización sin enviar imagen', async () => {
     const offerId = offerDetails.id;
     const updateDto: UpdateOfferDto = {
-      precioMenorcost: '70.00',
+      precioBaseNeto: '70.00',
     };
 
     await expect(
@@ -160,8 +170,14 @@ describe('OffersController', () => {
 
   it('envía el estado solicitado y el usuario autenticado al servicio', async () => {
     const offerId = offerDetails.id;
-    const statusDto: UpdateOfertaStatusDto = { estado: 'PAUSADO' };
-    const pausedOffer = { ...offerDetails, estado: 'PAUSADO' as const };
+    const statusDto: UpdateOfertaStatusDto = {
+      estado: 'PAUSADO',
+    };
+    const pausedOffer = {
+      ...offerDetails,
+      estado: 'PAUSADO' as const,
+    };
+
     updateStatusOffer.mockResolvedValueOnce(pausedOffer);
 
     await expect(
@@ -174,22 +190,24 @@ describe('OffersController', () => {
       'PAUSADO',
     );
   });
+
   it('obtiene el resumen para el comerciante autenticado', async () => {
-  const summary = {
-    total: 6,
-    activas: 3,
-    pausadas: 1,
-    proximasAVencer: 2,
-    vencidas: 1,
-    sinStock: 5,
-    unidadesReservadas: 12,
-  };
-  getDashboardSummary.mockResolvedValueOnce(summary);
+    const summary = {
+      total: 6,
+      activas: 3,
+      pausadas: 1,
+      proximasAVencer: 2,
+      vencidas: 1,
+      sinStock: 5,
+      unidadesReservadas: 12,
+    };
 
-  await expect(controller.getDashboardSummary(usuario)).resolves.toEqual(
-    summary,
-  );
+    getDashboardSummary.mockResolvedValueOnce(summary);
 
-  expect(getDashboardSummary).toHaveBeenCalledWith('user-1');
+    await expect(
+      controller.getDashboardSummary(usuario),
+    ).resolves.toEqual(summary);
+
+    expect(getDashboardSummary).toHaveBeenCalledWith('user-1');
   });
 });

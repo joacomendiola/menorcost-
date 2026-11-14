@@ -1,10 +1,20 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import {RedirectInicio} from "./auth/RedirectInicio";
 import { RutaProtegida, RutaPublica, RutaComerciante, RutaAdmin, RutaCliente } from './auth/Rutas';
+import { DetalleOfertaPage } from './comercios/DetalleOfertaPage';
 import { HorariosComercioPage } from './comercios/HorariosComercioPage';
 import { PerfilComercioPage } from './comercios/PerfilComercioPage';
+import { CanastaPage } from './comercios/CanastaPage';
+import { ListaCanastasPage } from './comercios/ListaCanastasPage';
 import { RegistroComercioPage } from './comercios/RegistroComercioPage';
 import { TiendaPublicaPage } from './comercios/TiendaPublicaPage';
 import { TopBar } from './components/TopBar';
+import { AltasTab } from './modules/admin/AltasTab';
+import { Backoffice } from './modules/admin/Backoffice';
+import { BajasTab } from './modules/admin/BajasTab';
+import { DenunciasTab } from './modules/admin/DenunciasTab';
+import { Reviews } from './modules/merchant/Reviews';
+import { Ticket } from './modules/orders/Ticket';
 import { ComercioEstadoPage } from './pages/ComercioEstadoPage';
 import { EnConstruccion } from './pages/EnConstruccion';
 import { Login } from './pages/Login';
@@ -14,20 +24,11 @@ import { Registro } from './pages/Registro';
 import { Restablecer } from './pages/Restablecer';
 import { VerificarCorreo } from './pages/VerificarCorreo';
 import { NuevaOfertaPage } from './ofertas/NewOfertaPage';
-
 import { PanelComerciante } from './modules/merchant/PanelComerciante';
 import { PedidosPanel } from './modules/merchant/PedidosPanel';
 import { ResumenPanel } from './modules/merchant/ResumenPanel';
-import { Reviews } from './modules/merchant/Reviews';
-import { Ticket } from './modules/orders/Ticket';
-import { Backoffice } from './modules/admin/Backoffice';
-import { AltasTab } from './modules/admin/AltasTab';
-import { BajasTab } from './modules/admin/BajasTab';
-import { DenunciasTab } from './modules/admin/DenunciasTab';
-import { RedirectInicio } from './auth/RedirectInicio';
 
 import { MisOfertasPage } from './ofertas/MisOfertasPage';
-
 
 export default function App() {
   const { pathname } = useLocation();
@@ -36,6 +37,7 @@ export default function App() {
   return (
     <>
       {!esPanelComerciante && <TopBar />}
+
       <Routes>
         <Route element={<RutaPublica />}>
           <Route path="/login" element={<Login />} />
@@ -67,6 +69,21 @@ export default function App() {
         </Route>
 
         <Route element={<RutaCliente />}>
+          <Route
+            path="/comercios/:comercioId/productos/:productoId"
+            element={<DetalleOfertaPage />}
+          />
+
+          <Route
+            path="/canastas"
+            element={<ListaCanastasPage />}
+          />
+
+          <Route
+            path="/canastas/:comercioId"
+            element={<CanastaPage />}
+          />
+
           <Route path="/pedido/:codigo" element={<Ticket />} />
           <Route
             path="/mis-pedidos"
@@ -77,15 +94,7 @@ export default function App() {
               />
             }
           />
-          <Route
-            path="/canastas"
-            element={
-              <EnConstruccion
-                titulo="Mis canastas"
-                descripcion="Guardá productos y armá canastas para comprar más rápido."
-              />
-            }
-          />
+         
           <Route
             path="/buscar"
             element={
@@ -122,6 +131,7 @@ export default function App() {
           </Route>
         </Route>
 
+        {/* RUTAS POR DEFECTO */}
         <Route path="/" element={<RedirectInicio />} />
         <Route path="*" element={<RedirectInicio />} />
       </Routes>

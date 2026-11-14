@@ -18,9 +18,10 @@ import {
   PrismaOfferReservationsAdapter,
 } from './prisma-ofertas.adapters.js';
 import { OffersExpirationService } from './ofertas-vencimiento.service.js';
+import { SimuladorPreciosModule } from '../simulador-precios/simulador-precios.module.js';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, SimuladorPreciosModule],
   controllers: [OffersController],
   providers: [
     OffersExpirationService,
