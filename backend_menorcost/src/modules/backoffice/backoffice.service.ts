@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
+import type { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { MailerService } from '../auth/mailer/mailer.service.js';
 import type { EnvioCorreo } from '../auth/mailer/mailer.interface.js';
@@ -81,15 +82,18 @@ export class BackofficeService {
 
   // --- 2. SOLICITUDES DE ALTA ---
   async listarAltas(search?: string, estado?: string) {
-    const whereUsuario: any = { rol: 'COMERCIANTE', deletedAt: null };
+    const whereUsuario: Prisma.UsuarioWhereInput = {
+      rol: 'COMERCIANTE',
+      deletedAt: null,
+    };
 
     if (estado && estado !== 'todos') {
-      whereUsuario.estado = estado;
+      whereUsuario.estado = estado as Prisma.UsuarioWhereInput['estado'];
     }
 
     // La búsqueda de altas permite matchear por datos del usuario o por CUIT.
     // El filtro de estado se respeta en ambas ramas.
-    const where: any = search
+    const where: Prisma.ComercioWhereInput = search
       ? {
           OR: [
             {
@@ -253,10 +257,11 @@ export class BackofficeService {
 
   // --- 3. DENUNCIAS Y MODERACIÓN ---
   async listarDenuncias(search?: string, estado?: string) {
-    const whereClause: any = {};
+    const whereClause: Prisma.ReporteWhereInput = {};
 
     if (estado && estado !== 'todos') {
-      whereClause.estado_reporte = estado;
+      whereClause.estado_reporte =
+        estado as Prisma.ReporteWhereInput['estado_reporte'];
     }
 
     if (search) {
@@ -513,7 +518,7 @@ export class BackofficeService {
 
   // Restaura a HABILITADO si el denunciado ya no tiene reportes abiertos.
   private async restaurarSiCorresponde(
-    tx: any,
+    tx: Prisma.TransactionClient,
     idDenunciado: string,
     idReporteExcluido: number,
   ) {
@@ -658,6 +663,21 @@ export class BackofficeService {
       throw new BadRequestException(
         'El usuario no está suspendido ni bajo investigación',
       );
+    }
+
+    if (usuario.estado === 'BAJO_INVESTIGACION') {
+      const reportesAbiertos = await this.prisma.reporte.count({
+        where: {
+          id_denunciado: idUsuario,
+          estado_reporte: { in: ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'] },
+        },
+      });
+
+      if (reportesAbiertos > 0) {
+        throw new BadRequestException(
+          'No se puede rehabilitar una cuenta bajo investigación con reportes abiertos',
+        );
+      }
     }
 
     return this.prisma.$transaction(async (tx) => {
