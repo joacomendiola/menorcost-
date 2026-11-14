@@ -47,8 +47,6 @@ export function PedidosPanel() {
 
   const cargarPedidos = useCallback(async (activa?: () => boolean) => {
     if (!token) return;
-    setCargando(true);
-    setError(null);
     try {
       const resultado = await reportesApi.pedidosComerciante(token);
       if (!activa || activa()) setPedidos(resultado);
@@ -70,12 +68,40 @@ export function PedidosPanel() {
   }, [token, cerrarSesion]);
 
   useEffect(() => {
+    if (!token) return;
     let activa = true;
-    void cargarPedidos(() => activa);
+
+    reportesApi
+      .pedidosComerciante(token)
+      .then((resultado) => {
+        if (activa) setPedidos(resultado);
+      })
+      .catch((err) => {
+        if (!activa) return;
+        if (err instanceof ApiError && err.status === 401) {
+          cerrarSesion();
+          return;
+        }
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : 'No se pudieron cargar los pedidos. Intenta nuevamente.',
+        );
+      })
+      .finally(() => {
+        if (activa) setCargando(false);
+      });
+
     return () => {
       activa = false;
     };
-  }, [cargarPedidos]);
+  }, [token, cerrarSesion]);
+
+  function reintentar() {
+    setCargando(true);
+    setError(null);
+    void cargarPedidos();
+  }
 
   async function enviarReporte(
     evento: FormEvent<HTMLFormElement>,
@@ -182,7 +208,7 @@ export function PedidosPanel() {
               <Button
                 mt="sm"
                 variant="default"
-                onClick={() => void cargarPedidos()}
+                onClick={reintentar}
               >
                 Reintentar
               </Button>
