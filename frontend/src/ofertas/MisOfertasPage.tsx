@@ -41,15 +41,6 @@ const offerFilters: { value: OfferFilter; label: string }[] = [
   { value: 'ELIMINADO', label: 'Dadas de baja' },
 ];
 
-function priceToCents(value: FormDataEntryValue | null): bigint | null {
-  if (typeof value !== 'string' || !/^\d+(\.\d{1,2})?$/.test(value)) {
-    return null;
-  }
-
-  const [whole, fraction = ''] = value.split('.');
-  return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'));
-}
-
 function formatDate(date: string): string {
   const parts = date.split('-');
 
@@ -60,65 +51,6 @@ function formatDate(date: string): string {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
-async function requestOffers<T>(
-  path: string,
-  token: string,
-  init?: RequestInit,
-): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...init?.headers,
-    },
-  });
-
-  const text = await response.text();
-  let payload: unknown = null;
-
-  if (text) {
-    try {
-      payload = JSON.parse(text) as unknown;
-    } catch {
-      throw new Error('El servidor devolvió una respuesta inválida.');
-    }
-  }
-
-  if (!response.ok) {
-    let message = `No se pudo completar la solicitud (${response.status}).`;
-
-    if (
-      typeof payload === 'object' &&
-      payload !== null &&
-      'message' in payload
-    ) {
-      const serverMessage = payload.message;
-
-      if (typeof serverMessage === 'string') {
-        message = serverMessage;
-      } else if (
-        Array.isArray(serverMessage) &&
-        serverMessage.every((part) => typeof part === 'string')
-      ) {
-        message = serverMessage.join('. ');
-      }
-    }
-
-    const minimumStock =
-      typeof payload === 'object' &&
-      payload !== null &&
-      'minimumStock' in payload &&
-      typeof payload.minimumStock === 'number' &&
-      Number.isInteger(payload.minimumStock) &&
-      payload.minimumStock >= 0
-        ? payload.minimumStock
-        : undefined;
-
-    throw new OfferRequestError(message, response.status, minimumStock);
-  }
-
-  return payload as T;
-}
 export function MisOfertasPage() {
   const { usuario, token } = useAuth();
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -131,9 +63,10 @@ export function MisOfertasPage() {
   const [summary, setSummary] = useState<OfferDashboardSummary | null>(null);
   const [summaryError, setSummaryError] = useState('');
   const [filter, setFilter] = useState<OfferFilter>('TODAS');
+  const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
   const missingSession = usuario?.rol === 'COMERCIANTE' && !token;
 
-    function reloadOffers() {
+  function reloadOffers() {
     setLoading(true);
     setLoadingError('');
     setSummary(null);
@@ -191,86 +124,6 @@ export function MisOfertasPage() {
       active = false;
     };
   }, [token, usuario?.rol, reloadCount]);
-
-  async function handleUpdate(
-    event: FormEvent<HTMLFormElement>,
-    offer: Offer,
-  ) {
-    event.preventDefault();
-    setSaveError('');
-    setSuccessMessage('');
-
-    if (!token) {
-      setSaveError('Iniciá sesión para modificar una oferta.');
-      return;
-    }
-
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const precioLista = priceToCents(formData.get('precioLista'));
-    const precioBaseNeto = priceToCents(formData.get('precioBaseNeto'));
-
-    if (precioLista === null || precioBaseNeto === null) {
-      setSaveError('Ingresá precios válidos con hasta dos decimales.');
-      return;
-    }
-
-    if (precioLista <= 0n || precioBaseNeto <= 0n) {
-      setSaveError('Los precios deben ser mayores que cero.');
-      return;
-    }
-
-    const image = formData.get('imagen');
-
-    if (image instanceof File && image.size === 0) {
-      formData.delete('imagen');
-    } else if (image instanceof File) {
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-      const maxSize = 5 * 1024 * 1024;
-
-      if (!allowedTypes.includes(image.type)) {
-        setSaveError('Elegí una imagen JPEG, PNG o WebP.');
-        return;
-      }
-
-      if (image.size > maxSize) {
-        setSaveError('La imagen no puede superar los 5 MB.');
-        return;
-      }
-    }
-
-    setSavingId(offer.id);
-
-    try {
-      await requestOffers<Offer>(`/offers/${offer.id}`, token, {
-        method: 'PATCH',
-        body: formData,
-      });
-
-      setSuccessMessage('Oferta actualizada correctamente.');
-      reloadOffers();
-    } catch (error: unknown) {
-      if (error instanceof OfferRequestError) {
-        const stockInput = form.elements.namedItem('stock');
-
-        if (stockInput instanceof HTMLInputElement) {
-          if (error.status === 400 && error.minimumStock !== undefined) {
-            stockInput.value = String(error.minimumStock);
-          } else if (error.status === 503) {
-            stockInput.value = String(offer.stock);
-          }
-        }
-      }
-
-      setSaveError(
-        error instanceof Error
-          ? error.message
-          : 'No se pudo actualizar la oferta.',
-      );
-    } finally {
-      setSavingId(null);
-    }
-  }
 
   async function handleStatusChange(
     offer: Offer,
@@ -541,108 +394,60 @@ export function MisOfertasPage() {
                     </div>
 
                     {isEditable ? (
-                      <>
-                        <div
-                          className="offer-card__actions"
-                          aria-label={`Acciones de estado para ${offer.titulo}`}
+                      <div
+                        className="offer-card__actions"
+                        aria-label={`Acciones para ${offer.titulo}`}
+                      >
+                        <button
+                          className="chip chip--active"
+                          type="button"
+                          disabled={isSaving}
+                          onClick={() => {
+                            setSaveError('');
+                            setSuccessMessage('');
+                            setEditingOffer(offer);
+                          }}
                         >
-                          {offer.estado === 'ACTIVO' && (
-                            <button
-                              className="chip"
-                              type="button"
-                              disabled={isSaving}
-                              onClick={() =>
-                                void handleStatusChange(offer, 'PAUSADO')
-                              }
-                            >
-                              {isSaving ? 'Procesando…' : 'Pausar oferta'}
-                            </button>
-                          )}
+                          Editar oferta
+                        </button>
 
-                          {offer.estado === 'PAUSADO' && (
-                            <button
-                              className="chip"
-                              type="button"
-                              disabled={isSaving}
-                              onClick={() =>
-                                void handleStatusChange(offer, 'ACTIVO')
-                              }
-                            >
-                              {isSaving ? 'Procesando…' : 'Reactivar oferta'}
-                            </button>
-                          )}
-
+                        {offer.estado === 'ACTIVO' && (
                           <button
-                            className="chip chip--danger"
+                            className="chip"
                             type="button"
                             disabled={isSaving}
                             onClick={() =>
-                              void handleStatusChange(offer, 'ELIMINADO')
+                              void handleStatusChange(offer, 'PAUSADO')
                             }
                           >
-                            {isSaving ? 'Procesando…' : 'Dar de baja'}
+                            {isSaving ? 'Procesando…' : 'Pausar oferta'}
                           </button>
-                        </div>
+                        )}
 
-                        <form
-                          key={`${offer.id}-${offer.precioLista}-${offer.precioBaseNeto}-${offer.precioPublico}-${offer.stock}-${offer.imagen}`}
-                          className="offer-edit-form"
-                          onSubmit={(event) => void handleUpdate(event, offer)}
-                        >
-                          <label>
-                            Precio de lista
-                            <input
-                              name="precioLista"
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              defaultValue={offer.precioLista}
-                              required
-                            />
-                          </label>
-
-                          <label>
-                            Precio base neto a cobrar
-                            <input
-                              name="precioBaseNeto"
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              defaultValue={offer.precioBaseNeto}
-                              required
-                            />
-                          </label>
-
-                          <label>
-                            Stock
-                            <input
-                              name="stock"
-                              type="number"
-                              min="0"
-                              step="1"
-                              defaultValue={offer.stock}
-                              required
-                            />
-                          </label>
-
-                          <label>
-                            Cambiar imagen (opcional)
-                            <input
-                              name="imagen"
-                              type="file"
-                              accept="image/jpeg,image/png,image/webp"
-                            />
-                          </label>
-
+                        {offer.estado === 'PAUSADO' && (
                           <button
-                            className="chip chip--active"
-                            type="submit"
+                            className="chip"
+                            type="button"
                             disabled={isSaving}
+                            onClick={() =>
+                              void handleStatusChange(offer, 'ACTIVO')
+                            }
                           >
-                            {isSaving ? 'Guardando…' : 'Guardar cambios'}
+                            {isSaving ? 'Procesando…' : 'Reactivar oferta'}
                           </button>
-                        </form>
-                      </>
+                        )}
+
+                        <button
+                          className="chip chip--danger"
+                          type="button"
+                          disabled={isSaving}
+                          onClick={() =>
+                            void handleStatusChange(offer, 'ELIMINADO')
+                          }
+                        >
+                          {isSaving ? 'Procesando…' : 'Dar de baja'}
+                        </button>
+                      </div>
                     ) : (
                       <p>Esta oferta ya no puede modificarse.</p>
                     )}
@@ -653,6 +458,22 @@ export function MisOfertasPage() {
           </div>
         )}
       </section>
+
+      {editingOffer && (
+        <EditarOfertaModal
+          key={editingOffer.id}
+          offer={editingOffer}
+          opened
+          token={token ?? ''}
+          onClose={() => setEditingOffer(null)}
+          onSaved={() => {
+            setEditingOffer(null);
+            setSaveError('');
+            setSuccessMessage('Oferta actualizada correctamente.');
+            reloadOffers();
+          }}
+        />
+      )}
     </main>
   );
 }
