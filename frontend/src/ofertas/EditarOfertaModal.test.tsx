@@ -90,12 +90,8 @@ describe('EditarOfertaModal', () => {
   it('precarga los datos editables de la oferta', () => {
     renderModal();
 
-    expect(screen.getByLabelText('Precio de lista original')).toHaveValue(
-      '100.00',
-    );
-    expect(screen.getByLabelText('Precio base neto a cobrar')).toHaveValue(
-      '75.00',
-    );
+    expect(screen.getByLabelText('Precio de lista original')).toHaveValue(100);
+    expect(screen.getByLabelText('Precio base neto a cobrar')).toHaveValue(75);
     expect(screen.getByLabelText('Stock')).toHaveValue(5);
     expect(screen.getByLabelText('Fecha de vencimiento')).toHaveValue(
       '2099-12-31',

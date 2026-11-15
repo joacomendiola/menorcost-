@@ -306,6 +306,7 @@ export function EditarOfertaModal({
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
             <TextInput
               label="Precio de lista original"
+              aria-label="Precio de lista original"
               type="number"
               min="0.01"
               step="0.01"
@@ -323,6 +324,7 @@ export function EditarOfertaModal({
 
             <TextInput
               label="Precio base neto a cobrar"
+              aria-label="Precio base neto a cobrar"
               type="number"
               min="0.01"
               step="0.01"
@@ -341,6 +343,7 @@ export function EditarOfertaModal({
 
             <TextInput
               label="Stock"
+              aria-label="Stock"
               type="number"
               min={0}
               step={1}
@@ -357,6 +360,7 @@ export function EditarOfertaModal({
 
             <TextInput
               label="Fecha de vencimiento"
+              aria-label="Fecha de vencimiento"
               type="date"
               min={fechaMananaArgentina()}
               value={fechaVencimiento}
