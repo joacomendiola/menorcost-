@@ -24,6 +24,7 @@ export class CanastasService {
             idComercio: true,
             nombreFantasia: true,
             estado: true,
+            mercadoPagoVinculado: true,
           },
         },
         items: {
@@ -35,6 +36,11 @@ export class CanastasService {
                 imagen: true,
                 stock: true,
                 precioPublico: true,
+                // Datos congelados al publicar la oferta: D4 los usa para
+                // calcular el Split Payment sin recalcular comisiones.
+                precioBaseNeto: true,
+                comisionMenorcostTasaAplicada: true,
+                tasaMpEstimadaAplicada: true,
                 estado: true,
                 fechaVencimiento: true,
               },
@@ -74,7 +80,7 @@ export class CanastasService {
       }
     }
 
-    return this.serializarCanasta(canasta);
+    return this.serializarCanastaParaCheckout(canasta);
   }
 
   async obtenerTodas(usuarioId: string) {
@@ -588,6 +594,81 @@ export class CanastasService {
     }
 
     return this.serializarCanasta(canasta);
+  }
+
+  /**
+   * Serializador exclusivo del checkout. Expone, además del precio público,
+   * los datos congelados que D4 necesita para armar el Split Payment.
+   *
+   * Se mantiene separado de `serializarCanasta` a propósito: ese último lo
+   * comparten los endpoints públicos de canasta y el frontend, y no debe
+   * cambiar su contrato.
+   */
+  private serializarCanastaParaCheckout(canasta: {
+    idCanasta: string;
+    comercioId: string;
+    comercio: {
+      idComercio: string;
+      nombreFantasia: string;
+      estado: string;
+      mercadoPagoVinculado: boolean;
+    } | null;
+    items: Array<{
+      idCanastaItem: string;
+      productoId: string;
+      cantidad: number;
+      producto: {
+        idProducto: string;
+        titulo: string;
+        imagen: string;
+        stock: number;
+        precioPublico: unknown;
+        precioBaseNeto: unknown;
+        comisionMenorcostTasaAplicada: unknown;
+        tasaMpEstimadaAplicada: unknown;
+        estado: string;
+        fechaVencimiento: Date;
+      };
+    }>;
+  }) {
+    const items = canasta.items.map((item) => {
+      const precioUnitario = Number(item.producto.precioPublico);
+
+      return {
+        idCanastaItem: item.idCanastaItem,
+        productoId: item.productoId,
+        cantidad: item.cantidad,
+        precioUnitario: precioUnitario.toFixed(2),
+        subtotal: (precioUnitario * item.cantidad).toFixed(2),
+        producto: {
+          ...item.producto,
+          precioPublico: precioUnitario.toFixed(2),
+          precioBaseNeto: Number(item.producto.precioBaseNeto).toFixed(2),
+          comisionMenorcostTasaAplicada: Number(
+            item.producto.comisionMenorcostTasaAplicada,
+          ).toFixed(4),
+          tasaMpEstimadaAplicada: Number(
+            item.producto.tasaMpEstimadaAplicada,
+          ).toFixed(4),
+          fechaVencimiento: this.obtenerFechaProducto(
+            item.producto.fechaVencimiento,
+          ),
+        },
+      };
+    });
+
+    const subtotal = items.reduce(
+      (total, item) => total + Number(item.subtotal),
+      0,
+    );
+
+    return {
+      idCanasta: canasta.idCanasta,
+      comercioId: canasta.comercioId,
+      comercio: canasta.comercio,
+      subtotal: subtotal.toFixed(2),
+      items,
+    };
   }
 
   private serializarCanasta(canasta: {

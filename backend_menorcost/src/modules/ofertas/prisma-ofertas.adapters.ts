@@ -236,7 +236,10 @@ export class PrismaOfferRepositoryAdapter implements OfferRepository {
     userId: string,
     offerId: string,
     data: Partial<CalculatedOfferPrices> &
-      Pick<UpdateOfferDto, 'precioLista' | 'stock'> & {
+      Pick<
+        UpdateOfferDto,
+        'precioLista' | 'stock' | 'fechaVencimiento'
+      > & {
         imagen?: string;
       },
   ): Promise<OfferDetails | null> {
@@ -263,6 +266,13 @@ export class PrismaOfferRepositoryAdapter implements OfferRepository {
           }
         : {}),
       ...(data.stock !== undefined ? { stock: data.stock } : {}),
+      ...(data.fechaVencimiento !== undefined
+        ? {
+            fechaVencimiento: new Date(
+              `${data.fechaVencimiento}T00:00:00.000Z`,
+            ),
+          }
+        : {}),
       ...(data.imagen !== undefined ? { imagen: data.imagen } : {}),
     };
 

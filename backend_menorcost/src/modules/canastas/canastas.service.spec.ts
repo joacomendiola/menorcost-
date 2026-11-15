@@ -44,16 +44,27 @@ describe('CanastasService', () => {
     ],
   });
 
+  const productoParaCheckout = {
+    ...producto,
+    precioBaseNeto: '1000.00',
+    comisionMenorcostTasaAplicada: '0.1000',
+    tasaMpEstimadaAplicada: '0.0650',
+  };
+
   const canastaParaCheckout = (overrides: Record<string, unknown> = {}) => ({
     idCanasta: canastaId,
     comercioId,
-    comercio: { ...comercio, estado: 'HABILITADO' },
+    comercio: {
+      ...comercio,
+      estado: 'HABILITADO',
+      mercadoPagoVinculado: true,
+    },
     items: [
       {
         idCanastaItem: canastaItemId,
         productoId,
         cantidad: 2,
-        producto,
+        producto: productoParaCheckout,
       },
     ],
     ...overrides,
@@ -92,6 +103,12 @@ describe('CanastasService', () => {
 
     expect(resultado.items).toHaveLength(1);
     expect(resultado.items[0].cantidad).toBe(2);
+    expect(resultado.items[0].producto.precioBaseNeto).toBe('1000.00');
+    expect(
+      resultado.items[0].producto.comisionMenorcostTasaAplicada,
+    ).toBe('0.1000');
+    expect(resultado.items[0].producto.tasaMpEstimadaAplicada).toBe('0.0650');
+    expect(resultado.comercio?.mercadoPagoVinculado).toBe(true);
     expect(prisma.canasta.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { idCanasta: canastaId } }),
     );

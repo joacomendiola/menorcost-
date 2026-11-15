@@ -1,37 +1,26 @@
-# Nota: `Producto` no persiste `precioBaseNeto`
+# Contrato de precios entre el simulador y las ofertas
 
 ## Situación actual
 
-El precio base neto sí se persiste como **snapshot histórico del pedido**:
-
-```prisma
-model PedidoItem {
-  precioBaseNetoAplicado Decimal @map("precio_base_neto_aplicado") @db.Decimal(10, 2)
-}
-```
-
-Pero la oferta (`Producto`) solo guarda:
+`Producto` persiste los tres precios que produce el simulador:
 
 ```prisma
 precioLista      Decimal
-precioMenorcost  Decimal
+precioBaseNeto   Decimal
+precioPublico    Decimal
 ```
 
-No existe `Producto.precioBaseNeto`.
+Además guarda las tasas aplicadas (`comisionMenorcostTasaAplicada` y
+`tasaMpEstimadaAplicada`) como snapshot del cálculo.
 
-## Impacto
+## Contrato
 
-- **Alta de oferta:** funciona. El simulador recibe el base neto, calcula el precio público y el formulario envía `precioMenorcost = precioPublico` a `POST /offers`.
-- **Edición de oferta:** no se puede precargar el precio base neto porque no está asociado al producto. Tampoco conviene derivarlo desde `precioMenorcost`, porque el cálculo inverso con redondeos hacia arriba puede no devolver el valor original.
-- **Este sprint:** el simulador se integra únicamente en “Nueva oferta”. La edición queda fuera de alcance.
-
-## Si más adelante se necesita editar con simulador
-
-Agregar `precioBaseNeto` a `Producto` y actualizar:
-
-- `CreateOfferDto` y `UpdateOfferDto`.
-- El adaptador Prisma de ofertas.
-- La respuesta de `OfferDetails`.
-- El formulario de edición para precargar ese valor.
-
-Ese cambio corresponde coordinarlo con D3, dueño de la entidad `Producto`.
+- **Alta de oferta:** el simulador recibe `precioBaseNeto` y `precioLista`,
+  calcula el precio público y el formulario envía `precioBaseNeto` a
+  `POST /offers`. El backend vuelve a calcular las comisiones y el
+  `precioPublico`; no confía en montos precalculados por el frontend.
+- **Edición de oferta:** el formulario precarga `precioLista` y
+  `precioBaseNeto` desde la oferta, y muestra `precioPublico` como precio final
+  al público. El backend recalcula el público al guardar.
+- **Visualización:** el panel de ofertas usa `precioPublico` como precio
+  promocional y `precioLista` como precio original.

@@ -188,7 +188,7 @@ describe('ComerciosService.obtenerPublico', () => {
           idProducto: 'p1',
           titulo: 'Yogur',
           precioLista: '100',
-          precioMenorcost: '75',
+          precioPublico: '75',
         },
       ],
     });

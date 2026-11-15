@@ -361,6 +361,48 @@ describe('OffersService', () => {
     expect(repository.updateForOwner).not.toHaveBeenCalled();
   });
 
+  it('actualiza la fecha de vencimiento cuando es futura', async () => {
+    const update: UpdateOfferDto = { fechaVencimiento: '2099-01-31' };
+    const updatedOffer = {
+      ...offerDetails,
+      fechaVencimiento: '2099-01-31',
+    };
+
+    vi.mocked(repository.updateForOwner).mockResolvedValueOnce(updatedOffer);
+
+    await expect(
+      service.update('user-1', offerDetails.id, update),
+    ).resolves.toEqual(updatedOffer);
+
+    expect(repository.updateForOwner).toHaveBeenCalledWith(
+      'user-1',
+      offerDetails.id,
+      { fechaVencimiento: '2099-01-31' },
+    );
+    expect(simuladorPrecios.calcular).not.toHaveBeenCalled();
+    expect(reservations.getReservedUnitsForOffer).not.toHaveBeenCalled();
+  });
+
+  it('rechaza una fecha de vencimiento pasada', async () => {
+    await expect(
+      service.update('user-1', offerDetails.id, {
+        fechaVencimiento: '2020-01-01',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(repository.updateForOwner).not.toHaveBeenCalled();
+  });
+
+  it('rechaza una fecha de vencimiento inexistente', async () => {
+    await expect(
+      service.update('user-1', offerDetails.id, {
+        fechaVencimiento: '2099-02-30',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(repository.updateForOwner).not.toHaveBeenCalled();
+  });
+
   it('actualiza los campos permitidos de la oferta', async () => {
   const update: UpdateOfferDto = {
     precioBaseNeto: '70.00',

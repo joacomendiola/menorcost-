@@ -21,6 +21,10 @@ export class UpdateOfferDto {
   @Min(0)
   stock?: number;
 
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  fechaVencimiento?: string;
+
   // TODO CU 2.02: el servicio debe comprobar que el nuevo stock
   // no quede por debajo de las unidades reservadas en PENDIENTE_RETIRO.
   // El DTO solo valida formato y que el stock no sea negativo.

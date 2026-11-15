@@ -238,7 +238,7 @@ export function NewOfferForm({ token, comercioId, categorias }: Props) {
     data.set('fechaVencimiento', fechaVencimiento);
     data.set('stock', String(stockNumero));
     data.set('precioLista', precioLista);
-    data.set('precioMenorcost', simulacion.precioPublico);
+    data.set('precioBaseNeto', simulacion.precioBaseNeto);
     data.set('imagen', archivo);
 
     setSubmitting(true);

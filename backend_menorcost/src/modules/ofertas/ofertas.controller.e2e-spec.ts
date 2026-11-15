@@ -67,7 +67,7 @@ describe('Endpoints HTTP de ofertas', () => {
     fechaVencimiento: '2099-12-31',
     stock: 5,
     precioLista: '100.00',
-    precioMenorcost: '75.00',
+    precioBaseNeto: '75.00',
     imagen: '/uploads/test.png',
     estado: 'ACTIVO',
   };
@@ -146,7 +146,7 @@ describe('Endpoints HTTP de ofertas', () => {
       .field('fechaVencimiento', '2099-12-31')
       .field('stock', '5')
       .field('precioLista', '100.00')
-      .field('precioMenorcost', '75.00')
+      .field('precioBaseNeto', '75.00')
       .attach('imagen', png, {
         filename: 'producto.png',
         contentType: 'image/png',
@@ -167,7 +167,7 @@ describe('Endpoints HTTP de ofertas', () => {
       .field('fechaVencimiento', '2099-12-31')
       .field('stock', '5')
       .field('precioLista', '100.00')
-      .field('precioMenorcost', '75.00')
+      .field('precioBaseNeto', '75.00')
       .attach('imagen', png, {
         filename: 'producto.png',
         contentType: 'image/png',
@@ -198,7 +198,7 @@ describe('Endpoints HTTP de ofertas', () => {
       .field('fechaVencimiento', '2099-12-31')
       .field('stock', '5')
       .field('precioLista', '100.00')
-      .field('precioMenorcost', '75.00')
+      .field('precioBaseNeto', '75.00')
       .expect(400);
 
     expect(createOffer).not.toHaveBeenCalled();
@@ -215,7 +215,7 @@ describe('Endpoints HTTP de ofertas', () => {
       .field('fechaVencimiento', '2099-12-31')
       .field('stock', '5')
       .field('precioLista', '100.00')
-      .field('precioMenorcost', '75.00')
+      .field('precioBaseNeto', '75.00')
       .attach('imagen', Buffer.from('esto no es una imagen'), {
         filename: 'nota.txt',
         contentType: 'text/plain',
@@ -236,7 +236,7 @@ describe('Endpoints HTTP de ofertas', () => {
       .field('fechaVencimiento', '2099-12-31')
       .field('stock', '5')
       .field('precioLista', '100.00')
-      .field('precioMenorcost', '75.00')
+      .field('precioBaseNeto', '75.00')
       .attach('imagen', Buffer.from('esto no es una imagen real'), {
         filename: 'falso.png',
         contentType: 'image/png',
@@ -257,7 +257,7 @@ describe('Endpoints HTTP de ofertas', () => {
       .field('fechaVencimiento', '2099-12-31')
       .field('stock', '0')
       .field('precioLista', '100.00')
-      .field('precioMenorcost', '75.00')
+      .field('precioBaseNeto', '75.00')
       .attach('imagen', png, {
         filename: 'producto.png',
         contentType: 'image/png',
@@ -315,7 +315,7 @@ describe('Endpoints HTTP de ofertas', () => {
     await request(app.getHttpServer())
       .patch('/offers/no-es-un-uuid')
       .set('Authorization', TEST_AUTHORIZATION)
-      .field('precioMenorcost', '70.00')
+      .field('precioBaseNeto', '70.00')
       .expect(400);
 
     expect(updateOffer).not.toHaveBeenCalled();
@@ -325,7 +325,7 @@ describe('Endpoints HTTP de ofertas', () => {
     await request(app.getHttpServer())
       .patch(`/offers/${offerId}`)
       .set('Authorization', TEST_AUTHORIZATION)
-      .field('precioMenorcost', '70.999')
+      .field('precioBaseNeto', '70.999')
       .expect(400);
 
     expect(updateOffer).not.toHaveBeenCalled();
@@ -345,7 +345,7 @@ describe('Endpoints HTTP de ofertas', () => {
     await request(app.getHttpServer())
       .patch(`/offers/${offerId}`)
       .set('Authorization', TEST_AUTHORIZATION)
-      .field('precioMenorcost', '70.00')
+      .field('precioBaseNeto', '70.00')
       .attach('imagen', Buffer.from('no es una imagen'), {
         filename: 'nota.txt',
         contentType: 'text/plain',
@@ -368,14 +368,14 @@ describe('Endpoints HTTP de ofertas', () => {
     await request(app.getHttpServer())
       .patch(`/offers/${offerId}`)
       .set('Authorization', TEST_AUTHORIZATION)
-      .field('precioMenorcost', '70.00')
+      .field('precioBaseNeto', '70.00')
       .expect(200)
       .expect(offerDetails);
 
     expect(updateOffer).toHaveBeenCalledWith(
       'user-test',
       offerId,
-      expect.objectContaining({ precioMenorcost: '70.00' }),
+      expect.objectContaining({ precioBaseNeto: '70.00' }),
       undefined,
     );
   });
@@ -384,7 +384,7 @@ describe('Endpoints HTTP de ofertas', () => {
     await request(app.getHttpServer())
       .patch(`/offers/${offerId}`)
       .set('Authorization', TEST_AUTHORIZATION)
-      .field('precioMenorcost', '70.00')
+      .field('precioBaseNeto', '70.00')
       .attach('imagen', png, {
         filename: 'producto.png',
         contentType: 'image/png',
@@ -394,7 +394,7 @@ describe('Endpoints HTTP de ofertas', () => {
     expect(updateOffer).toHaveBeenCalledWith(
       'user-test',
       offerId,
-      expect.objectContaining({ precioMenorcost: '70.00' }),
+      expect.objectContaining({ precioBaseNeto: '70.00' }),
       expect.objectContaining({
         mimetype: 'image/png',
         buffer: expect.any(Buffer),
