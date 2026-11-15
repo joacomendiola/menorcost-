@@ -28,13 +28,6 @@ DROP INDEX "pedido_usuario_id_idx";
 -- AlterTable
 ALTER TABLE "canasta" DROP COLUMN "subtotal";
 
--- AlterTable
-ALTER TABLE "producto" DROP COLUMN "precio_menorcost",
-ADD COLUMN     "comision_menorcost_tasa_aplicada" DECIMAL(6,4) NOT NULL,
-ADD COLUMN     "precio_base_neto" DECIMAL(10,2) NOT NULL,
-ADD COLUMN     "precio_publico" DECIMAL(10,2) NOT NULL,
-ADD COLUMN     "tasa_mp_estimada_aplicada" DECIMAL(6,4) NOT NULL;
-
 -- CreateIndex
 CREATE INDEX "canasta_usuario_id_updated_at_idx" ON "canasta"("usuario_id", "updated_at");
 

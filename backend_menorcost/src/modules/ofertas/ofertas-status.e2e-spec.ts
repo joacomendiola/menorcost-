@@ -34,7 +34,7 @@ const offerDetails = {
   fechaVencimiento: '2099-12-31',
   stock: 5,
   precioLista: '100.00',
-  precioMenorcost: '75.00',
+  precioBaseNeto: '75.00',
   imagen: '/uploads/test.png',
   estado: 'PAUSADO',
 };

@@ -17,7 +17,8 @@ type Offer = {
   fechaVencimiento: string;
   stock: number;
   precioLista: string;
-  precioMenorcost: string;
+  precioBaseNeto: string;
+  precioPublico: string;
   imagen: string;
   estado: OfferStatus;
 };
@@ -244,22 +245,15 @@ export function MisOfertasPage() {
     const form = event.currentTarget;
     const formData = new FormData(form);
     const precioLista = priceToCents(formData.get('precioLista'));
-    const precioMenorcost = priceToCents(formData.get('precioMenorcost'));
+    const precioBaseNeto = priceToCents(formData.get('precioBaseNeto'));
 
-    if (precioLista === null || precioMenorcost === null) {
+    if (precioLista === null || precioBaseNeto === null) {
       setSaveError('Ingresá precios válidos con hasta dos decimales.');
       return;
     }
 
-    if (precioLista <= 0n || precioMenorcost <= 0n) {
+    if (precioLista <= 0n || precioBaseNeto <= 0n) {
       setSaveError('Los precios deben ser mayores que cero.');
-      return;
-    }
-
-    if (precioMenorcost >= precioLista) {
-      setSaveError(
-        'El precio promocional debe ser menor que el precio de lista.',
-      );
       return;
     }
 
@@ -574,8 +568,8 @@ export function MisOfertasPage() {
                         <strong>${offer.precioLista}</strong>
                       </p>
                       <p>
-                        <span>Precio promocional</span>
-                        <strong>${offer.precioMenorcost}</strong>
+                        <span>Precio final al público</span>
+                        <strong>${offer.precioPublico}</strong>
                       </p>
                       <p>
                         <span>Stock disponible</span>
@@ -628,7 +622,7 @@ export function MisOfertasPage() {
                         </div>
 
                         <form
-                          key={`${offer.id}-${offer.precioLista}-${offer.precioMenorcost}-${offer.stock}-${offer.imagen}`}
+                          key={`${offer.id}-${offer.precioLista}-${offer.precioBaseNeto}-${offer.precioPublico}-${offer.stock}-${offer.imagen}`}
                           className="offer-edit-form"
                           onSubmit={(event) => void handleUpdate(event, offer)}
                         >
@@ -645,13 +639,13 @@ export function MisOfertasPage() {
                           </label>
 
                           <label>
-                            Precio promocional
+                            Precio base neto a cobrar
                             <input
-                              name="precioMenorcost"
+                              name="precioBaseNeto"
                               type="number"
                               min="0.01"
                               step="0.01"
-                              defaultValue={offer.precioMenorcost}
+                              defaultValue={offer.precioBaseNeto}
                               required
                             />
                           </label>
