@@ -1,39 +1,16 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/contexto';
-
-type OfferStatus =
-  | 'ACTIVO'
-  | 'PAUSADO'
-  | 'VENCIDO_ELIMINADO'
-  | 'ELIMINADO';
-
-type Offer = {
-  id: string;
-  comercioId: string;
-  categoriaId: string;
-  titulo: string;
-  descripcion: string;
-  fechaVencimiento: string;
-  stock: number;
-  precioLista: string;
-  precioBaseNeto: string;
-  precioPublico: string;
-  imagen: string;
-  estado: OfferStatus;
-};
-
-type ManageableOfferStatus = 'ACTIVO' | 'PAUSADO' | 'ELIMINADO';
-
-type OfferDashboardSummary = {
-  total: number;
-  activas: number;
-  pausadas: number;
-  proximasAVencer: number;
-  vencidas: number;
-  sinStock: number;
-  unidadesReservadas: number;
-};
+import { EditarOfertaModal } from './EditarOfertaModal';
+import {
+  API_URL,
+  OfferRequestError,
+  requestOffers,
+  type ManageableOfferStatus,
+  type Offer,
+  type OfferDashboardSummary,
+  type OfferStatus,
+} from './ofertasApi';
 
 type OfferFilter =
   | 'TODAS'
@@ -41,20 +18,6 @@ type OfferFilter =
   | 'PAUSADO'
   | 'VENCIDO_ELIMINADO'
   | 'ELIMINADO';
-
-class OfferRequestError extends Error {
-  readonly status: number;
-  readonly minimumStock?: number;
-
-  constructor(message: string, status: number, minimumStock?: number) {
-    super(message);
-    this.name = 'OfferRequestError';
-    this.status = status;
-    this.minimumStock = minimumStock;
-  }
-}
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const statusLabels: Record<OfferStatus, string> = {
   ACTIVO: 'Activa',

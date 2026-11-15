@@ -1,6 +1,21 @@
 import { BadRequestException } from '@nestjs/common';
 import type { CreateOfferDto } from './dto/create-oferta.dto.js';
 
+export function validateFechaVencimiento(
+  fechaVencimiento: string,
+  now = new Date(),
+): void {
+  if (!isValidDateOnly(fechaVencimiento)) {
+    throw new BadRequestException('La fecha de caducidad no es válida');
+  }
+
+  if (fechaVencimiento <= todayInArgentina(now)) {
+    throw new BadRequestException(
+      'La fecha de caducidad debe ser posterior a la fecha actual',
+    );
+  }
+}
+
 export function validateOfferRules(
   offer: Pick<
     CreateOfferDto,
@@ -8,15 +23,7 @@ export function validateOfferRules(
   >,
   now = new Date(),
 ): void {
-  if (!isValidDateOnly(offer.fechaVencimiento)) {
-    throw new BadRequestException('La fecha de caducidad no es válida');
-  }
-
-  if (offer.fechaVencimiento <= todayInArgentina(now)) {
-    throw new BadRequestException(
-      'La fecha de caducidad debe ser posterior a la fecha actual',
-    );
-  }
+  validateFechaVencimiento(offer.fechaVencimiento, now);
 
   const listPrice = toCents(offer.precioLista);
   const basePrice = toCents(offer.precioBaseNeto);

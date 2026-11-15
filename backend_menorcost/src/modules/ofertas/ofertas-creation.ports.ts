@@ -82,7 +82,10 @@ export interface OfferRepository {
     userId: string,
     offerId: string,
     data: Partial<CalculatedOfferPrices> &
-      Pick<UpdateOfferDto, 'precioLista' | 'stock'> & {
+      Pick<
+        UpdateOfferDto,
+        'precioLista' | 'stock' | 'fechaVencimiento'
+      > & {
         imagen?: string;
       },
   ): Promise<OfferDetails | null>;

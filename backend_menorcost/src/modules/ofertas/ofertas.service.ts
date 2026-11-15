@@ -29,6 +29,7 @@ import type { UpdateOfferDto } from './dto/update-oferta.dto.js';
 import { ImageStorageService } from './image-store.service.js';
 import {
   todayInArgentina,
+  validateFechaVencimiento,
   validateOfferRules,
   validatePublicPrice,
 } from './ofertas-rules.js';
@@ -166,11 +167,16 @@ export class OffersService {
       dto.precioLista === undefined &&
       dto.precioBaseNeto === undefined &&
       dto.stock === undefined &&
+      dto.fechaVencimiento === undefined &&
       image === undefined
     ) {
       throw new BadRequestException(
         'Debes indicar al menos un dato para modificar',
       );
+    }
+
+    if (dto.fechaVencimiento !== undefined) {
+      validateFechaVencimiento(dto.fechaVencimiento);
     }
 
     const cambiaPrecio =
@@ -229,6 +235,9 @@ export class OffersService {
           ? { precioLista: dto.precioLista }
           : {}),
         ...(dto.stock !== undefined ? { stock: dto.stock } : {}),
+        ...(dto.fechaVencimiento !== undefined
+          ? { fechaVencimiento: dto.fechaVencimiento }
+          : {}),
         ...preciosCalculados,
         ...(newImageUrl ? { imagen: newImageUrl } : {}),
       });
