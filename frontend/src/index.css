@@ -668,22 +668,6 @@ h3 {
   overflow: hidden;
 }
 
-.leaflet-container {
-  height: 240px;
-  width: 100%;
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  background: #eceff2;
-}
-
-.leaflet-tile {
-  filter: saturate(0.6) brightness(1.05);
-}
-
-.map-pin {
-  background: transparent;
-  border: none;
-}
-
 /* ===== MERCHANT HEADER ===== */
 .merchant-header {
   display: flex;

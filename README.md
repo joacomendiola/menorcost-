@@ -90,10 +90,10 @@ Crea un archivo `frontend/.env.local` para conectar React con NestJS y configura
 
 ```env
 VITE_API_URL=http://localhost:3000
-VITE_CARTO_BASEMAP_API_KEY=cb1_58if_1_17b97274313cfc1418ddc767
+VITE_GOOGLE_MAPS_API_KEY=tu_clave_de_google_maps
 ```
 
-La clave de CARTO se solicita en [CARTO Basemaps](https://www.carto.com/basemaps/apikey/index.html). Se usa para cargar los tiles del mapa de inicio y exploración. Vite expone las variables `VITE_*` al navegador; restringí la clave a los dominios de la aplicación desde CARTO y no la publiques en el repositorio. `frontend/.env.local` está excluido de Git.
+La clave de Google Maps se solicita en [Google Maps Platform](https://developers.google.com/maps/get-started). Se usa para cargar los mapas de inicio, exploración, ubicación y comercios. Vite expone las variables `VITE_*` al navegador; restringí la clave a los dominios de la aplicación desde Google Cloud y no la publiques en el repositorio. `frontend/.env.local` está excluido de Git.
 
 Después de crear o modificar este archivo, reiniciá el frontend (`npm run dev` dentro de `/frontend`) para que Vite vuelva a cargar las variables.
 
