@@ -184,6 +184,39 @@ Contraseña: Password123
 
 La notificación puede consultarse desde la campana del panel del comerciante.
 
+
+### Datos de prueba del backoffice
+
+Además de la seed general, el backend incluye una seed específica para probar el panel de administración: altas de comercios, solicitudes de baja y denuncias.
+
+Desde la carpeta del backend:
+
+```powershell
+cd backend_menorcost
+npm run seed
+npm run seed:backoffice
+```
+
+La seed de backoffice es idempotente: vuelve a crear únicamente sus datos de prueba y no modifica el resto de la base. Requiere que `npm run seed` se haya ejecutado antes. Para restaurar los datos a su estado inicial, volvé a ejecutar `npm run seed:backoffice`.
+
+Datos que genera:
+
+- 2 altas pendientes, 1 rechazada y 2 aprobadas.
+- 3 bajas pendientes (una bloqueada por un pedido en curso), 1 aprobada y 1 rechazada.
+- 7 denuncias: 5 abiertas, 1 resuelta y 1 desestimada.
+- 16 usuarios de prueba.
+
+Credenciales:
+
+```text
+Administrador: admin@test.com / Password123
+Usuarios de backoffice: bo.*@test.com / Password123
+```
+
+Los usuarios de backoffice usan correos ficticios `@test.com`; no son cuentas de Gmail. El detalle de cada usuario y sus datos asociados está en `backend_menorcost/prisma/seed-backoffice.ts`.
+
+Estos datos son solo para desarrollo local.
+
 ---
 
 ## 🌿 Flujo de Trabajo en Git para el Equipo
