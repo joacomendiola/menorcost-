@@ -131,6 +131,14 @@ export class BajaService {
             },
           },
         },
+        resueltoPor: {
+          select: {
+            id: true,
+            nombre: true,
+            apellido: true,
+            email: true,
+          },
+        },
       },
     });
 

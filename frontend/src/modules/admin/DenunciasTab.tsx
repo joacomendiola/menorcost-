@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Button } from '@mantine/core';
+import { Button, Radio } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
   adminApi,
   type AdminDenuncia,
   type AdminNotificacion,
+  type AlcanceSancion,
   type EstadoUsuario,
 } from '../../api';
 import { useAuth } from '../../auth/contexto';
@@ -96,6 +97,8 @@ export function DenunciasTab() {
 
   const [procesando, setProcesando] = useState<number | null>(null);
   const [sancionando, setSancionando] = useState<AdminDenuncia | null>(null);
+  const [alcanceSancion, setAlcanceSancion] =
+    useState<AlcanceSancion>('CUENTA');
   const [desestimando, setDesestimando] = useState<AdminDenuncia | null>(null);
   const [rehabilitando, setRehabilitando] = useState<AdminDenuncia | null>(null);
   const [resultado, setResultado] = useState<{ tone: 'ok' | 'warn'; texto: string } | null>(null);
@@ -143,28 +146,47 @@ export function DenunciasTab() {
         });
         setRehabilitando(null);
       } else {
-        const resp = await adminApi.sancionarDenuncia(token, d.id_reporte);
-        const cierre =
-          resp.denunciasCerradas > 0
-            ? ` También se cerraron ${resp.denunciasCerradas} denuncia(s) abierta(s) del mismo usuario.`
-            : '';
+        const resp = await adminApi.sancionarDenuncia(
+          token,
+          d.id_reporte,
+          alcanceSancion,
+        );
         const correosOk =
           resp.notificacion.enviada && resp.notificacionEmisor.enviada;
         const avisos = [resp.notificacion.aviso, resp.notificacionEmisor.aviso]
           .filter(Boolean)
           .join(' ');
 
-        setResultado(
-          correosOk
-            ? {
-                tone: 'ok',
-                texto: `La cuenta de ${objetivo} pasó a SUSPENDIDO y se notificó a ambas partes por correo.${cierre}`,
-              }
-            : {
-                tone: 'warn',
-                texto: `${objetivo} fue suspendido. ${avisos || 'No se pudo enviar uno de los correos.'}${cierre}`,
-              },
-        );
+        if (alcanceSancion === 'PUBLICACION') {
+          setResultado(
+            correosOk
+              ? {
+                  tone: 'ok',
+                  texto: `Denuncia #${d.id_reporte} resuelta. Se dieron de baja ${resp.productosEliminados ?? 0} publicación(es) del pedido reportado.`,
+                }
+              : {
+                  tone: 'warn',
+                  texto: `La publicación reportada fue dada de baja. ${avisos || 'No se pudo enviar uno de los correos.'}`,
+                },
+          );
+        } else {
+          const cerradas = resp.denunciasCerradas ?? 0;
+          const cierre =
+            cerradas > 0
+              ? ` También se cerraron ${cerradas} denuncia(s) abierta(s) del mismo usuario.`
+              : '';
+          setResultado(
+            correosOk
+              ? {
+                  tone: 'ok',
+                  texto: `La cuenta de ${objetivo} pasó a SUSPENDIDO y se notificó a ambas partes por correo.${cierre}`,
+                }
+              : {
+                  tone: 'warn',
+                  texto: `${objetivo} fue suspendido. ${avisos || 'No se pudo enviar uno de los correos.'}${cierre}`,
+                },
+          );
+        }
         setSancionando(null);
       }
       refrescarKpis();
@@ -286,6 +308,14 @@ export function DenunciasTab() {
                       ...(d.admin
                         ? [{ label: 'Resuelta por', value: nombreCompleto(d.admin) }]
                         : []),
+                      ...(d.fecha_resolucion
+                        ? [
+                            {
+                              label: 'Fecha de resolución',
+                              value: formatFechaLarga(d.fecha_resolucion),
+                            },
+                          ]
+                        : []),
                     ]}
                   />
                 }
@@ -325,7 +355,10 @@ export function DenunciasTab() {
                             color="red"
                             className="btn-danger btn-compact"
                             disabled={bloqueado}
-                            onClick={() => setSancionando(d)}
+                            onClick={() => {
+                              setAlcanceSancion('CUENTA');
+                              setSancionando(d);
+                            }}
                           >
                             Sancionar
                           </Button>
@@ -368,16 +401,58 @@ export function DenunciasTab() {
       <ConfirmDialog
         open={sancionando !== null}
         danger
-        title="Sancionar cuenta"
-        confirmLabel="Suspender cuenta"
+        title={
+          alcanceSancion === 'PUBLICACION'
+            ? 'Dar de baja publicación'
+            : 'Sancionar cuenta'
+        }
+        confirmLabel={
+          alcanceSancion === 'PUBLICACION'
+            ? 'Dar de baja publicación'
+            : 'Suspender cuenta'
+        }
         loading={procesando !== null}
         onClose={() => setSancionando(null)}
         onConfirm={() => sancionando && void ejecutar(sancionando, 'sancionar')}
       >
-        La cuenta de <strong>{sancionando ? nombreCompleto(sancionando.denunciado) : ''}</strong>{' '}
-        pasará a <strong>SUSPENDIDO</strong>, se cerrarán sus sesiones y se notificará a ambas
-        partes por correo. También se cerrarán las demás denuncias abiertas del mismo usuario. La
-        resolución del conflicto es externa: el sistema solo actualiza el estado.
+        {sancionando?.tipo_destino === 'COMERCIO' && (
+          <div style={{ marginBottom: 12 }}>
+            <Radio.Group
+              value={alcanceSancion}
+              onChange={(value) =>
+                setAlcanceSancion(value as AlcanceSancion)
+              }
+            >
+              <Radio value="CUENTA" label="Suspender la cuenta" />
+              <Radio
+                value="PUBLICACION"
+                label="Dar de baja la publicación reportada"
+              />
+            </Radio.Group>
+          </div>
+        )}
+        {alcanceSancion === 'PUBLICACION' ? (
+          <>
+            La denuncia <strong>#{sancionando?.id_reporte ?? ''}</strong> se
+            marcará como <strong>RESUELTA</strong> y se darán de baja las
+            publicaciones del pedido reportado (estado{' '}
+            <strong>ELIMINADO</strong>). La cuenta de{' '}
+            <strong>
+              {sancionando ? nombreCompleto(sancionando.denunciado) : ''}
+            </strong>{' '}
+            no se suspende. Se notificará a ambas partes por correo.
+          </>
+        ) : (
+          <>
+            La cuenta de{' '}
+            <strong>
+              {sancionando ? nombreCompleto(sancionando.denunciado) : ''}
+            </strong>{' '}
+            pasará a <strong>SUSPENDIDO</strong>, se cerrarán sus sesiones y se
+            notificará a ambas partes por correo. También se cerrarán las demás
+            denuncias abiertas del mismo usuario.
+          </>
+        )}
       </ConfirmDialog>
 
       <ConfirmDialog

@@ -129,6 +129,9 @@ interface ComercioSeed {
   logoUrl: string;
   abierto: boolean;
   estado: EstadoComercio;
+  resueltoPorId?: string | null;
+  resueltoEn?: Date | null;
+  motivoRechazo?: string | null;
   mercadoPagoVinculado: boolean;
   reputacionPromedio: number;
   totalCalificaciones: number;
@@ -472,6 +475,9 @@ const comercios: ComercioSeed[] = [
     logoUrl: '/uploads/logo-test.png',
     abierto: false,
     estado: 'DOCUMENTACION_RECHAZADA',
+    resueltoEn: fecha(-7),
+    motivoRechazo:
+      'La constancia de CUIT no coincide con la razón social declarada.',
     mercadoPagoVinculado: false,
     reputacionPromedio: 0,
     totalCalificaciones: 0,
@@ -495,6 +501,8 @@ const comercios: ComercioSeed[] = [
     logoUrl: '/uploads/logo-test.png',
     abierto: true,
     estado: 'HABILITADO',
+    resueltoEn: fecha(-18),
+    motivoRechazo: null,
     mercadoPagoVinculado: true,
     reputacionPromedio: 4.8,
     totalCalificaciones: 25,
@@ -518,6 +526,8 @@ const comercios: ComercioSeed[] = [
     logoUrl: '/uploads/logo-test.png',
     abierto: true,
     estado: 'HABILITADO',
+    resueltoEn: fecha(-40),
+    motivoRechazo: null,
     mercadoPagoVinculado: true,
     reputacionPromedio: 4.2,
     totalCalificaciones: 8,
@@ -1170,9 +1180,17 @@ async function crearDirecciones(prisma: PrismaClient): Promise<void> {
   }
 }
 
-async function crearComercios(prisma: PrismaClient): Promise<void> {
+async function crearComercios(
+  prisma: PrismaClient,
+  adminId: string,
+): Promise<void> {
   for (const comercio of comercios) {
-    await prisma.comercio.create({ data: comercio });
+    await prisma.comercio.create({
+      data: {
+        ...comercio,
+        resueltoPorId: comercio.resueltoEn ? adminId : null,
+      },
+    });
   }
 }
 
@@ -1397,7 +1415,7 @@ async function main(): Promise<void> {
     await limpiarSeed(prisma);
     await crearUsuarios(prisma, passwordHash);
     await crearDirecciones(prisma);
-    await crearComercios(prisma);
+    await crearComercios(prisma, admin.id);
     await crearProductos(prisma, categorias);
     await crearPedidos(prisma);
     await crearPedidoBloqueado(prisma, productoDemo);

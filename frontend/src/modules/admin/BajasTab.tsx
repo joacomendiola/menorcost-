@@ -138,7 +138,7 @@ export function BajasTab() {
                         label: 'Saldo de tarifas',
                         value:
                           baja.saldoTarifas === 0
-                            ? 'No disponible'
+                            ? `${formatPesos(0)} (sin deudas)`
                             : formatPesos(baja.saldoTarifas),
                       },
                       ...(u.comercio
@@ -153,6 +153,14 @@ export function BajasTab() {
                       },
                       ...(baja.resueltoEn
                         ? [{ label: 'Resuelta', value: formatFechaCorta(baja.resueltoEn) }]
+                        : []),
+                      ...(baja.resueltoPor
+                        ? [
+                            {
+                              label: 'Resuelta por',
+                              value: `${nombreCompleto(baja.resueltoPor)} (${baja.resueltoPor.email})`,
+                            },
+                          ]
                         : []),
                       ...(baja.observaciones
                         ? [{ label: 'Observaciones', value: baja.observaciones }]
