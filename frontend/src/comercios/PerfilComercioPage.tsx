@@ -15,6 +15,7 @@ import { ApiError } from '../api';
 import { useAuth } from '../auth/contexto';
 import { BuscadorComercio } from './BuscadorComercio';
 import { MapaComercio } from './MapaComercio';
+import { MercadoPagoBoton } from './MercadoPagoBoton';
 import {
   comerciosApi,
   resolverImagen,
@@ -488,11 +489,6 @@ export function PerfilComercioPage() {
               </Button>
             )}
           </div>
-          <span className="muted">
-            {comercio.mercadoPagoVinculado
-              ? 'Mercado Pago vinculado'
-              : 'Mercado Pago sin vincular'}
-          </span>
         </div>
       </div>
 

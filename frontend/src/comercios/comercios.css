@@ -221,6 +221,29 @@
   }
 }
 
+/* Cobros con Mercado Pago (CU-1.09) */
+.comercio-mp {
+  margin-left: auto;
+  align-self: center;
+  max-width: 340px;
+}
+
+@media (max-width: 560px) {
+  .comercio-mp {
+    margin-left: 0;
+    align-self: stretch;
+    max-width: none;
+  }
+
+  .comercio-mp .mantine-Stack-root {
+    align-items: flex-start;
+  }
+
+  .comercio-mp .mantine-Text-root {
+    text-align: left;
+  }
+}
+
 .chip--disabled {
   opacity: 0.6;
   cursor: not-allowed;

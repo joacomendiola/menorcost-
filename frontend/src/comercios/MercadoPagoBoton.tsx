@@ -67,6 +67,15 @@ const AVISOS: Record<string, Aviso> = {
   },
 };
 
+function resolverAviso(
+  resultado: string | null,
+  motivo: string | null,
+): Aviso | null {
+  if (!resultado) return null;
+  const clave = resultado === 'ok' ? 'ok' : (motivo ?? resultado);
+  return AVISOS[clave] ?? AVISOS.error_interno;
+}
+
 export function MercadoPagoBoton({
   token,
   vinculado,
@@ -74,23 +83,23 @@ export function MercadoPagoBoton({
   onCambio,
 }: Props) {
   const [params, setParams] = useSearchParams();
-  const [aviso, setAviso] = useState<Aviso | null>(null);
+  const resultado = params.get('mp');
+  const motivo = params.get('motivo');
+  const [aviso, setAviso] = useState<Aviso | null>(() =>
+    resolverAviso(resultado, motivo),
+  );
   const [conectando, setConectando] = useState(false);
   const [desconectando, setDesconectando] = useState(false);
   const cambioRef = useRef(onCambio);
-  cambioRef.current = onCambio;
 
-  const resultado = params.get('mp');
-  const motivo = params.get('motivo');
+  useEffect(() => {
+    cambioRef.current = onCambio;
+  }, [onCambio]);
 
   useEffect(() => {
     if (!resultado) return;
 
-    const clave =
-      resultado === 'ok' ? 'ok' : (motivo ?? resultado);
-    const mensaje = AVISOS[clave] ?? AVISOS.error_interno;
-
-    setAviso(mensaje);
+    const mensaje = resolverAviso(resultado, motivo) ?? AVISOS.error_interno;
     notifications.show({ color: mensaje.color, message: mensaje.texto });
 
     if (resultado === 'ok') {
