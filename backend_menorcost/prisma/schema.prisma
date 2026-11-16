@@ -503,6 +503,10 @@ model CredencialMp {
   email                String?            @db.VarChar(255)
   accessToken          String             @map("access_token") @db.Text
   refreshToken         String             @map("refresh_token") @db.Text
+  // Permisos otorgados por Mercado Pago. Sin "offline_access" no se puede refrescar.
+  scope                String?            @db.VarChar(200)
+  // true = credencial de producción; false = sandbox de Mercado Pago.
+  liveMode             Boolean?           @map("live_mode")
   fechaTokenExpiration DateTime           @map("fecha_token_expiration")
   fechaVinculacion     DateTime           @default(now()) @map("fecha_vinculacion")
   estado               EstadoCredencialMp @default(ACTIVA)
@@ -510,8 +514,25 @@ model CredencialMp {
   updatedAt            DateTime           @updatedAt @map("updated_at")
 
   comercio Comercio @relation(fields: [comercioId], references: [idComercio], onDelete: Cascade)
+  splits   SplitPago[]
 
   @@map("credenciales_mp")
+}
+
+// Estado efímero del flujo OAuth: guarda el nonce (un solo uso) y el
+// code_verifier de PKCE. Sin relaciones a propósito para no tocar modelos ajenos.
+model MpOauthState {
+  id           String    @id @default(uuid()) @db.Uuid
+  nonce        String    @unique @db.VarChar(64)
+  usuarioId    String    @map("usuario_id") @db.Uuid
+  comercioId   String    @map("id_comercio") @db.Uuid
+  codeVerifier String?   @map("code_verifier") @db.VarChar(128)
+  expiraEn     DateTime  @map("expira_en")
+  usadoEn      DateTime? @map("usado_en")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([expiraEn])
+  @@map("mp_oauth_state")
 }
 
 model Pago {
@@ -541,13 +562,17 @@ model SplitPago {
   recipientType     TipoSplit @map("recipient_type")
   // Para COMERCIO se guarda el id del comercio; para MARKETPLACE puede quedar null.
   destinatarioId    String?   @map("destinatario_id") @db.Uuid
+  // Credencial de Mercado Pago con la que se cobró esta parte del split.
+  credencialId      String?   @map("id_credencial") @db.Uuid
   monto             Decimal   @db.Decimal(10, 2)
   moneda            String    @default("ARS") @db.VarChar(3)
   fechaHoraRegistro DateTime  @default(now()) @map("fecha_hora_registro")
 
-  pago Pago @relation(fields: [pagoId], references: [idPago], onDelete: Cascade)
+  pago       Pago         @relation(fields: [pagoId], references: [idPago], onDelete: Cascade)
+  credencial CredencialMp? @relation(fields: [credencialId], references: [idCredencial], onDelete: SetNull)
 
   @@unique([pagoId, recipientType])
   @@index([pagoId])
+  @@index([credencialId])
   @@map("splits_pagos")
 }
