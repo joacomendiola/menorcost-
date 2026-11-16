@@ -6,6 +6,7 @@ export type MotivoOauth =
   | 'cuenta_mp_en_uso'
   | 'ya_vinculado'
   | 'comercio_no_habilitado'
+  | 'usuario_no_habilitado'
   | 'sin_comercio'
   | 'error_interno';
 
