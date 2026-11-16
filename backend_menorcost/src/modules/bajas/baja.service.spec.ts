@@ -160,6 +160,20 @@ describe('BajaService.listarSolicitudes', () => {
       'u1',
       'u2',
     ]);
+    expect(prismaMock.solicitudBaja.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          resueltoPor: {
+            select: {
+              id: true,
+              nombre: true,
+              apellido: true,
+              email: true,
+            },
+          },
+        }),
+      }),
+    );
     expect(resultado[0]).toMatchObject({
       pedidosCompletados: 4,
       saldoTarifas: 0,

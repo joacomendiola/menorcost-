@@ -65,6 +65,12 @@ vi.mock('./useAdminList', () => {
           updatedAt: '2026-01-01T00:00:00.000Z',
           pedidosCompletados: 3,
           saldoTarifas: 0,
+          resueltoPor: {
+            id: 'admin-1',
+            nombre: 'Admin',
+            apellido: 'Uno',
+            email: 'admin@example.com',
+          },
           usuario,
         },
       ],
@@ -161,14 +167,25 @@ beforeEach(() => {
 });
 
 describe('BajasTab', () => {
-  it('muestra que el saldo no está disponible en lugar de afirmar que es cero', () => {
+  it('muestra el saldo cero como sin deudas', () => {
     render(
       <MantineProvider>
         <BajasTab />
       </MantineProvider>,
     );
 
-    expect(screen.getByText('No disponible')).toBeTruthy();
+    expect(screen.getByText('$0 (sin deudas)')).toBeTruthy();
+  });
+
+  it('muestra el administrador que resolvió la baja', () => {
+    render(
+      <MantineProvider>
+        <BajasTab />
+      </MantineProvider>,
+    );
+
+    expect(screen.getByText('Resuelta por')).toBeTruthy();
+    expect(screen.getByText('Admin Uno (admin@example.com)')).toBeTruthy();
   });
 
   it('aprueba una baja y refresca los indicadores', async () => {
