@@ -1,4 +1,4 @@
-import { Alert, Button, Loader, Stack, Text } from '@mantine/core';
+import { Button, Loader, Stack, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -21,7 +21,7 @@ const AVISOS: Record<string, Aviso> = {
   ok: {
     color: 'green',
     texto:
-      '¡Listo! Tu cuenta de Mercado Pago quedó vinculada. Ya podés publicar ofertas y cobrar con Split Payment.',
+      '¡Listo! Tu cuenta de Mercado Pago quedó vinculada. Ya podés recibir pagos por Mercado Pago.',
   },
   cancelado: { color: 'yellow', texto: AVISO_CANCELADO },
   state_invalido: {
@@ -85,22 +85,33 @@ export function MercadoPagoBoton({
   const [params, setParams] = useSearchParams();
   const resultado = params.get('mp');
   const motivo = params.get('motivo');
-  const [aviso, setAviso] = useState<Aviso | null>(() =>
-    resolverAviso(resultado, motivo),
-  );
   const [conectando, setConectando] = useState(false);
   const [desconectando, setDesconectando] = useState(false);
   const cambioRef = useRef(onCambio);
+  const avisoMostrado = useRef<string | null>(null);
 
   useEffect(() => {
     cambioRef.current = onCambio;
   }, [onCambio]);
 
   useEffect(() => {
-    if (!resultado) return;
+    if (!resultado) {
+      avisoMostrado.current = null;
+      return;
+    }
+
+    const clave = `${resultado}|${motivo ?? ''}`;
+
+    // StrictMode vuelve a ejecutar los efectos en desarrollo: mostramos un solo aviso.
+    if (avisoMostrado.current === clave) return;
+    avisoMostrado.current = clave;
 
     const mensaje = resolverAviso(resultado, motivo) ?? AVISOS.error_interno;
-    notifications.show({ color: mensaje.color, message: mensaje.texto });
+    notifications.show({
+      color: mensaje.color,
+      title: 'Mercado Pago',
+      message: mensaje.texto,
+    });
 
     if (resultado === 'ok') {
       cambioRef.current();
@@ -120,8 +131,11 @@ export function MercadoPagoBoton({
         error instanceof ApiError
           ? error.message
           : 'No pudimos iniciar la vinculación con Mercado Pago.';
-      setAviso({ color: 'red', texto: mensaje });
-      notifications.show({ color: 'red', message: mensaje });
+      notifications.show({
+        color: 'red',
+        title: 'Mercado Pago',
+        message: mensaje,
+      });
       setConectando(false);
     }
   }
@@ -131,15 +145,16 @@ export function MercadoPagoBoton({
 
     try {
       await mercadoPagoApi.desconectar(token);
-      setAviso(null);
       notifications.show({
         color: 'green',
+        title: 'Mercado Pago',
         message: 'Desvinculaste tu cuenta de Mercado Pago.',
       });
       onCambio();
     } catch (error) {
       notifications.show({
         color: 'red',
+        title: 'Mercado Pago',
         message:
           error instanceof ApiError
             ? error.message
@@ -174,12 +189,6 @@ export function MercadoPagoBoton({
           </Text>
         )}
       </Stack>
-
-      {aviso && (
-        <Alert color={aviso.color} variant="light" mt="sm" title="Mercado Pago">
-          {aviso.texto}
-        </Alert>
-      )}
     </div>
   );
 }
