@@ -8,6 +8,7 @@ import { CanastasModule } from './modules/canastas/canastas.module.js';
 import { CatalogoModule } from './modules/catalogo/catalogo.module.js';
 import { ComerciosModule } from './modules/comercios/comercios.module.js';
 import { DireccionesModule } from './modules/direcciones/direcciones.module.js';
+import { MercadoPagoModule } from './modules/mercado-pago/mercado-pago.module.js';
 import { NotificacionesModule } from './modules/notificaciones/notificaciones.module.js';
 import { OffersModule } from './modules/ofertas/ofertas.module.js';
 import { PlacesModule } from './modules/places/places.module.js';
@@ -36,6 +37,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     SimuladorPreciosModule,
     CanastasModule,
     CatalogoModule,
+    MercadoPagoModule,
   ],
 })
 export class AppModule {}
