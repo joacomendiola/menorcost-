@@ -80,10 +80,10 @@ export class MercadoPagoClient {
       respuesta = await fetch(URL_TOKEN, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
           Accept: 'application/json',
         },
-        body: JSON.stringify(cuerpo),
+        body: new URLSearchParams(cuerpo).toString(),
         signal: AbortSignal.timeout(this.config.timeoutMs()),
       });
     } catch {
@@ -105,9 +105,11 @@ export class MercadoPagoClient {
     }
 
     if (!respuesta.ok) {
-      // No se loguea el cuerpo: puede contener datos del comerciante.
+      // No se loguea el cuerpo completo: puede contener datos del comerciante.
+      // El `message` de MP describe el motivo del rechazo y no incluye tokens.
+      const detalle = datos.message ? `: ${datos.message}` : '';
       this.logger.warn(
-        `Mercado Pago rechazó el intercambio (HTTP ${respuesta.status}, error ${datos.error ?? 'desconocido'})`,
+        `Mercado Pago rechazó el intercambio (HTTP ${respuesta.status}, error ${datos.error ?? 'desconocido'}${detalle})`,
       );
       throw this.traducirError(respuesta.status, datos.error);
     }
