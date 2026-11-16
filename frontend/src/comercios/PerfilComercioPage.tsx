@@ -441,6 +441,14 @@ export function PerfilComercioPage() {
               </span>
             </div>
           </div>
+          {token && (
+            <MercadoPagoBoton
+              token={token}
+              vinculado={comercio.mercadoPagoVinculado}
+              habilitado={comercio.estado === 'HABILITADO'}
+              onCambio={() => setRecargar((valor) => valor + 1)}
+            />
+          )}
         </div>
       </div>
 

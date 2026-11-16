@@ -233,6 +233,28 @@ async function pedir<T>(
   return data as T;
 }
 
+export interface EstadoMercadoPago {
+  vinculado: boolean;
+  estadoCredencial: 'ACTIVA' | 'REVOCADA' | 'EXPIRADA' | null;
+  fechaVinculacion: string | null;
+  scope: string | null;
+  liveMode: boolean | null;
+}
+
+export const mercadoPagoApi = {
+  urlAutorizacion: (token: string) =>
+    pedir<{ url: string }>('/mercadopago/oauth/url', { token }),
+
+  estado: (token: string) =>
+    pedir<EstadoMercadoPago>('/mercadopago/status', { token }),
+
+  desconectar: (token: string) =>
+    pedir<{ mercadoPagoVinculado: boolean }>('/mercadopago/oauth/disconnect', {
+      method: 'POST',
+      token,
+    }),
+};
+
 export const comerciosApi = {
   tienda: (id: string) =>
     pedir<TiendaPublica>(`/comercios/publicos/${encodeURIComponent(id)}`),
