@@ -504,7 +504,8 @@ model CredencialMp {
   accessToken          String             @map("access_token") @db.Text
   refreshToken         String             @map("refresh_token") @db.Text
   // Permisos otorgados por Mercado Pago. Sin "offline_access" no se puede refrescar.
-  scope                String?            @db.VarChar(200)
+  // Text porque MP puede devolver una lista larga y variable de scopes.
+  scope                String?            @db.Text
   // true = credencial de producción; false = sandbox de Mercado Pago.
   liveMode             Boolean?           @map("live_mode")
   fechaTokenExpiration DateTime           @map("fecha_token_expiration")

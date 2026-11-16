@@ -173,9 +173,16 @@ export class MercadoPagoService {
         );
       }
 
+      const detalle =
+        error instanceof Prisma.PrismaClientKnownRequestError
+          ? `${error.code} ${JSON.stringify(error.meta ?? {})}`
+          : error instanceof Error
+            ? error.message
+            : 'error desconocido';
+
+      // Solo longitudes: sirven para detectar columnas chicas sin exponer tokens.
       this.logger.error(
-        'Falló el guardado de la credencial de Mercado Pago',
-        error instanceof Error ? error.message : undefined,
+        `Falló el guardado de la credencial de Mercado Pago (mpUserId ${datos.mpUserId.length}, scope ${datos.scope?.length ?? 0}, accessToken ${datos.accessToken.length}, refreshToken ${datos.refreshToken.length}): ${detalle}`,
       );
       throw new MercadoPagoOauthError(
         'error_interno',
