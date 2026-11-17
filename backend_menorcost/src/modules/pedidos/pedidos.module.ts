@@ -4,6 +4,8 @@ import { CanastasModule } from '../canastas/canastas.module.js';
 import { CheckoutController } from './checkout.controller.js';
 import { CheckoutService } from './checkout.service.js';
 import { FranjasService } from './franjas.service.js';
+import { PedidosController } from './pedidos.controller.js';
+import { PedidosService } from './pedidos.service.js';
 import {
   PASARELA_PAGO,
   PagoSimuladoService,
@@ -18,9 +20,10 @@ import {
  */
 @Module({
   imports: [AuthModule, CanastasModule],
-  controllers: [CheckoutController],
+  controllers: [CheckoutController, PedidosController],
   providers: [
     CheckoutService,
+    PedidosService,
     FranjasService,
     PagoSimuladoService,
     { provide: PASARELA_PAGO, useExisting: PagoSimuladoService },
