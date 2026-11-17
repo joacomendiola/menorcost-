@@ -4,6 +4,7 @@ import { Loader } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { ApiError, type EstadoUsuario } from '../api';
 import { useAuth } from '../auth/contexto';
+import { esEstadoOperativo } from '../auth/estados';
 import { PageShell } from '../components/PageShell';
 import { comerciosApi, type Comercio } from '../comercios/api';
 
@@ -37,7 +38,7 @@ function estadoVisible(
     return 'SUSPENDIDO';
   }
 
-  if (estadoUsuario === 'HABILITADO' && estadoComercio === 'HABILITADO') {
+  if (esEstadoOperativo(estadoUsuario) && estadoComercio === 'HABILITADO') {
     return 'HABILITADO';
   }
 

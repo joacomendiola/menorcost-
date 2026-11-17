@@ -76,6 +76,14 @@ describe('RutaComerciante', () => {
     expect(screen.getByText('PANEL')).toBeInTheDocument();
   });
 
+  it('permite el acceso al panel cuando está bajo investigación', () => {
+    useAuthMock.mockReturnValue(sesion('COMERCIANTE', 'BAJO_INVESTIGACION'));
+
+    renderizar('/panel');
+
+    expect(screen.getByText('PANEL')).toBeInTheDocument();
+  });
+
   it('redirige a /perfil si el rol no es comerciante', () => {
     useAuthMock.mockReturnValue(sesion('CLIENTE', 'HABILITADO'));
 
