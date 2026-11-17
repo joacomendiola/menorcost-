@@ -36,7 +36,10 @@ export class PedidosService {
         franjaHoraria: {
           select: { horaInicio: true, horaFin: true },
         },
-        items: { select: { cantidad: true } },
+        items: {
+          orderBy: { nroLinea: 'asc' },
+          select: { cantidad: true, nombreHistorico: true },
+        },
       },
     });
 
@@ -62,6 +65,10 @@ export class PedidosService {
         (total, item) => total + item.cantidad,
         0,
       ),
+      items: pedido.items.map((item) => ({
+        titulo: item.nombreHistorico,
+        cantidad: item.cantidad,
+      })),
     }));
   }
 

@@ -50,6 +50,11 @@ export type EstadoPedidoVisible =
   | 'CANCELADO'
   | 'CANCELADO_POR_FALTA_RETIRO';
 
+export interface PedidoResumenItem {
+  titulo: string;
+  cantidad: number;
+}
+
 export interface PedidoResumen {
   idPedido: string;
   codigoAlfanumerico: string;
@@ -59,6 +64,7 @@ export interface PedidoResumen {
   comercio: { idComercio: string; nombre: string } | null;
   franjaHorario: { inicio: string; fin: string } | null;
   itemsCantidad: number;
+  items: PedidoResumenItem[];
 }
 
 export interface PedidoTicketItem {
