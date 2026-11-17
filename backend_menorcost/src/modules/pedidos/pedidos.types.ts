@@ -43,3 +43,60 @@ export interface CheckoutRechazado {
   estado: 'RECHAZADO';
   message: string;
 }
+
+export type EstadoPedidoVisible =
+  | 'PENDIENTE_DE_RETIRO'
+  | 'ENTREGADO'
+  | 'CANCELADO'
+  | 'CANCELADO_POR_FALTA_RETIRO';
+
+export interface PedidoResumen {
+  idPedido: string;
+  codigoAlfanumerico: string;
+  estado: EstadoPedidoVisible;
+  fechaPedido: string;
+  total: number;
+  comercio: { idComercio: string; nombre: string } | null;
+  franjaHorario: { inicio: string; fin: string } | null;
+  itemsCantidad: number;
+}
+
+export interface PedidoTicketItem {
+  id: string;
+  titulo: string;
+  imagen: string | null;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+}
+
+/**
+ * Contrato exacto que consume `Ticket.tsx` (Pantalla 22). Los montos viajan
+ * como número porque la UI los formatea directo con `Intl.NumberFormat`.
+ */
+export interface PedidoTicket {
+  idPedido: string;
+  codigoAlfanumerico: string;
+  codigoQR: string;
+  estado: EstadoPedidoVisible;
+  fechaPedido: string;
+  subtotal: number;
+  tarifaServicio: number;
+  total: number;
+  comercio: { idComercio: string; nombre: string } | null;
+  franjaHorario: { inicio: string; fin: string } | null;
+  localAbierto: boolean | null;
+  items: PedidoTicketItem[];
+  calificacion: {
+    id: number;
+    puntaje: number;
+    comentario: string | null;
+    fecha: string;
+  } | null;
+  misReportes: Array<{
+    id: number;
+    motivo: string;
+    estado: string;
+    fecha: string;
+  }>;
+}
