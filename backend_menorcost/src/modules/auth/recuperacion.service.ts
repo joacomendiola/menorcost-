@@ -40,7 +40,7 @@ export class RecuperacionService {
 
       const frontendUrl =
         this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
-      const enlace = `${frontendUrl}/restablecer-password?token=${token}`;
+      const enlace = `${frontendUrl.replace(/\/$/, '')}/restablecer?token=${encodeURIComponent(token)}`;
 
       const { subject, html, text } = correoRecuperacion(
         enlace,
