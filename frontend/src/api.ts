@@ -197,6 +197,17 @@ export const authApi = {
       method: 'POST',
       body: { token, password },
     }),
+
+  cambiarPassword: (
+    token: string,
+    passwordActual: string,
+    passwordNueva: string,
+  ) =>
+    api<{ message: string }>('/auth/password', {
+      method: 'PATCH',
+      body: { passwordActual, passwordNueva },
+      token,
+    }),
 };
 
 export const simuladorPreciosApi = {
@@ -517,11 +528,11 @@ export interface AdminAlta {
   latitud: number | string;
   longitud: number | string;
   estado:
-    | 'PENDIENTE_VERIFICACION'
-    | 'HABILITADO'
-    | 'DOCUMENTACION_RECHAZADA'
-    | 'SUSPENDIDO'
-    | 'ELIMINADO';
+  | 'PENDIENTE_VERIFICACION'
+  | 'HABILITADO'
+  | 'DOCUMENTACION_RECHAZADA'
+  | 'SUSPENDIDO'
+  | 'ELIMINADO';
   resueltoPorId: string | null;
   resueltoEn: string | null;
   motivoRechazo: string | null;

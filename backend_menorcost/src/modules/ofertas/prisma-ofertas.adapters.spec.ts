@@ -147,6 +147,17 @@ describe('Adaptadores Prisma de ofertas', () => {
     });
   });
 
+  it('permite publicar si el comerciante está bajo investigación', async () => {
+    prismaMock.usuario.findFirst.mockResolvedValueOnce({
+      rol: 'COMERCIANTE',
+      estado: 'BAJO_INVESTIGACION',
+    });
+
+    await expect(
+      access.assertCanPublish(userId, comercioId),
+    ).resolves.toBeUndefined();
+  });
+
   it('rechaza a un usuario que no tiene rol de comerciante', async () => {
     prismaMock.usuario.findFirst.mockResolvedValueOnce({
       rol: 'CLIENTE',

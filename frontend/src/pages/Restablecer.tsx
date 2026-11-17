@@ -4,10 +4,12 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError, authApi } from '../api';
+import { useAuth } from '../auth/contexto';
 import { PageShell } from '../components/PageShell';
 
 export function Restablecer() {
   const navigate = useNavigate();
+  const { cerrarSesion } = useAuth();
   const [params] = useSearchParams();
   const token = params.get('token');
 
@@ -38,6 +40,7 @@ export function Restablecer() {
       notifications.show({
         message: 'Contraseña actualizada. Ya podés ingresar.',
       });
+      cerrarSesion();
       navigate('/login', { replace: true });
     } catch (err) {
       setError(

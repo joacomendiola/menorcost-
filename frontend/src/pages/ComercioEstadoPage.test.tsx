@@ -123,4 +123,22 @@ describe('ComercioEstadoPage (P10)', () => {
 
     expect(await screen.findByText('PANEL COMERCIANTE')).toBeInTheDocument();
   });
+
+  it('redirige al panel cuando la cuenta está bajo investigación', async () => {
+    useAuthMock.mockReturnValue(sesion('BAJO_INVESTIGACION'));
+    mioMock.mockResolvedValue({ estado: 'HABILITADO' });
+
+    render(
+      <MantineProvider>
+        <MemoryRouter initialEntries={['/comercio/estado']}>
+          <Routes>
+            <Route path="/comercio/estado" element={<ComercioEstadoPage />} />
+            <Route path="/panel" element={<div>PANEL COMERCIANTE</div>} />
+          </Routes>
+        </MemoryRouter>
+      </MantineProvider>,
+    );
+
+    expect(await screen.findByText('PANEL COMERCIANTE')).toBeInTheDocument();
+  });
 });

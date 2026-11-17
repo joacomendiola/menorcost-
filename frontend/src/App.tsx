@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import {RedirectInicio} from "./auth/RedirectInicio";
+import { RedirectInicio } from "./auth/RedirectInicio";
 import { RutaProtegida, RutaPublica, RutaComerciante, RutaAdmin, RutaCliente } from './auth/Rutas';
 import { DetalleOfertaPage } from './comercios/DetalleOfertaPage';
 import { HorariosComercioPage } from './comercios/HorariosComercioPage';
@@ -46,11 +46,12 @@ export default function App() {
       <Routes>
         <Route element={<RutaPublica />}>
           <Route path="/login" element={<Login />} />
-          <Route path="/recuperar" element={<Recuperar />} />
-          <Route path="/restablecer" element={<Restablecer />} />
           <Route path="/registro" element={<Registro />} />
           <Route path="/verificar-correo" element={<VerificarCorreo />} />
         </Route>
+
+        <Route path="/recuperar" element={<Recuperar />} />
+        <Route path="/restablecer" element={<Restablecer />} />
 
         <Route path="/comercios/:id" element={<TiendaPublicaPage />} />
 
@@ -97,7 +98,7 @@ export default function App() {
             path="/mis-pedidos"
             element={<MisPedidosPage />}
           />
-         
+
           <Route path="/buscar" element={<ExplorarPage />} />
         </Route>
 

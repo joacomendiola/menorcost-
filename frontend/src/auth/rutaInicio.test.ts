@@ -8,6 +8,7 @@ describe("rutaInicio", () => {
 
   it("mantiene las pantallas de inicio de comerciante y administrador", () => {
     expect(rutaInicio("COMERCIANTE", "HABILITADO")).toBe("/panel");
+    expect(rutaInicio("COMERCIANTE", "BAJO_INVESTIGACION")).toBe("/panel");
     expect(rutaInicio("COMERCIANTE", "PENDIENTE_VERIFICACION")).toBe(
       "/comercio/estado",
     );
