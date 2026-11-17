@@ -27,7 +27,6 @@ export interface CheckoutResumen {
   };
   items: CheckoutItem[];
   subtotal: string;
-  tarifaServicio: string;
   total: string;
   franjas: CheckoutFranja[];
 }

@@ -5,7 +5,6 @@ import {
   Badge,
   Button,
   Chip,
-  Container,
   Divider,
   Group,
   Loader,
@@ -115,40 +114,39 @@ export function Checkout() {
 
   if (parametrosInvalidos) {
     return (
-      <Container size="sm" py="xl">
+      <main className="comercio-page canastas-page">
         <Alert color="red">No se pudo identificar el pedido.</Alert>
-      </Container>
+      </main>
     );
   }
 
   if (cargando) {
     return (
-      <Container size="sm" py="xl">
-        <Group justify="center">
+      <main className="comercio-page canastas-page">
+        <div className="tienda-cargando">
           <Loader color="brand" />
-        </Group>
-      </Container>
+        </div>
+      </main>
     );
   }
 
   if (!resumen) {
     return (
-      <Container size="sm" py="xl">
-        <Stack gap="md">
-          <Alert color="red">
-            {error || 'No pudimos cargar el resumen del pedido.'}
-          </Alert>
-          <Button variant="default" onClick={() => navigate(-1)}>
-            ← Volver
-          </Button>
-        </Stack>
-      </Container>
+      <main className="comercio-page canastas-page">
+        <Alert color="red">
+          {error || 'No pudimos cargar el resumen del pedido.'}
+        </Alert>
+
+        <Button mt="md" variant="default" onClick={() => navigate(-1)}>
+          ← Volver
+        </Button>
+      </main>
     );
   }
 
   if (confirmado) {
     return (
-      <Container size="sm" py="xl">
+      <main className="comercio-page canastas-page">
         <Paper withBorder p="lg" radius="lg">
           <Stack gap="sm">
             <Title order={2}>¡Pago aprobado!</Title>
@@ -182,24 +180,23 @@ export function Checkout() {
             </Button>
           </Stack>
         </Paper>
-      </Container>
+      </main>
     );
   }
 
   const sinFranjas = resumen.franjas.length === 0;
 
   return (
-    <Container size="sm" py="xl">
-      <Stack gap="lg">
-        <Button
-          variant="subtle"
-          w="fit-content"
-          px={0}
-          onClick={() => navigate(`/canastas/${comercioId}`)}
-        >
-          ← Volver a la canasta
-        </Button>
+    <main className="comercio-page canastas-page">
+      <button
+        type="button"
+        className="chip"
+        onClick={() => navigate(`/canastas/${comercioId}`)}
+      >
+        ← Volver a la canasta
+      </button>
 
+      <Stack gap="lg" mt="md">
         <div>
           <Title order={1}>Pagar pedido</Title>
           <Text c="dimmed">{resumen.comercio.nombreFantasia}</Text>
@@ -229,10 +226,6 @@ export function Checkout() {
             <Group justify="space-between">
               <Text c="dimmed">Subtotal</Text>
               <Text>{moneda.format(Number(resumen.subtotal))}</Text>
-            </Group>
-            <Group justify="space-between">
-              <Text c="dimmed">Tarifa de servicio</Text>
-              <Text>{moneda.format(Number(resumen.tarifaServicio))}</Text>
             </Group>
 
             <Divider />
@@ -331,6 +324,6 @@ export function Checkout() {
           </Group>
         </Stack>
       </Modal>
-    </Container>
+    </main>
   );
 }

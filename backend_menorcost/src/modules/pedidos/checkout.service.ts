@@ -99,7 +99,7 @@ export class CheckoutService {
       throw new NotFoundException('El comercio no existe.');
     }
 
-    const { total, tarifaServicio } = this.calcular(detalle);
+    const { total } = this.calcular(detalle);
 
     return {
       comercio: {
@@ -117,7 +117,6 @@ export class CheckoutService {
         subtotal: item.subtotal,
       })),
       subtotal: aMonto(total),
-      tarifaServicio: aMonto(tarifaServicio),
       total: aMonto(total),
       franjas,
     };

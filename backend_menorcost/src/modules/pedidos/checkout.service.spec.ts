@@ -135,8 +135,7 @@ describe('CheckoutService', () => {
       });
       expect(resultado.subtotal).toBe('9411.78');
       expect(resultado.total).toBe('9411.78');
-      // 2 unidades × ceil2(1000 × 0.10) = 200.00
-      expect(resultado.tarifaServicio).toBe('200.00');
+      expect(resultado).not.toHaveProperty('tarifaServicio');
       expect(resultado.items[0]).toEqual(
         expect.objectContaining({
           productoId,
