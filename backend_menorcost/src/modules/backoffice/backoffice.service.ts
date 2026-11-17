@@ -9,6 +9,7 @@ import type { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { MailerService } from '../auth/mailer/mailer.service.js';
 import type { EnvioCorreo } from '../auth/mailer/mailer.interface.js';
+import type { AlcanceSancion } from './dto/sancionar-reporte.dto.js';
 
 const USUARIO_PUBLICO_SELECT = {
   id: true,
@@ -124,11 +125,19 @@ export class BackofficeService {
             direcciones: true,
           },
         },
+        resueltoPor: {
+          select: {
+            id: true,
+            nombre: true,
+            apellido: true,
+            email: true,
+          },
+        },
       },
     });
   }
 
-  async aprobarAlta(idComercio: string) {
+  async aprobarAlta(idComercio: string, idAdmin: string) {
     const comercio = await this.prisma.comercio.findUnique({
       where: { idComercio },
       include: {
@@ -161,7 +170,12 @@ export class BackofficeService {
           idComercio: idComercio,
           estado: 'PENDIENTE_VERIFICACION',
         },
-        data: { estado: 'HABILITADO' },
+        data: {
+          estado: 'HABILITADO',
+          resueltoPorId: idAdmin,
+          resueltoEn: new Date(),
+          motivoRechazo: null,
+        },
       });
 
       // Si una de las dos filas no estaba pendiente, se revierte todo.
@@ -191,7 +205,7 @@ export class BackofficeService {
     };
   }
 
-  async rechazarAlta(idComercio: string, motivo: string) {
+  async rechazarAlta(idComercio: string, motivo: string, idAdmin: string) {
     const comercio = await this.prisma.comercio.findUnique({
       where: { idComercio },
       include: {
@@ -224,7 +238,12 @@ export class BackofficeService {
           idComercio: idComercio,
           estado: 'PENDIENTE_VERIFICACION',
         },
-        data: { estado: 'DOCUMENTACION_RECHAZADA' },
+        data: {
+          estado: 'DOCUMENTACION_RECHAZADA',
+          resueltoPorId: idAdmin,
+          resueltoEn: new Date(),
+          motivoRechazo: motivo,
+        },
       });
 
       // Si una de las dos filas no estaba pendiente, se revierte todo.
@@ -544,7 +563,17 @@ export class BackofficeService {
     }
   }
 
-  async sancionar(idReporte: number, idAdmin: string) {
+  async sancionar(
+    idReporte: number,
+    idAdmin: string,
+    alcance: AlcanceSancion = 'CUENTA',
+  ) {
+    return alcance === 'PUBLICACION'
+      ? this.sancionarPublicacion(idReporte, idAdmin)
+      : this.sancionarCuenta(idReporte, idAdmin);
+  }
+
+  private async sancionarCuenta(idReporte: number, idAdmin: string) {
     const reporte = await this.prisma.reporte.findUnique({
       where: { id_reporte: idReporte },
       include: {
@@ -647,6 +676,107 @@ export class BackofficeService {
       usuario: usuarioSuspendido,
       comercioSuspendido,
       denunciasCerradas,
+      notificacion,
+      notificacionEmisor,
+    };
+  }
+
+  private async sancionarPublicacion(idReporte: number, idAdmin: string) {
+    const reporte = await this.prisma.reporte.findUnique({
+      where: { id_reporte: idReporte },
+      include: {
+        denunciado: { select: USUARIO_PUBLICO_SELECT },
+        emisor: { select: USUARIO_PUBLICO_SELECT },
+        pedido: { include: { items: { select: { productoId: true } } } },
+      },
+    });
+
+    if (!reporte) throw new NotFoundException('Reporte no encontrado');
+
+    if (['RESUELTO', 'DESESTIMADO'].includes(reporte.estado_reporte)) {
+      throw new BadRequestException('El reporte ya fue cerrado previamente');
+    }
+
+    if (reporte.tipo_destino !== 'COMERCIO') {
+      throw new BadRequestException(
+        'Solo se puede dar de baja la publicación de un reporte dirigido a un comercio',
+      );
+    }
+
+    const productoIds = [
+      ...new Set(reporte.pedido.items.map((item) => item.productoId)),
+    ];
+    if (productoIds.length === 0) {
+      throw new BadRequestException(
+        'El pedido reportado no tiene publicaciones para dar de baja',
+      );
+    }
+
+    const { reporteActualizado, productosEliminados } =
+      await this.prisma.$transaction(async (tx) => {
+        const actualizados = await tx.reporte.updateMany({
+          where: {
+            id_reporte: idReporte,
+            estado_reporte: {
+              in: ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'],
+            },
+          },
+          data: {
+            estado_reporte: 'RESUELTO',
+            id_admin: idAdmin,
+            fecha_resolucion: new Date(),
+          },
+        });
+
+        if (actualizados.count === 0) {
+          throw new ConflictException(
+            'El reporte ya fue cerrado por otro administrador',
+          );
+        }
+
+        const productos = await tx.producto.updateMany({
+          where: {
+            idProducto: { in: productoIds },
+            comercioId: reporte.pedido.comercioId,
+            estado: { not: 'ELIMINADO' },
+          },
+          data: { estado: 'ELIMINADO' },
+        });
+
+        await this.restaurarSiCorresponde(
+          tx,
+          reporte.id_denunciado,
+          idReporte,
+        );
+
+        const rep = await tx.reporte.findUniqueOrThrow({
+          where: { id_reporte: idReporte },
+        });
+
+        return {
+          reporteActualizado: rep,
+          productosEliminados: productos.count,
+        };
+      });
+
+    const [notificacion, notificacionEmisor] = await Promise.all([
+      this.enviarCorreoSeguro({
+        to: reporte.denunciado.email,
+        subject: `Resolución del reporte #${idReporte}`,
+        html: `<p>Hola ${reporte.denunciado.nombre},</p>
+               <p>El reporte #${idReporte} fue <strong>RESUELTO</strong> y la publicación reportada fue dada de baja por la administración de Menorcost.</p>`,
+      }),
+      this.enviarCorreoSeguro({
+        to: reporte.emisor.email,
+        subject: `Resolución del reporte #${idReporte}`,
+        html: `<p>Hola ${reporte.emisor.nombre},</p>
+               <p>Tu reporte #${idReporte} fue <strong>RESUELTO</strong> y la publicación reportada fue dada de baja por la administración de Menorcost.</p>`,
+      }),
+    ]);
+
+    return {
+      reporte: reporteActualizado,
+      productosEliminados,
       notificacion,
       notificacionEmisor,
     };

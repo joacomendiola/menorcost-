@@ -175,6 +175,15 @@ export function AltasTab() {
                         label: 'Documentos adjuntos',
                         value: 'No se almacenan en el sistema',
                       },
+                      ...(alta.resueltoEn
+                        ? [{ label: 'Resuelta', value: formatFechaCorta(alta.resueltoEn) }]
+                        : []),
+                      ...(alta.resueltoPor
+                        ? [{ label: 'Administrador', value: nombreCompleto(alta.resueltoPor) }]
+                        : []),
+                      ...(alta.motivoRechazo
+                        ? [{ label: 'Motivo de rechazo', value: alta.motivoRechazo }]
+                        : []),
                       { label: 'Contacto', value: alta.telefono || u.telefono || '—' },
                       {
                         label: 'Reputación',

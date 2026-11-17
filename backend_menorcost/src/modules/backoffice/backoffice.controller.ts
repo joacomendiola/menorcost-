@@ -11,6 +11,7 @@ import {
 import { BackofficeService } from './backoffice.service.js';
 import { RechazarAltaDto } from './dto/rechazar-alta.dto.js';
 import { FiltroAdminDto } from './dto/filtro-admin.dto.js';
+import { SancionarReporteDto } from './dto/sancionar-reporte.dto.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
@@ -35,16 +36,20 @@ export class BackofficeController {
   }
 
   @Patch('altas/:id/aprobar')
-  async aprobarAlta(@Param('id') idComercio: string) {
-    return this.backofficeService.aprobarAlta(idComercio);
+  async aprobarAlta(
+    @Param('id') idComercio: string,
+    @CurrentUser() admin: AuthenticatedUser,
+  ) {
+    return this.backofficeService.aprobarAlta(idComercio, admin.id);
   }
 
   @Patch('altas/:id/rechazar')
   async rechazarAlta(
     @Param('id') idComercio: string,
     @Body() dto: RechazarAltaDto,
+    @CurrentUser() admin: AuthenticatedUser,
   ) {
-    return this.backofficeService.rechazarAlta(idComercio, dto.motivo);
+    return this.backofficeService.rechazarAlta(idComercio, dto.motivo, admin.id);
   }
 
   // --- MÓDULO DENUNCIAS ---
@@ -77,9 +82,14 @@ export class BackofficeController {
   @Patch('denuncias/:id/sancionar')
   async sancionar(
     @Param('id', ParseIntPipe) idReporte: number,
+    @Body() dto: SancionarReporteDto,
     @CurrentUser() admin: AuthenticatedUser,
   ) {
-    return this.backofficeService.sancionar(idReporte, admin.id);
+    return this.backofficeService.sancionar(
+      idReporte,
+      admin.id,
+      dto?.alcance ?? 'CUENTA',
+    );
   }
 
   // --- MÓDULO USUARIOS ---

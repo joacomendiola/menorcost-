@@ -215,6 +215,8 @@ Usuarios de backoffice: bo.*@test.com / Password123
 
 Los usuarios de backoffice usan correos ficticios `@test.com`; no son cuentas de Gmail. El detalle de cada usuario y sus datos asociados está en `backend_menorcost/prisma/seed-backoffice.ts`.
 
+CU-1.02 no almacena documentación: el comerciante la envía a `menorcost@gmail.com` y la revisión es externa. El Backoffice registra únicamente la resolución del alta: administrador, fecha y motivo de rechazo (CU-5.03).
+
 Estos datos son solo para desarrollo local.
 
 ---

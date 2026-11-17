@@ -82,10 +82,14 @@ model Comercio {
   portadaUrl           String?        @map("portada_url") @db.VarChar(500)
   abierto              Boolean        @default(false)
   estado               EstadoComercio @default(PENDIENTE_VERIFICACION)
+  resueltoPorId        String?        @map("resuelto_por_id")
+  resueltoEn           DateTime?      @map("resuelto_en")
+  motivoRechazo        String?        @map("motivo_rechazo") @db.VarChar(500)
   createdAt            DateTime       @default(now()) @map("created_at")
   updatedAt            DateTime       @updatedAt @map("updated_at")
 
-  usuario               Usuario                      @relation(fields: [userId], references: [id])
+  usuario               Usuario                      @relation("ComercioUsuario", fields: [userId], references: [id])
+  resueltoPor           Usuario?                     @relation("AltaResuelta", fields: [resueltoPorId], references: [id], onDelete: SetNull)
   productos             Producto[]
   pedidos               Pedido[]
   canastas              Canasta[]
@@ -200,7 +204,8 @@ model Usuario {
   pedidos     Pedido[]
   canastas    Canasta[]
 
-  comercio Comercio?
+  comercio        Comercio?  @relation("ComercioUsuario")
+  altasResueltas  Comercio[] @relation("AltaResuelta")
 
   solicitudesBaja SolicitudBaja[] @relation("BajaSolicitada")
   bajasResueltas  SolicitudBaja[] @relation("BajaResuelta")

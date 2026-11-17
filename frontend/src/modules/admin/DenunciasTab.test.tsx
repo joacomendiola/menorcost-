@@ -42,7 +42,7 @@ const mocks = vi.hoisted(() => {
         estado_reporte: 'PENDIENTE_REVISION',
         tipo_destino: 'COMERCIO',
         fecha_reporte: '2026-01-01T00:00:00.000Z',
-        fecha_resolucion: null,
+        fecha_resolucion: null as string | null,
         id_pedido: 'p1',
         id_emisor: 'u1',
         id_denunciado: 'u2',
@@ -102,13 +102,16 @@ vi.mock('./AdminUI', () => ({
   AdminEmpty: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   AdminItem: ({
     titulo,
+    detalle,
     acciones,
   }: {
     titulo: string;
+    detalle?: ReactNode;
     acciones?: ReactNode;
   }) => (
     <section>
       <h2>{titulo}</h2>
+      {detalle}
       {acciones}
     </section>
   ),
@@ -116,7 +119,20 @@ vi.mock('./AdminUI', () => ({
   AdminResult: ({ children }: { children: ReactNode }) => (
     <div role="status">{children}</div>
   ),
-  AdminRows: () => null,
+  AdminRows: ({
+    rows,
+  }: {
+    rows: Array<{ label: string; value: ReactNode }>;
+  }) => (
+    <dl>
+      {rows.map((row) => (
+        <div key={row.label}>
+          <dt>{row.label}</dt>
+          <dd>{row.value}</dd>
+        </div>
+      ))}
+    </dl>
+  ),
   AdminSkeleton: () => <div>cargando</div>,
   ConfirmDialog: ({
     open,
@@ -144,8 +160,17 @@ afterEach(cleanup);
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.items[0].estado_reporte = 'PENDIENTE_REVISION';
+  mocks.items[0].fecha_resolucion = null;
+  mocks.items[0].admin = null;
   mocks.items[0].denunciado.estado = 'BAJO_INVESTIGACION';
   mocks.items[0].registro.abiertas = 1;
+  mocks.sancionarDenuncia.mockResolvedValue({
+    reporte: { id_reporte: 7, estado_reporte: 'RESUELTO' },
+    usuario: mocks.items[0].denunciado,
+    denunciasCerradas: 0,
+    notificacion: { enviada: true },
+    notificacionEmisor: { enviada: true },
+  });
   mocks.desestimarDenuncia.mockResolvedValue({
     success: true,
     notificaciones: {
@@ -242,6 +267,56 @@ describe('DenunciasTab', () => {
 
     await waitFor(() =>
       expect(screen.getByText(/No se pudo notificar a: emisor/)).toBeTruthy(),
+    );
+  });
+
+  it('muestra la fecha de resolución de una denuncia cerrada', () => {
+    mocks.items[0].estado_reporte = 'RESUELTO';
+    mocks.items[0].fecha_resolucion = '2026-02-03T12:00:00.000Z';
+
+    render(
+      <MantineProvider>
+        <DenunciasTab />
+      </MantineProvider>,
+    );
+
+    expect(screen.getByText('Fecha de resolución')).toBeTruthy();
+    expect(screen.getByText('03/02/2026')).toBeTruthy();
+  });
+
+  it('da de baja la publicación reportada', async () => {
+    mocks.sancionarDenuncia.mockResolvedValue({
+      reporte: { id_reporte: 7, estado_reporte: 'RESUELTO' },
+      productosEliminados: 2,
+      notificacion: { enviada: true },
+      notificacionEmisor: { enviada: true },
+    });
+
+    render(
+      <MantineProvider>
+        <DenunciasTab />
+      </MantineProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sancionar' }));
+    fireEvent.click(
+      screen.getByLabelText('Dar de baja la publicación reportada'),
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Dar de baja publicación' }),
+    );
+
+    await waitFor(() =>
+      expect(mocks.sancionarDenuncia).toHaveBeenCalledWith(
+        'token',
+        7,
+        'PUBLICACION',
+      ),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Se dieron de baja 2 publicación/),
+      ).toBeTruthy(),
     );
   });
 });

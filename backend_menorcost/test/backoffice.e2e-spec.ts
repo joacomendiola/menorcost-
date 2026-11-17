@@ -160,6 +160,7 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
     let comercioPendienteId: string;
     let comercioHabilitadoId: string;
     let pedidoId: string;
+    let productoId: string;
     let reporteId: number;
 
     beforeAll(async () => {
@@ -214,7 +215,7 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
         },
       });
       categoriaIds.push(categoria.idCategoria);
-      await prisma.producto.create({
+      const producto = await prisma.producto.create({
         data: {
           comercioId: comercioHabilitadoId,
           categoriaId: categoria.idCategoria,
@@ -231,10 +232,25 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
           estado: 'ACTIVO',
         },
       });
+      productoId = producto.idProducto;
 
       // 5. Pedido ENTREGADO
       const pedido = await crearPedido(cliente.id, comercioHabilitadoId);
       pedidoId = pedido.id_pedido;
+      await prisma.pedidoItem.create({
+        data: {
+          pedidoId,
+          productoId,
+          nroLinea: 1,
+          cantidad: 1,
+          precio_unitario: 1000,
+          precioBaseNetoAplicado: 800,
+          comisionMenorcostMonto: 100,
+          subtotal: 1000,
+          nombreHistorico: 'Producto Backoffice',
+          fechaVencimientoHistorica: new Date(Date.now() + 86400000 * 30),
+        },
+      });
 
       // 6. Reporte existente para tests
       const reporte = await prisma.reporte.create({
@@ -614,6 +630,10 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
           }),
         );
       });
+
+      afterAll(async () => {
+        await prisma.reporte.deleteMany({ where: { id_reporte: reporteId } });
+      });
     });
 
     describe('PATCH /admin/denuncias/:id/investigacion - Toggle investigación', () => {
@@ -692,7 +712,7 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
       it('rechaza no-admin', async () => {
         await request(server())
           .patch(`/admin/denuncias/${reporteToggleId}/investigacion`)
-          .set(auth(comercianteToken))
+          .set(auth(clienteToken))
           .expect(403);
       });
     });
@@ -803,6 +823,86 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
           where: { id: comercianteHabilitado.id },
         });
         expect(usuario?.estado).toBe('HABILITADO');
+
+        await prisma.reporte.delete({ where: { id_reporte: r.id_reporte } });
+      });
+    });
+
+    describe('PATCH /admin/denuncias/:id/sancionar - Dar de baja publicación', () => {
+      let reportePublicacionId: number;
+
+      beforeAll(async () => {
+        const r = await prisma.reporte.create({
+          data: {
+            id_pedido: pedidoId,
+            motivo: 'Publicación con problemas',
+            tipo_destino: 'COMERCIO',
+            estado_reporte: 'PENDIENTE_REVISION',
+            id_emisor: cliente.id,
+            id_denunciado: comercianteHabilitado.id,
+          },
+        });
+        reportePublicacionId = r.id_reporte;
+      });
+
+      afterAll(async () => {
+        await prisma.reporte.deleteMany({
+          where: { id_reporte: reportePublicacionId },
+        });
+      });
+
+      it('marca el reporte como RESUELTO y elimina los productos del pedido', async () => {
+        const res = await request(server())
+          .patch(`/admin/denuncias/${reportePublicacionId}/sancionar`)
+          .set(auth(adminToken))
+          .send({ alcance: 'PUBLICACION' })
+          .expect(200);
+
+        expect(res.body).toMatchObject({
+          reporte: { estado_reporte: 'RESUELTO', id_admin: admin.id },
+          productosEliminados: 1,
+          notificacion: { enviada: expect.any(Boolean) },
+          notificacionEmisor: { enviada: expect.any(Boolean) },
+        });
+
+        const reporte = await prisma.reporte.findUnique({
+          where: { id_reporte: reportePublicacionId },
+        });
+        expect(reporte?.fecha_resolucion).toBeDefined();
+
+        const producto = await prisma.producto.findUnique({
+          where: { idProducto: productoId },
+        });
+        expect(producto?.estado).toBe('ELIMINADO');
+
+        const usuario = await prisma.usuario.findUnique({
+          where: { id: comercianteHabilitado.id },
+        });
+        expect(usuario?.estado).not.toBe('SUSPENDIDO');
+
+        const comercio = await prisma.comercio.findUnique({
+          where: { idComercio: comercioHabilitadoId },
+        });
+        expect(comercio?.estado).not.toBe('SUSPENDIDO');
+      });
+
+      it('rechaza dar de baja la publicación de un reporte dirigido a un cliente', async () => {
+        const r = await prisma.reporte.create({
+          data: {
+            id_pedido: pedidoId,
+            motivo: 'Publicación de cliente',
+            tipo_destino: 'CLIENTE',
+            estado_reporte: 'PENDIENTE_REVISION',
+            id_emisor: comercianteHabilitado.id,
+            id_denunciado: cliente.id,
+          },
+        });
+
+        await request(server())
+          .patch(`/admin/denuncias/${r.id_reporte}/sancionar`)
+          .set(auth(adminToken))
+          .send({ alcance: 'PUBLICACION' })
+          .expect(400);
 
         await prisma.reporte.delete({ where: { id_reporte: r.id_reporte } });
       });
@@ -969,7 +1069,7 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
       it('rechaza no-admin (403)', async () => {
         await request(server())
           .patch(`/admin/usuarios/${usuarioRehabId}/rehabilitar`)
-          .set(auth(comercianteToken))
+          .set(auth(clienteToken))
           .expect(403);
       });
     });

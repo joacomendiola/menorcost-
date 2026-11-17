@@ -509,6 +509,15 @@ export interface AdminAlta {
     | 'DOCUMENTACION_RECHAZADA'
     | 'SUSPENDIDO'
     | 'ELIMINADO';
+  resueltoPorId: string | null;
+  resueltoEn: string | null;
+  motivoRechazo: string | null;
+  resueltoPor?: {
+    id: string;
+    nombre: string;
+    apellido: string;
+    email: string;
+  } | null;
   usuario: AdminUsuario & { direcciones: Direccion[] };
 }
 
@@ -521,6 +530,12 @@ export interface AdminBaja {
   estado: EstadoBaja;
   observaciones: string | null;
   resueltoEn: string | null;
+  resueltoPor?: {
+    id: string;
+    nombre: string;
+    apellido: string;
+    email: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
   pedidosCompletados: number;
@@ -569,6 +584,8 @@ export interface AdminDenuncia {
     desestimadas: number;
   };
 }
+
+export type AlcanceSancion = 'CUENTA' | 'PUBLICACION';
 
 export interface AdminNotificacion {
   enviada: boolean;
@@ -647,14 +664,23 @@ export const adminApi = {
       { method: 'PATCH', token },
     ),
 
-  sancionarDenuncia: (token: string, id: number) =>
+  sancionarDenuncia: (
+    token: string,
+    id: number,
+    alcance: AlcanceSancion = 'CUENTA',
+  ) =>
     api<{
       reporte: Pick<AdminDenuncia, 'id_reporte' | 'estado_reporte'>;
-      usuario: AdminUsuario;
-      denunciasCerradas: number;
+      usuario?: AdminUsuario;
+      denunciasCerradas?: number;
+      productosEliminados?: number;
       notificacion: AdminNotificacion;
       notificacionEmisor: AdminNotificacion;
-    }>(`/admin/denuncias/${id}/sancionar`, { method: 'PATCH', token }),
+    }>(`/admin/denuncias/${id}/sancionar`, {
+      method: 'PATCH',
+      body: { alcance },
+      token,
+    }),
 
   rehabilitarUsuario: (token: string, idUsuario: string) =>
     api<AdminUsuario>(
