@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { esEstadoUsuarioOperativo } from '../auth/estados-usuario.js';
 import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface.js';
 import { MercadoPagoClient } from './mercado-pago.client.js';
 import { MercadoPagoConfigService } from './mercado-pago.config.js';
@@ -231,7 +232,7 @@ export class MercadoPagoService {
   }
 
   private async validarUsuario(usuario: AuthenticatedUser): Promise<void> {
-    if (usuario.estado !== 'HABILITADO') {
+    if (!esEstadoUsuarioOperativo(usuario.estado)) {
       throw new MercadoPagoOauthError(
         'usuario_no_habilitado',
         'Tu cuenta todavía no está habilitada para vincular Mercado Pago.',

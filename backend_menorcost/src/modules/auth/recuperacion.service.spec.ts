@@ -73,7 +73,7 @@ describe('RecuperacionService.solicitar', () => {
     expect(mailerMock.enviar).toHaveBeenCalledWith(
       expect.objectContaining({
         text: expect.stringContaining(
-          'http://localhost:5173/restablecer-password?token=token-de-prueba',
+          'http://localhost:5173/restablecer?token=token-de-prueba',
         ),
       }),
     );

@@ -101,6 +101,7 @@ export function ExplorarPage() {
       .then(([cats, direcciones]) => {
         if (!activo) return;
         setCategorias(cats);
+        setCargando(true);
         setDireccion(
           direcciones.find((item) => item.esPredeterminada) ?? null,
         );
@@ -115,7 +116,6 @@ export function ExplorarPage() {
 
   useEffect(() => {
     let activo = true;
-    setCargando(true);
     const qs = new URLSearchParams();
     if (query) qs.set('q', query);
     if (filtros.categoriaId) qs.set('categoriaId', filtros.categoriaId);
@@ -190,16 +190,23 @@ export function ExplorarPage() {
     }
     setAvisoBusqueda('');
     setPestana('productos');
+    setCargando(true);
     setParams({ q: texto });
   }
 
   function reintentar() {
     setError('');
+    setCargando(true);
     setIntento((valor) => valor + 1);
   }
 
+  function aplicarFiltros(nuevos: Filtros) {
+    setCargando(true);
+    setFiltros(nuevos);
+  }
+
   function limpiarFiltros() {
-    setFiltros(filtrosVacios);
+    aplicarFiltros(filtrosVacios);
     setTemporales(filtrosVacios);
   }
 
@@ -244,7 +251,7 @@ export function ExplorarPage() {
         <div className="explorar__categorias">
           <button
             className={!filtros.categoriaId ? 'is-active' : ''}
-            onClick={() => setFiltros({ ...filtros, categoriaId: '' })}
+            onClick={() => aplicarFiltros({ ...filtros, categoriaId: '' })}
           >
             Todas
           </button>
@@ -253,7 +260,7 @@ export function ExplorarPage() {
               key={categoria.id}
               className={filtros.categoriaId === categoria.id ? 'is-active' : ''}
               onClick={() =>
-                setFiltros({
+                aplicarFiltros({
                   ...filtros,
                   categoriaId:
                     filtros.categoriaId === categoria.id ? '' : categoria.id,
@@ -480,7 +487,7 @@ export function ExplorarPage() {
             </Button>
             <Button
               onClick={() => {
-                setFiltros(temporales);
+                aplicarFiltros(temporales);
                 setModal(false);
               }}
             >

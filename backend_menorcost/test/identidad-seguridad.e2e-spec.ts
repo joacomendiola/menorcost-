@@ -20,7 +20,11 @@ describe('Identidad y seguridad (e2e)', () => {
     email: string;
     dni: string;
     rol?: 'CLIENTE' | 'COMERCIANTE' | 'ADMINISTRADOR';
-    estado?: 'HABILITADO' | 'PENDIENTE_VERIFICACION' | 'SUSPENDIDO';
+    estado?:
+      | 'HABILITADO'
+      | 'BAJO_INVESTIGACION'
+      | 'PENDIENTE_VERIFICACION'
+      | 'SUSPENDIDO';
     password?: string;
   }) {
     return prisma.usuario.create({
@@ -80,6 +84,25 @@ describe('Identidad y seguridad (e2e)', () => {
         .get('/auth/me')
         .set('Authorization', 'Bearer token-falso')
         .expect(401);
+    });
+
+    it('permite el acceso de cuentas bajo investigación', async () => {
+      const email = 'bajo-investigacion@menorcost.local';
+      await crearUsuario({
+        email,
+        dni: '49999999',
+        estado: 'BAJO_INVESTIGACION',
+      });
+
+      const ingreso = await login(email).expect(200);
+      expect(ingreso.body.usuario.estado).toBe('BAJO_INVESTIGACION');
+
+      const me = await request(server())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${ingreso.body.accessToken as string}`)
+        .expect(200);
+
+      expect(me.body.estado).toBe('BAJO_INVESTIGACION');
     });
   });
 
@@ -228,6 +251,99 @@ describe('Identidad y seguridad (e2e)', () => {
     });
   });
 
+  describe('Cambio de contraseña autenticado [1.06]', () => {
+    it('rechaza la contraseña actual incorrecta', async () => {
+      const email = 'cambio-clave@menorcost.local';
+      await crearUsuario({ email, dni: '49000001' });
+
+      const token = (await login(email).expect(200)).body.accessToken as string;
+
+      await request(server())
+        .patch('/auth/password')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          passwordActual: 'Incorrecta123',
+          passwordNueva: 'NuevaClave123',
+        })
+        .expect(400);
+
+      await request(server())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      await login(email).expect(200);
+    });
+
+    it('cambia la contraseña e invalida la sesión anterior', async () => {
+      const email = 'cambio-clave-ok@menorcost.local';
+      await crearUsuario({ email, dni: '49000002' });
+
+      const token = (await login(email).expect(200)).body.accessToken as string;
+
+      await request(server())
+        .patch('/auth/password')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          passwordActual: PASSWORD,
+          passwordNueva: 'NuevaClave123',
+        })
+        .expect(200);
+
+      await request(server())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(401);
+
+      await login(email).expect(401);
+      await login(email, 'NuevaClave123').expect(200);
+    });
+
+    it('permite el cambio a una cuenta administradora', async () => {
+      const email = 'admin-cambio@menorcost.local';
+      await crearUsuario({
+        email,
+        dni: '49000003',
+        rol: 'ADMINISTRADOR',
+      });
+
+      const token = (await login(email).expect(200)).body.accessToken as string;
+
+      await request(server())
+        .patch('/auth/password')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          passwordActual: PASSWORD,
+          passwordNueva: 'AdminNueva123',
+        })
+        .expect(200);
+
+      await login(email, 'AdminNueva123').expect(200);
+    });
+
+    it('permite el cambio a una cuenta comerciante', async () => {
+      const email = 'comerciante-cambio@menorcost.local';
+      await crearUsuario({
+        email,
+        dni: '49000004',
+        rol: 'COMERCIANTE',
+      });
+
+      const token = (await login(email).expect(200)).body.accessToken as string;
+
+      await request(server())
+        .patch('/auth/password')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          passwordActual: PASSWORD,
+          passwordNueva: 'ComercioNueva123',
+        })
+        .expect(200);
+
+      await login(email).expect(401);
+      await login(email, 'ComercioNueva123').expect(200);
+    });
+  });
+
   describe('Gestión de direcciones [1.02]', () => {
     let token: string;
     let usuarioId: string;
@@ -357,9 +473,9 @@ describe('Identidad y seguridad (e2e)', () => {
         .post('/baja-cuenta')
         .set(auth)
         .send({ motivo: 'Otra vez', password: PASSWORD })
-        .expect(409);
+        .expect(401);
 
-      await request(server()).get('/admin/bajas').set(auth).expect(403);
+      await request(server()).get('/admin/bajas').set(auth).expect(401);
 
       const adminEmail = 'admin@menorcost.local';
       await crearUsuario({

@@ -15,11 +15,14 @@ describe('ExplorarPage', () => {
   beforeEach(() => {
     mocks.api.mockReset(); mocks.listar.mockReset().mockResolvedValue([]);
     mocks.api.mockImplementation((path: string) => path === '/categorias' ? Promise.resolve([]) : Promise.resolve([]));
-    globalThis.ResizeObserver = class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    } as typeof ResizeObserver;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
   });
 
   it('muestra ofertas vacías con una sugerencia para ajustar criterios', async () => {

@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { esEstadoUsuarioOperativo } from '../auth/estados-usuario.js';
 import type { CreateOfferDto } from './dto/create-oferta.dto.js';
 import type { UpdateOfferDto } from './dto/update-oferta.dto.js';
 import type {
@@ -91,7 +92,7 @@ export class PrismaOfferAccessAdapter implements OfferAccess {
     if (
       !usuario ||
       usuario.rol !== 'COMERCIANTE' ||
-      usuario.estado !== 'HABILITADO'
+      !esEstadoUsuarioOperativo(usuario.estado)
     ) {
       throw new ForbiddenException(
         'Se requiere una cuenta de comerciante habilitada',

@@ -1,6 +1,7 @@
 import { Center, Loader } from '@mantine/core';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from './contexto';
+import { esEstadoOperativo } from './estados';
 import { rutaInicio } from './rutaInicio';
 
 export function RutaProtegida() {
@@ -54,7 +55,7 @@ export function RutaComerciante() {
     return <Navigate to="/perfil" replace />;
   }
 
-  if (usuario.estado !== 'HABILITADO') {
+  if (!esEstadoOperativo(usuario.estado)) {
     return <Navigate to="/comercio/estado" replace />;
   }
 

@@ -141,6 +141,17 @@ describe('MercadoPagoService', () => {
         servicio.crearUrlAutorizacion(suspendido),
       ).rejects.toBeInstanceOf(MercadoPagoOauthError);
     });
+
+    it('permite iniciar OAuth si el usuario está bajo investigación', async () => {
+      const bajoInvestigacion = {
+        ...usuario,
+        estado: 'BAJO_INVESTIGACION' as const,
+      };
+
+      await expect(
+        servicio.crearUrlAutorizacion(bajoInvestigacion),
+      ).resolves.toHaveProperty('url');
+    });
   });
 
   describe('vincularDesdeCallback', () => {
