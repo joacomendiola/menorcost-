@@ -179,7 +179,7 @@ export class CheckoutService {
             estado: cobro.aprobado ? 'PENDIENTE_DE_RETIRO' : 'PENDIENTE_PAGO',
             franjaHorarioId: franja.id,
             subtotal: calculo.subtotal,
-            tarifaServicio: calculo.tarifaServicio,
+            tarifa_servicio: calculo.tarifaServicio,
             comisionMenorcostTasa: calculo.tasaMenorcost,
             tasaMpEstimada: calculo.tasaMp,
             total: calculo.total,
