@@ -74,6 +74,7 @@ function renderizar() {
           <Route path="/checkout/:comercioId" element={<Checkout />} />
           <Route path="/comercios/:comercioId" element={<div>Tienda</div>} />
           <Route path="/canastas/:comercioId" element={<div>Canasta</div>} />
+          <Route path="/pedido/:codigo" element={<div>Ticket QR</div>} />
         </Routes>
       </MemoryRouter>
     </MantineProvider>,
@@ -112,7 +113,7 @@ describe('Checkout', () => {
     });
   });
 
-  it('al aprobar el pago muestra el código de retiro', async () => {
+  it('al aprobar el pago navega al ticket con QR', async () => {
     mocks.pagar.mockResolvedValue({
       idPedido: 'pedido-1',
       codigoAlfanumerico: 'ABCD2345',
@@ -128,8 +129,7 @@ describe('Checkout', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Aprobar' }));
 
-    expect(await screen.findByText('ABCD2345')).toBeTruthy();
-    expect(screen.getByText('¡Pago aprobado!')).toBeTruthy();
+    expect(await screen.findByText('Ticket QR')).toBeTruthy();
     expect(mocks.pagar).toHaveBeenCalledWith('token', {
       comercioId,
       franjaHorarioId: 'f1',

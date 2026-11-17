@@ -339,7 +339,20 @@ export interface PedidoReportableComerciante {
   } | null;
 }
 
+export interface PedidoResumen {
+  idPedido: string;
+  codigoAlfanumerico: string;
+  estado: EstadoPedido;
+  fechaPedido: string;
+  total: number;
+  comercio: { idComercio: string; nombre: string } | null;
+  franjaHorario: { inicio: string; fin: string } | null;
+  itemsCantidad: number;
+  items: Array<{ titulo: string; cantidad: number }>;
+}
+
 export const pedidosApi = {
+  listar: (token: string) => api<PedidoResumen[]>('/pedidos', { token }),
   obtenerPorCodigo: (token: string, codigo: string) =>
     api<PedidoTicket>(`/pedidos/${encodeURIComponent(codigo)}`, { token }),
 };

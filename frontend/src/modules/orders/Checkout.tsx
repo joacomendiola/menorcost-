@@ -20,7 +20,6 @@ import { ApiError } from '../../api';
 import { useAuth } from '../../auth/contexto';
 import {
   checkoutApi,
-  type CheckoutConfirmado,
   type CheckoutResumen,
   type ResultadoPagoSimulado,
 } from './checkoutApi';
@@ -49,7 +48,6 @@ export function Checkout() {
   const [franjaId, setFranjaId] = useState<string | null>(null);
   const [confirmando, setConfirmando] = useState(false);
   const [pagando, setPagando] = useState(false);
-  const [confirmado, setConfirmado] = useState<CheckoutConfirmado | null>(null);
 
   const parametrosInvalidos = !comercioId || !token;
 
@@ -95,8 +93,8 @@ export function Checkout() {
         resultadoPagoSimulado: resultado,
       });
 
-      setConfirmado(pedido);
       setConfirmando(false);
+      navigate(`/pedido/${pedido.codigoAlfanumerico}`);
     } catch (err) {
       setConfirmando(false);
       const mensaje = mensajeError(err);
@@ -140,46 +138,6 @@ export function Checkout() {
         <Button mt="md" variant="default" onClick={() => navigate(-1)}>
           ← Volver
         </Button>
-      </main>
-    );
-  }
-
-  if (confirmado) {
-    return (
-      <main className="comercio-page canastas-page">
-        <Paper withBorder p="lg" radius="lg">
-          <Stack gap="sm">
-            <Title order={2}>¡Pago aprobado!</Title>
-
-            <Text c="dimmed">
-              Guardá tu código para retirar el pedido en el mostrador.
-            </Text>
-
-            <Paper withBorder p="md" radius="md" bg="brand.0">
-              <Stack gap={4} align="center">
-                <Text size="sm" c="dimmed">
-                  Código de retiro
-                </Text>
-                <Text fw={800} size="xl" style={{ letterSpacing: 2 }}>
-                  {confirmado.codigoAlfanumerico}
-                </Text>
-              </Stack>
-            </Paper>
-
-            <Group justify="space-between">
-              <Text>Total pagado</Text>
-              <Text fw={700}>{moneda.format(Number(confirmado.total))}</Text>
-            </Group>
-
-            <Button
-              fullWidth
-              mt="sm"
-              onClick={() => navigate(`/comercios/${comercioId}`)}
-            >
-              Seguir comprando
-            </Button>
-          </Stack>
-        </Paper>
       </main>
     );
   }

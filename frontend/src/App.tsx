@@ -18,8 +18,8 @@ import { DenunciasTab } from './modules/admin/DenunciasTab';
 import { Reviews } from './modules/merchant/Reviews';
 import { Checkout } from './modules/orders/Checkout';
 import { Ticket } from './modules/orders/Ticket';
+import { MisPedidosPage } from './modules/orders/MisPedidosPage';
 import { ComercioEstadoPage } from './pages/ComercioEstadoPage';
-import { EnConstruccion } from './pages/EnConstruccion';
 import { Login } from './pages/Login';
 import { Perfil } from './pages/Perfil';
 import { Recuperar } from './pages/Recuperar';
@@ -95,12 +95,7 @@ export default function App() {
           <Route path="/checkout/:comercioId" element={<Checkout />} />
           <Route
             path="/mis-pedidos"
-            element={
-              <EnConstruccion
-                titulo="Mis pedidos"
-                descripcion="Acá vas a poder seguir el estado de tus pedidos y acceder a tus tickets."
-              />
-            }
+            element={<MisPedidosPage />}
           />
          
           <Route path="/buscar" element={<ExplorarPage />} />
