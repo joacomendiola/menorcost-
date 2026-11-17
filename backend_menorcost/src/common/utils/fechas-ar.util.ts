@@ -78,20 +78,24 @@ export function fechaISOaDate(fechaISO: string): Date {
   return new Date(`${fechaISO}T00:00:00.000Z`);
 }
 
-/** Etiqueta legible para el selector de franjas: `Lun 17/11 · 10:00 a 11:00`. */
+const ABREVIATURA_DIA = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+/**
+ * Etiqueta legible para el selector de franjas: `Lun 17/11 · 10:00 a 11:00`.
+ *
+ * Se arma a mano (en vez de `Intl` con `es-AR`) para que el formato no dependa
+ * de la versión de ICU del runtime: `es-AR` devuelve `17-11` en algunos Node.
+ */
 export function etiquetaRetiro(
   fechaISO: string,
   horaInicio: string,
   horaFin: string,
 ): string {
-  const dia = new Intl.DateTimeFormat('es-AR', {
-    timeZone: 'UTC',
-    weekday: 'short',
-    day: '2-digit',
-    month: '2-digit',
-  }).format(fechaISOaDate(fechaISO));
+  const fecha = fechaISOaDate(fechaISO);
+  const dia = ABREVIATURA_DIA[fecha.getUTCDay()];
+  const diaMes = `${String(fecha.getUTCDate()).padStart(2, '0')}/${String(
+    fecha.getUTCMonth() + 1,
+  ).padStart(2, '0')}`;
 
-  const capitalizado = dia.charAt(0).toUpperCase() + dia.slice(1);
-
-  return `${capitalizado} · ${horaInicio} a ${horaFin}`;
+  return `${dia} ${diaMes} · ${horaInicio} a ${horaFin}`;
 }

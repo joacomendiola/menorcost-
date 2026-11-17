@@ -16,6 +16,7 @@ import { Backoffice } from './modules/admin/Backoffice';
 import { BajasTab } from './modules/admin/BajasTab';
 import { DenunciasTab } from './modules/admin/DenunciasTab';
 import { Reviews } from './modules/merchant/Reviews';
+import { Checkout } from './modules/orders/Checkout';
 import { Ticket } from './modules/orders/Ticket';
 import { ComercioEstadoPage } from './pages/ComercioEstadoPage';
 import { EnConstruccion } from './pages/EnConstruccion';
@@ -91,6 +92,7 @@ export default function App() {
           />
 
           <Route path="/pedido/:codigo" element={<Ticket />} />
+          <Route path="/checkout/:comercioId" element={<Checkout />} />
           <Route
             path="/mis-pedidos"
             element={

@@ -249,7 +249,7 @@ export class CheckoutService {
         {
           idPedido: creado.pedido.id_pedido,
           estado: 'RECHAZADO',
-          mensaje:
+          message:
             'Pago rechazado: no se descontó stock y la canasta sigue disponible.',
         },
         HttpStatus.PAYMENT_REQUIRED,

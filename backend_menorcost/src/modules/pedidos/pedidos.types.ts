@@ -42,5 +42,5 @@ export interface CheckoutConfirmado {
 export interface CheckoutRechazado {
   idPedido: string;
   estado: 'RECHAZADO';
-  mensaje: string;
+  message: string;
 }
