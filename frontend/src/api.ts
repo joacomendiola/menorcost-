@@ -314,12 +314,14 @@ export interface PedidoTicket {
   codigoQR: string;
   estado: EstadoPedido;
   fechaPedido: string;
+  fechaEntrega: string | null;
   subtotal: number;
   tarifaServicio: number;
   total: number;
   comercio: { idComercio: string; nombre: string } | null;
   franjaHorario: { inicio: string; fin: string } | null;
   localAbierto: boolean | null;
+  pagoEstado: string | null;
   items: PedidoTicketItem[];
   calificacion: {
     id: number;
@@ -341,6 +343,7 @@ export interface PedidoReportableComerciante {
   estado: EstadoPedido;
   fecha_pedido: string;
   total: number | string;
+  usuario?: { nombre: string; apellido: string } | null;
   items: Array<{ cantidad: number; producto: { titulo: string } }>;
   reporteAbierto: {
     id_reporte: number;
@@ -366,6 +369,73 @@ export const pedidosApi = {
   listar: (token: string) => api<PedidoResumen[]>('/pedidos', { token }),
   obtenerPorCodigo: (token: string, codigo: string) =>
     api<PedidoTicket>(`/pedidos/${encodeURIComponent(codigo)}`, { token }),
+
+  // CU-2.06 — panel de mostrador del comerciante
+  comercio: (token: string) => api<PedidoComercio[]>('/pedidos/comercio', { token }),
+
+  validarEntrega: (token: string, codigo: string) =>
+    api<EntregaValidada>('/pedidos/validar', {
+      method: 'POST',
+      body: { codigo },
+      token,
+    }),
+
+  entregar: (token: string, idPedido: string) =>
+    api<{ idPedido: string; estado: 'ENTREGADO'; yaEntregado: boolean }>(
+      `/pedidos/${idPedido}/entregar`,
+      { method: 'POST', token },
+    ),
+
+  cancelar: (token: string, idPedido: string) =>
+    api<{ idPedido: string; estado: 'CANCELADO'; stockRestaurado: boolean }>(
+      `/pedidos/${idPedido}/cancelar`,
+      { method: 'POST', token },
+    ),
+};
+
+/** Pedido tal como lo ve el mostrador del comerciante. */
+export interface PedidoComercio {
+  idPedido: string;
+  codigoAlfanumerico: string;
+  estado: EstadoPedido | 'PENDIENTE_PAGO';
+  fechaPedido: string;
+  fechaEntrega: string | null;
+  total: number;
+  cliente: { nombre: string; apellido: string } | null;
+  pagoEstado: string | null;
+  items: Array<{ titulo: string; cantidad: number }>;
+}
+
+export interface EntregaValidada {
+  pedido: PedidoComercio;
+  puedeEntregar: boolean;
+  motivo: string | null;
+}
+
+/* ---------- Notificaciones ---------- */
+
+export type TipoNotificacion =
+  | 'OFERTA_VENCIDA'
+  | 'PEDIDO_ENTREGADO'
+  | 'PEDIDO_CANCELADO'
+  | 'PEDIDO_CANCELADO_POR_FALTA_RETIRO';
+
+export interface Notificacion {
+  id: string;
+  titulo: string;
+  mensaje: string;
+  tipo: TipoNotificacion;
+  leida: boolean;
+  createdAt: string;
+}
+
+export const notificacionesApi = {
+  listar: (token: string) => api<Notificacion[]>('/notifications', { token }),
+  marcarLeida: (token: string, id: string) =>
+    api<Notificacion>(`/notifications/${id}/read`, {
+      method: 'PATCH',
+      token,
+    }),
 };
 
 /* ---------- Reputación (Pantalla 15 + 22) ---------- */

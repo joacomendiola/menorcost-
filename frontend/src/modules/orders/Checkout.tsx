@@ -37,6 +37,15 @@ function mensajeError(error: unknown): string {
   return 'No pudimos completar el pago.';
 }
 
+/** Clave estable por intento de checkout (se rota al recargar la pantalla). */
+function nuevaClaveIdempotencia(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `ck-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function Checkout() {
   const { comercioId } = useParams<{ comercioId: string }>();
   const { token } = useAuth();
@@ -48,6 +57,7 @@ export function Checkout() {
   const [franjaId, setFranjaId] = useState<string | null>(null);
   const [confirmando, setConfirmando] = useState(false);
   const [pagando, setPagando] = useState(false);
+  const [idempotencyKey] = useState(nuevaClaveIdempotencia);
 
   const parametrosInvalidos = !comercioId || !token;
 
@@ -90,6 +100,7 @@ export function Checkout() {
       const pedido = await checkoutApi.pagar(token, {
         comercioId,
         franjaHorarioId: franjaId,
+        idempotencyKey,
         resultadoPagoSimulado: resultado,
       });
 

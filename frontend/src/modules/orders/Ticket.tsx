@@ -36,6 +36,13 @@ const ESTADO_META: Record<string, { label: string; tone: BadgeTone }> = {
   },
 };
 
+const ESTADO_PAGO: Record<string, { label: string; tone: BadgeTone }> = {
+  PAGADO: { label: 'PAGADO', tone: 'ok' },
+  PENDIENTE: { label: 'PENDIENTE', tone: 'pend' },
+  RECHAZADO: { label: 'RECHAZADO', tone: 'bad' },
+  REEMBOLSADO: { label: 'REEMBOLSADO', tone: 'neutro' },
+};
+
 const money = new Intl.NumberFormat('es-AR', {
   style: 'currency',
   currency: 'ARS',
@@ -327,11 +334,12 @@ export function Ticket() {
   const reporteAbierto = pedido.misReportes.find((reporte) =>
     ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'].includes(reporte.estado),
   );
-  const puedeReportar = [
-    'ENTREGADO',
-    'PENDIENTE_DE_RETIRO',
-    'CANCELADO',
-  ].includes(pedido.estado);
+  // El cliente solo reporta pedidos ya entregados (CU-2.06).
+  const puedeReportar = pedido.estado === 'ENTREGADO';
+  const pagoMeta = ESTADO_PAGO[pedido.pagoEstado ?? ''] ?? {
+    label: pedido.pagoEstado ?? '—',
+    tone: 'neutro' as BadgeTone,
+  };
 
   return (
     <main className="ticket-wrap">
@@ -394,10 +402,22 @@ export function Ticket() {
           <div className="ticket-row">
             <dt>Pago</dt>
             <dd>
-              <span className="ticket-paid">PAGADO</span> ·{' '}
+              <Badge tone={pagoMeta.tone}>{pagoMeta.label}</Badge> ·{' '}
               {money.format(pedido.total)}
             </dd>
           </div>
+
+          {pedido.fechaEntrega && (
+            <div className="ticket-row">
+              <dt>Entregado</dt>
+              <dd>
+                {new Intl.DateTimeFormat('es-AR', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                }).format(new Date(pedido.fechaEntrega))}
+              </dd>
+            </div>
+          )}
 
           {pedido.items.map((item) => (
             <div className="ticket-row" key={item.id}>

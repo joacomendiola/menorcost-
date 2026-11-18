@@ -44,6 +44,8 @@ export type ResultadoPagoSimulado = 'APROBADO' | 'RECHAZADO';
 export interface CrearPedidoPayload {
   comercioId: string;
   franjaHorarioId: string;
+  /** Clave estable por intento de checkout: evita pedidos duplicados. */
+  idempotencyKey: string;
   resultadoPagoSimulado?: ResultadoPagoSimulado;
 }
 
