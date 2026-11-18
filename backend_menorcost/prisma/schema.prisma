@@ -181,6 +181,9 @@ enum EstadoSolicitudBaja {
 
 enum TipoNotificacion {
   OFERTA_VENCIDA
+  PEDIDO_ENTREGADO
+  PEDIDO_CANCELADO
+  PEDIDO_CANCELADO_POR_FALTA_RETIRO
 }
 
 model Usuario {
@@ -401,6 +404,8 @@ model CanastaItem {
 model Pedido {
   id_pedido           String       @id @default(uuid()) @map("id_pedido") @db.Uuid
   nroPedido           String       @unique @map("nro_pedido") @db.VarChar(30)
+  // Clave de idempotencia del checkout: evita pedidos/cobros duplicados.
+  idempotencyKey      String?      @unique @map("idempotency_key") @db.VarChar(64)
   usuarioId           String       @map("usuario_id")
   comercioId          String       @map("id_comercio") @db.Uuid
   estado              EstadoPedido @default(PENDIENTE_PAGO)
@@ -408,6 +413,8 @@ model Pedido {
   codigoAlfanumerico  String       @unique @map("codigo_alfanumerico") @db.VarChar(20)
   fecha_pedido        DateTime     @default(now()) @map("fecha_pedido") @db.Timestamp(0)
   fechaExpiracionPago DateTime?    @map("fecha_expiracion_pago")
+  // CU-2.06: fecha/hora en que el comerciante confirmó la entrega en mostrador.
+  fecha_entrega       DateTime?    @map("fecha_entrega") @db.Timestamp(0)
   franjaHorarioId     String?      @map("franja_horario_id") @db.Uuid
   subtotal            Decimal      @db.Decimal(10, 2)
 
