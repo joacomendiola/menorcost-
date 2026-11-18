@@ -236,11 +236,9 @@ describe('CheckoutService', () => {
 
       expect(tx.producto.updateMany).not.toHaveBeenCalled();
       expect(tx.canasta.delete).not.toHaveBeenCalled();
-
-      const data = tx.pedido.create.mock.calls[0][0].data;
-      expect(data.estado).toBe('PENDIENTE_PAGO');
-      expect(data.pagos.create.estado).toBe('RECHAZADO');
-      expect(data.pagos.create.splits).toBeUndefined();
+      // El cobro ocurre fuera de la transacción: un rechazo no toca la base.
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(tx.pedido.create).not.toHaveBeenCalled();
     });
 
     it('revierte con 409 si el stock cambió antes de escribir', async () => {

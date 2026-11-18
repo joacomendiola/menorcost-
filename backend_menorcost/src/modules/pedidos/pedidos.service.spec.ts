@@ -23,6 +23,7 @@ describe('PedidosService', () => {
     codigoQR: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
     estado: 'PENDIENTE_DE_RETIRO',
     fecha_pedido: new Date('2026-11-17T04:33:49.000Z'),
+    fecha_entrega: null,
     subtotal: new Prisma.Decimal('5600.00'),
     tarifa_servicio: new Prisma.Decimal('600.00'),
     total: new Prisma.Decimal('5600.00'),
@@ -43,6 +44,7 @@ describe('PedidosService', () => {
       },
     ],
     calificacion: null,
+    pagos: [{ estado: 'PAGADO' }],
     reportes: [],
   };
 
@@ -108,6 +110,7 @@ describe('PedidosService', () => {
         expect.objectContaining({
           where: {
             usuarioId,
+            estado: { not: 'PENDIENTE_PAGO' },
             OR: [
               { codigoAlfanumerico: { in: ['hrwwlbwy', 'HRWWLBWY'] } },
               { codigoQR: { in: ['hrwwlbwy', 'HRWWLBWY'] } },
