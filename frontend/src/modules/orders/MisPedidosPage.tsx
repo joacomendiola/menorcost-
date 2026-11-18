@@ -1,7 +1,13 @@
 import { Loader } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ApiError, pedidosApi, type PedidoResumen } from '../../api';
+import {
+  ApiError,
+  notificacionesApi,
+  pedidosApi,
+  type Notificacion,
+  type PedidoResumen,
+} from '../../api';
 import { useAuth } from '../../auth/contexto';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 
@@ -43,6 +49,7 @@ export function MisPedidosPage() {
   const [pedidos, setPedidos] = useState<PedidoResumen[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  const [avisos, setAvisos] = useState<Notificacion[]>([]);
 
   useEffect(() => {
     if (!token) return;
@@ -64,10 +71,34 @@ export function MisPedidosPage() {
         if (activo) setCargando(false);
       });
 
+    // Avisos de pedidos (entrega / cancelación) al entrar a "Mis pedidos".
+    notificacionesApi
+      .listar(token)
+      .then((data) => {
+        if (!activo) return;
+
+        setAvisos(data.filter((n) => !n.leida && n.tipo.startsWith('PEDIDO_')));
+      })
+      .catch(() => {
+        // El aviso es secundario: si falla, la lista de pedidos igual se muestra.
+      });
+
     return () => {
       activo = false;
     };
   }, [token]);
+
+  async function descartarAviso(aviso: Notificacion) {
+    if (!token) return;
+
+    setAvisos((actuales) => actuales.filter((item) => item.id !== aviso.id));
+
+    try {
+      await notificacionesApi.marcarLeida(token, aviso.id);
+    } catch {
+      // Si falla, el aviso se vuelve a mostrar en la próxima visita.
+    }
+  }
 
   if (!cargandoSesion && !token) {
     return (
@@ -89,6 +120,41 @@ export function MisPedidosPage() {
       </button>
 
       <h1 className="mis-pedidos-page__titulo">Mis pedidos</h1>
+
+      {avisos.length > 0 && (
+        <section
+          className="mis-pedidos-avisos"
+          aria-label="Avisos de pedidos"
+          style={{ display: 'grid', gap: 12, marginBottom: 16 }}
+        >
+          {avisos.map((aviso) => (
+            <article key={aviso.id} className="card card--left" role="status">
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <strong>{aviso.titulo}</strong>
+                  <p className="muted" style={{ margin: '4px 0 0' }}>
+                    {aviso.mensaje}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="chip"
+                  onClick={() => void descartarAviso(aviso)}
+                >
+                  Entendido
+                </button>
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
 
       {cargando ? (
         <div className="tienda-cargando">
