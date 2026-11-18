@@ -110,7 +110,12 @@ export function PedidosPanel() {
 
   useEffect(() => {
     let activa = true;
-    void cargar(() => activa);
+
+    const cargarInicial = async () => {
+      await cargar(() => activa);
+    };
+
+    void cargarInicial();
 
     return () => {
       activa = false;

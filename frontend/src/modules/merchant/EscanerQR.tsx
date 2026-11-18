@@ -33,7 +33,9 @@ export function EscanerQR({
   const [error, setError] = useState('');
   const [soportado] = useState(() => obtenerDetector() !== null);
 
-  onCodigoRef.current = onCodigo;
+  useEffect(() => {
+    onCodigoRef.current = onCodigo;
+  }, [onCodigo]);
 
   function detener() {
     streamRef.current?.getTracks().forEach((track) => track.stop());

@@ -174,7 +174,8 @@ describe('Ticket · calificación', () => {
     await screen.findByText('MC-1');
 
     expect(screen.queryByText('Calificá tu pedido')).toBeNull();
-    expect(screen.getByText('Reportar problema')).toBeTruthy();
+    // El cliente solo puede reportar pedidos ya entregados (CU-2.06).
+    expect(screen.queryByText('Reportar problema')).toBeNull();
   });
 
   it('muestra el resumen cuando el pedido ya fue calificado', async () => {

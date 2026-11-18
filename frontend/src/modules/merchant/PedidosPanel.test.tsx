@@ -10,6 +10,10 @@ const mocks = vi.hoisted(() => ({
   crear: vi.fn(),
   show: vi.fn(),
   cerrarSesion: vi.fn(),
+  comercio: vi.fn(),
+  validarEntrega: vi.fn(),
+  entregar: vi.fn(),
+  cancelar: vi.fn(),
 }));
 
 vi.mock('../../api', () => ({
@@ -24,6 +28,12 @@ vi.mock('../../api', () => ({
   reportesApi: {
     pedidosComerciante: mocks.pedidosComerciante,
     crear: mocks.crear,
+  },
+  pedidosApi: {
+    comercio: mocks.comercio,
+    validarEntrega: mocks.validarEntrega,
+    entregar: mocks.entregar,
+    cancelar: mocks.cancelar,
   },
 }));
 
@@ -67,6 +77,7 @@ async function elegirMotivo(label: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.pedidosComerciante.mockResolvedValue([pedido()]);
+  mocks.comercio.mockResolvedValue([]);
   mocks.crear.mockResolvedValue({
     id_reporte: 10,
     motivo: 'El cliente no se presentó a retirar el producto',
@@ -179,6 +190,108 @@ describe('PedidosPanel', () => {
           message: 'SMTP caído',
         }),
       ),
+    );
+  });
+
+  it('valida el código y confirma la entrega en mostrador', async () => {
+    mocks.validarEntrega.mockResolvedValue({
+      pedido: {
+        idPedido: 'p1',
+        codigoAlfanumerico: 'MC-1',
+        estado: 'PENDIENTE_DE_RETIRO',
+        fechaPedido: '2026-01-01T00:00:00.000Z',
+        fechaEntrega: null,
+        total: 1500,
+        cliente: { nombre: 'Ana', apellido: 'Paz' },
+        pagoEstado: 'PAGADO',
+        items: [{ titulo: 'Producto', cantidad: 1 }],
+      },
+      puedeEntregar: true,
+      motivo: null,
+    });
+    mocks.entregar.mockResolvedValue({
+      idPedido: 'p1',
+      estado: 'ENTREGADO',
+      yaEntregado: false,
+    });
+
+    renderPanel();
+    fireEvent.change(screen.getByLabelText('Código del pedido'), {
+      target: { value: 'MC-1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar código' }));
+
+    await screen.findByRole('button', { name: 'Confirmar entrega' });
+    expect(mocks.validarEntrega).toHaveBeenCalledWith('token', 'MC-1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar entrega' }));
+
+    await waitFor(() =>
+      expect(mocks.entregar).toHaveBeenCalledWith('token', 'p1'),
+    );
+    expect(mocks.show).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Entrega confirmada' }),
+    );
+  });
+
+  it('no permite entregar si el pago no está aprobado', async () => {
+    mocks.validarEntrega.mockResolvedValue({
+      pedido: {
+        idPedido: 'p1',
+        codigoAlfanumerico: 'MC-1',
+        estado: 'PENDIENTE_DE_RETIRO',
+        fechaPedido: '2026-01-01T00:00:00.000Z',
+        fechaEntrega: null,
+        total: 1500,
+        cliente: null,
+        pagoEstado: 'PENDIENTE',
+        items: [],
+      },
+      puedeEntregar: false,
+      motivo: 'El pedido no tiene un pago aprobado.',
+    });
+
+    renderPanel();
+    fireEvent.change(screen.getByLabelText('Código del pedido'), {
+      target: { value: 'MC-1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar código' }));
+
+    await screen.findByText('El pedido no tiene un pago aprobado.');
+    expect(
+      screen.queryByRole('button', { name: 'Confirmar entrega' }),
+    ).toBeNull();
+  });
+
+  it('permite cancelar un pedido pendiente de pago', async () => {
+    mocks.comercio.mockResolvedValue([
+      {
+        idPedido: 'p3',
+        codigoAlfanumerico: 'MC-3',
+        estado: 'PENDIENTE_PAGO',
+        fechaPedido: '2026-01-01T00:00:00.000Z',
+        fechaEntrega: null,
+        total: 900,
+        cliente: null,
+        pagoEstado: 'PENDIENTE',
+        items: [],
+      },
+    ]);
+    mocks.cancelar.mockResolvedValue({
+      idPedido: 'p3',
+      estado: 'CANCELADO',
+      stockRestaurado: true,
+    });
+
+    renderPanel();
+    await screen.findByText('Pedidos pendientes de pago');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar pedido' }));
+
+    await waitFor(() =>
+      expect(mocks.cancelar).toHaveBeenCalledWith('token', 'p3'),
+    );
+    expect(mocks.show).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Pedido cancelado' }),
     );
   });
 });
