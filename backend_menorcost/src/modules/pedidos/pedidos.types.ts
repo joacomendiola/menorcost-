@@ -86,12 +86,14 @@ export interface PedidoTicket {
   codigoQR: string;
   estado: EstadoPedidoVisible;
   fechaPedido: string;
+  fechaEntrega: string | null;
   subtotal: number;
   tarifaServicio: number;
   total: number;
   comercio: { idComercio: string; nombre: string } | null;
   franjaHorario: { inicio: string; fin: string } | null;
   localAbierto: boolean | null;
+  pagoEstado: string | null;
   items: PedidoTicketItem[];
   calificacion: {
     id: number;

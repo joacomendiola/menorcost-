@@ -57,6 +57,11 @@ export class CanastasService {
     if (canasta.comercio.estado !== 'HABILITADO') {
       throw new BadRequestException('El comercio no está habilitado.');
     }
+    if (!canasta.comercio.mercadoPagoVinculado) {
+      throw new BadRequestException(
+        'El comercio todavía no tiene Mercado Pago vinculado.',
+      );
+    }
     if (canasta.items.length === 0) {
       throw new BadRequestException('La canasta está vacía.');
     }
