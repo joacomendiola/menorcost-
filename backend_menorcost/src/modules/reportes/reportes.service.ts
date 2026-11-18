@@ -25,7 +25,8 @@ const ESTADOS_REPORTES_ABIERTOS = [
 ] as const;
 
 const ESTADOS_REPORTABLES: Record<Rol, EstadoPedido[]> = {
-  CLIENTE: ['ENTREGADO', 'PENDIENTE_DE_RETIRO', 'CANCELADO'],
+  // El cliente solo puede reportar pedidos que ya retiró (CU-2.06).
+  CLIENTE: ['ENTREGADO'],
   COMERCIANTE: [
     'ENTREGADO',
     'PENDIENTE_DE_RETIRO',
@@ -293,6 +294,7 @@ export class ReportesService {
         estado: true,
         fecha_pedido: true,
         total: true,
+        usuario: { select: { nombre: true, apellido: true } },
         items: {
           select: {
             cantidad: true,

@@ -252,13 +252,14 @@ export class PedidosService {
       );
     }
 
+    const pagoEstado = pedido.pagos[0]?.estado ?? null;
     const puedeEntregar =
-      pedido.estado === 'PENDIENTE_DE_RETIRO' && pedido.pagoEstado === 'PAGADO';
+      pedido.estado === 'PENDIENTE_DE_RETIRO' && pagoEstado === 'PAGADO';
 
     return {
       pedido: aPedidoComercio(pedido),
       puedeEntregar,
-      motivo: motivoNoEntregable(pedido.estado, pedido.pagoEstado),
+      motivo: motivoNoEntregable(pedido.estado, pagoEstado),
     };
   }
 
