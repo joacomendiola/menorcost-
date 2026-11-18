@@ -47,12 +47,14 @@ const pedidoBase: PedidoTicket = {
   codigoQR: 'qr-1',
   estado: 'ENTREGADO',
   fechaPedido: '2026-01-01T00:00:00.000Z',
+  fechaEntrega: '2026-01-02T12:00:00.000Z',
   subtotal: 1000,
   tarifaServicio: 0,
   total: 1000,
   comercio: { idComercio: 'c1', nombre: 'Local' },
   franjaHorario: null,
   localAbierto: true,
+  pagoEstado: 'PAGADO',
   items: [
     {
       id: 'i1',

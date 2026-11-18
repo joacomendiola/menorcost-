@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Button, Select, Text, Textarea } from '@mantine/core';
+import { Button, Select, Text, Textarea, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { ApiError, reportesApi } from '../../api';
-import type { PedidoReportableComerciante } from '../../api';
+import { ApiError, pedidosApi, reportesApi } from '../../api';
+import type {
+  EntregaValidada,
+  PedidoComercio,
+  PedidoReportableComerciante,
+} from '../../api';
 import { useAuth } from '../../auth/contexto';
 import { Card } from '../../components/ui/Card';
+import { EscanerQR } from './EscanerQR';
 
 const MOTIVO_OTRO = 'Otro motivo';
 const MOTIVOS = [
@@ -24,6 +29,7 @@ const MOTIVOS = [
 ];
 
 const ESTADOS: Record<string, string> = {
+  PENDIENTE_PAGO: 'Pendiente de pago',
   PENDIENTE_DE_RETIRO: 'Pendiente de retiro',
   ENTREGADO: 'Entregado',
   CANCELADO: 'Cancelado',
@@ -36,8 +42,18 @@ const money = new Intl.NumberFormat('es-AR', {
   maximumFractionDigits: 2,
 });
 
+const fecha = new Intl.DateTimeFormat('es-AR', {
+  dateStyle: 'short',
+  timeStyle: 'short',
+});
+
+function mensajeDeError(error: unknown, fallback: string): string {
+  return error instanceof ApiError ? error.message : fallback;
+}
+
 export function PedidosPanel() {
   const { token, cerrarSesion } = useAuth();
+
   const [pedidos, setPedidos] = useState<PedidoReportableComerciante[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,62 +61,145 @@ export function PedidosPanel() {
   const [descripciones, setDescripciones] = useState<Record<string, string>>({});
   const [procesando, setProcesando] = useState<string | null>(null);
 
-  const cargarPedidos = useCallback(async (activa?: () => boolean) => {
-    if (!token) return;
-    try {
-      const resultado = await reportesApi.pedidosComerciante(token);
-      if (!activa || activa()) setPedidos(resultado);
-    } catch (err) {
+  // CU-2.06 — verificación de entrega en mostrador
+  const [codigo, setCodigo] = useState('');
+  const [validando, setValidando] = useState(false);
+  const [validacion, setValidacion] = useState<EntregaValidada | null>(null);
+  const [errorValidacion, setErrorValidacion] = useState<string | null>(null);
+  const [entregando, setEntregando] = useState(false);
+  const [pedidosComercio, setPedidosComercio] = useState<PedidoComercio[]>([]);
+  const [cancelando, setCancelando] = useState<string | null>(null);
+
+  const manejarError = useCallback(
+    (err: unknown, fallback: string) => {
       if (err instanceof ApiError && err.status === 401) {
         cerrarSesion();
-        return;
+        return null;
       }
-      if (!activa || activa()) {
-        setError(
-          err instanceof ApiError
-            ? err.message
-            : 'No se pudieron cargar los pedidos. Intenta nuevamente.',
+      return mensajeDeError(err, fallback);
+    },
+    [cerrarSesion],
+  );
+
+  const cargar = useCallback(
+    async (activa?: () => boolean) => {
+      if (!token) return;
+
+      try {
+        const [reportables, todos] = await Promise.all([
+          reportesApi.pedidosComerciante(token),
+          pedidosApi.comercio(token),
+        ]);
+        if (!activa || activa()) {
+          setPedidos(reportables);
+          setPedidosComercio(todos);
+          setError(null);
+        }
+      } catch (err) {
+        const mensaje = manejarError(
+          err,
+          'No se pudieron cargar los pedidos. Intenta nuevamente.',
         );
+        if (mensaje && (!activa || activa())) setError(mensaje);
+      } finally {
+        if (!activa || activa()) setCargando(false);
       }
-    } finally {
-      if (!activa || activa()) setCargando(false);
-    }
-  }, [token, cerrarSesion]);
+    },
+    [token, manejarError],
+  );
 
   useEffect(() => {
-    if (!token) return;
     let activa = true;
-
-    reportesApi
-      .pedidosComerciante(token)
-      .then((resultado) => {
-        if (activa) setPedidos(resultado);
-      })
-      .catch((err) => {
-        if (!activa) return;
-        if (err instanceof ApiError && err.status === 401) {
-          cerrarSesion();
-          return;
-        }
-        setError(
-          err instanceof ApiError
-            ? err.message
-            : 'No se pudieron cargar los pedidos. Intenta nuevamente.',
-        );
-      })
-      .finally(() => {
-        if (activa) setCargando(false);
-      });
+    void cargar(() => activa);
 
     return () => {
       activa = false;
     };
-  }, [token, cerrarSesion]);
+  }, [cargar]);
 
-  function reintentar() {
-    setCargando(true);
-    setError(null);
-    void cargarPedidos();
+  async function validarCodigo(valor: string) {
+    if (!token) return;
+    const limpio = valor.trim();
+
+    if (!limpio) {
+      setErrorValidacion('Ingresá o escaneá el código del pedido.');
+      return;
+    }
+
+    setValidando(true);
+    setErrorValidacion(null);
+    setValidacion(null);
+
+    try {
+      const resultado = await pedidosApi.validarEntrega(token, limpio);
+      setValidacion(resultado);
+      setCodigo(resultado.pedido.codigoAlfanumerico);
+    } catch (err) {
+      setErrorValidacion(
+        manejarError(err, 'No pudimos validar el código. Intenta de nuevo.'),
+      );
+    } finally {
+      setValidando(false);
+    }
+  }
+
+  async function confirmarEntrega() {
+    if (!token || !validacion) return;
+
+    setEntregando(true);
+    try {
+      const resultado = await pedidosApi.entregar(
+        token,
+        validacion.pedido.idPedido,
+      );
+
+      notifications.show({
+        color: 'green',
+        title: 'Entrega confirmada',
+        message: resultado.yaEntregado
+          ? 'Ese pedido ya figuraba como entregado.'
+          : `Pedido ${validacion.pedido.codigoAlfanumerico} entregado. El cliente ya puede calificar y reportar.`,
+      });
+
+      setValidacion(null);
+      setCodigo('');
+      await cargar();
+    } catch (err) {
+      notifications.show({
+        color: 'red',
+        title: 'No se pudo confirmar la entrega',
+        message:
+          manejarError(err, 'Ocurrió un error inesperado.') ??
+          'Ocurrió un error inesperado.',
+      });
+    } finally {
+      setEntregando(false);
+    }
+  }
+
+  async function cancelarPedido(pedido: PedidoComercio) {
+    if (!token) return;
+
+    setCancelando(pedido.idPedido);
+    try {
+      await pedidosApi.cancelar(token, pedido.idPedido);
+      notifications.show({
+        color: 'green',
+        title: 'Pedido cancelado',
+        message: `Se canceló el pedido ${pedido.codigoAlfanumerico} y se liberó el stock reservado.`,
+      });
+      await cargar();
+    } catch (err) {
+      notifications.show({
+        color: 'red',
+        title: 'No se pudo cancelar',
+        message:
+          manejarError(err, 'Ocurrió un error inesperado.') ??
+          'Ocurrió un error inesperado.',
+      });
+    } finally {
+      setCancelando(null);
+    }
   }
 
   async function enviarReporte(
@@ -173,26 +272,166 @@ export function PedidosPanel() {
             },
       );
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        cerrarSesion();
-        return;
-      }
+      const mensaje = manejarError(
+        err,
+        'Ocurrió un error inesperado. Intenta nuevamente.',
+      );
+      if (!mensaje) return;
       notifications.show({
         color: 'red',
         title: 'No se pudo enviar el reporte',
-        message:
-          err instanceof ApiError
-            ? err.message
-            : 'Ocurrió un error inesperado. Intenta nuevamente.',
+        message: mensaje,
       });
     } finally {
       setProcesando(null);
     }
   }
 
+  const pendientesDePago = pedidosComercio.filter(
+    (pedido) => pedido.estado === 'PENDIENTE_PAGO',
+  );
+
   return (
     <main className="merchant-content">
-      <div style={{ marginTop: 16 }}>
+      <div style={{ display: 'grid', gap: 16, marginTop: 16 }}>
+        <Card className="reviews-card">
+          <h2 style={{ marginTop: 0 }}>Verificar entrega</h2>
+          <p className="muted" style={{ marginBottom: 16 }}>
+            Escaneá el QR del cliente o ingresá el código alfanumérico del
+            ticket para confirmar la entrega en mostrador.
+          </p>
+
+          <form
+            onSubmit={(evento) => {
+              evento.preventDefault();
+              void validarCodigo(codigo);
+            }}
+            style={{ display: 'grid', gap: 12 }}
+          >
+            <TextInput
+              label="Código del pedido"
+              placeholder="Ej. MC7K2P9A"
+              value={codigo}
+              onChange={(evento) => setCodigo(evento.currentTarget.value)}
+              maxLength={100}
+              autoComplete="off"
+            />
+
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <Button type="submit" loading={validando}>
+                Validar código
+              </Button>
+              <EscanerQR
+                onCodigo={(valor) => {
+                  setCodigo(valor);
+                  void validarCodigo(valor);
+                }}
+              />
+            </div>
+          </form>
+
+          {errorValidacion && (
+            <Text c="red" role="alert" mt="sm">
+              {errorValidacion}
+            </Text>
+          )}
+
+          {validacion && (
+            <div
+              style={{
+                border: '1px solid var(--bd)',
+                borderRadius: 16,
+                padding: 16,
+                marginTop: 16,
+                display: 'grid',
+                gap: 8,
+              }}
+            >
+              <Text fw={700}>
+                Pedido {validacion.pedido.codigoAlfanumerico} ·{' '}
+                {money.format(validacion.pedido.total)}
+              </Text>
+              <Text size="sm">
+                Cliente:{' '}
+                {validacion.pedido.cliente
+                  ? `${validacion.pedido.cliente.nombre} ${validacion.pedido.cliente.apellido}`
+                  : '—'}
+              </Text>
+              <Text size="sm">
+                Estado:{' '}
+                {ESTADOS[validacion.pedido.estado] ?? validacion.pedido.estado} ·
+                Pago: {validacion.pedido.pagoEstado ?? '—'}
+              </Text>
+              <Text size="sm">
+                {validacion.pedido.items
+                  .map((item) => `${item.cantidad}× ${item.titulo}`)
+                  .join(', ') || 'Sin artículos'}
+              </Text>
+
+              {validacion.puedeEntregar ? (
+                <Button
+                  color="green"
+                  loading={entregando}
+                  onClick={() => void confirmarEntrega()}
+                >
+                  Confirmar entrega
+                </Button>
+              ) : (
+                <Text c="orange" role="alert">
+                  {validacion.motivo ?? 'Este pedido no se puede entregar.'}
+                </Text>
+              )}
+            </div>
+          )}
+        </Card>
+
+        {pendientesDePago.length > 0 && (
+          <Card className="reviews-card">
+            <h2 style={{ marginTop: 0 }}>Pedidos pendientes de pago</h2>
+            <p className="muted" style={{ marginBottom: 16 }}>
+              Si el cliente no terminó el pago, podés cancelar el pedido para
+              liberar el stock reservado. No se cobró nada.
+            </p>
+
+            <div style={{ display: 'grid', gap: 12 }}>
+              {pendientesDePago.map((pedido) => (
+                <article
+                  key={pedido.idPedido}
+                  style={{
+                    border: '1px solid var(--bd)',
+                    borderRadius: 16,
+                    padding: 16,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <div>
+                    <Text fw={600}>{pedido.codigoAlfanumerico}</Text>
+                    <Text size="sm" c="dimmed">
+                      {fecha.format(new Date(pedido.fechaPedido))} ·{' '}
+                      {money.format(pedido.total)}
+                      {pedido.cliente
+                        ? ` · ${pedido.cliente.nombre} ${pedido.cliente.apellido}`
+                        : ''}
+                    </Text>
+                  </div>
+                  <Button
+                    color="red"
+                    variant="light"
+                    loading={cancelando === pedido.idPedido}
+                    onClick={() => void cancelarPedido(pedido)}
+                  >
+                    Cancelar pedido
+                  </Button>
+                </article>
+              ))}
+            </div>
+          </Card>
+        )}
+
         <Card className="reviews-card">
           <h2 style={{ marginTop: 0 }}>Pedidos</h2>
           <p className="muted" style={{ marginBottom: 16 }}>
@@ -205,11 +444,7 @@ export function PedidosPanel() {
           ) : error ? (
             <div role="alert">
               <Text c="red">{error}</Text>
-              <Button
-                mt="sm"
-                variant="default"
-                onClick={reintentar}
-              >
+              <Button mt="sm" variant="default" onClick={() => void cargar()}>
                 Reintentar
               </Button>
             </div>
@@ -230,6 +465,9 @@ export function PedidosPanel() {
                     Pedido {pedido.codigoAlfanumerico}
                   </h3>
                   <p>
+                    {pedido.usuario
+                      ? `Cliente: ${pedido.usuario.nombre} ${pedido.usuario.apellido} · `
+                      : ''}
                     Estado: {ESTADOS[pedido.estado] ?? pedido.estado} · Total:{' '}
                     {money.format(Number(pedido.total))}
                   </p>
@@ -285,7 +523,9 @@ export function PedidosPanel() {
                         type="submit"
                         variant="default"
                         loading={procesando === pedido.id_pedido}
-                        disabled={procesando !== null && procesando !== pedido.id_pedido}
+                        disabled={
+                          procesando !== null && procesando !== pedido.id_pedido
+                        }
                       >
                         Reportar problema
                       </Button>
