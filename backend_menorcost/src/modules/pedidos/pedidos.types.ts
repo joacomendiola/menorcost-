@@ -108,3 +108,28 @@ export interface PedidoTicket {
     fecha: string;
   }>;
 }
+
+export interface PedidoComercioItem {
+  titulo: string;
+  cantidad: number;
+}
+
+/** Pedido visible para el panel de mostrador del comerciante (CU-2.06). */
+export interface PedidoComercio {
+  idPedido: string;
+  codigoAlfanumerico: string;
+  estado: EstadoPedidoVisible | 'PENDIENTE_PAGO';
+  fechaPedido: string;
+  fechaEntrega: string | null;
+  total: number;
+  cliente: { nombre: string; apellido: string } | null;
+  pagoEstado: string | null;
+  items: PedidoComercioItem[];
+}
+
+/** Resultado de validar un código en el mostrador antes de entregar. */
+export interface EntregaValidada {
+  pedido: PedidoComercio;
+  puedeEntregar: boolean;
+  motivo: string | null;
+}
