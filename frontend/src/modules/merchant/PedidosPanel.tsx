@@ -293,9 +293,9 @@ export function PedidosPanel() {
   return (
     <main className="merchant-content">
       <div style={{ display: 'grid', gap: 16, marginTop: 16 }}>
-        <Card className="reviews-card">
-          <h2 style={{ marginTop: 0 }}>Verificar entrega</h2>
-          <p className="muted" style={{ marginBottom: 16 }}>
+        <Card className="delivery-verification-card" padding="sm" shadow="sm">
+          <h2 style={{ margin: '0 0 6px' }}>Verificar entrega</h2>
+          <p className="muted" style={{ margin: '0 0 12px' }}>
             Escaneá el QR del cliente o ingresá el código alfanumérico del
             ticket para confirmar la entrega en mostrador.
           </p>
@@ -305,7 +305,7 @@ export function PedidosPanel() {
               evento.preventDefault();
               void validarCodigo(codigo);
             }}
-            style={{ display: 'grid', gap: 12 }}
+            style={{ display: 'grid', gap: 8 }}
           >
             <TextInput
               label="Código del pedido"

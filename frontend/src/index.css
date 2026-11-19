@@ -808,6 +808,14 @@ h3 {
   min-height: 400px;
 }
 
+.delivery-verification-card {
+  width: 100%;
+  max-width: 760px;
+  height: auto;
+  min-height: 0;
+  margin-inline: auto;
+}
+
 .resena-item {
   animation: fadeIn 0.2s ease;
 }
