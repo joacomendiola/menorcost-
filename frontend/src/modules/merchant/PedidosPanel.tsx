@@ -8,6 +8,8 @@ import type {
   PedidoReportableComerciante,
 } from '../../api';
 import { useAuth } from '../../auth/contexto';
+import { Badge } from '../../components/ui/Badge';
+import { metaEstadoPago, metaEstadoPedido } from '../orders/estadosPedido';
 import { Card } from '../../components/ui/Card';
 import { EscanerQR } from './EscanerQR';
 
@@ -27,14 +29,6 @@ const MOTIVOS = [
   },
   { value: MOTIVO_OTRO, label: MOTIVO_OTRO },
 ];
-
-const ESTADOS: Record<string, string> = {
-  PENDIENTE_PAGO: 'Pendiente de pago',
-  PENDIENTE_DE_RETIRO: 'Pendiente de retiro',
-  ENTREGADO: 'Entregado',
-  CANCELADO: 'Cancelado',
-  CANCELADO_POR_FALTA_RETIRO: 'Cancelado por falta de retiro',
-};
 
 const money = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -362,11 +356,17 @@ export function PedidosPanel() {
                   ? `${validacion.pedido.cliente.nombre} ${validacion.pedido.cliente.apellido}`
                   : '—'}
               </Text>
-              <Text size="sm">
-                Estado:{' '}
-                {ESTADOS[validacion.pedido.estado] ?? validacion.pedido.estado} ·
-                Pago: {validacion.pedido.pagoEstado ?? '—'}
-              </Text>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <EstadoPedidoBadge estado={validacion.pedido.estado} />
+                <CobroBadge estado={validacion.pedido.pagoEstado} />
+              </div>
               <Text size="sm">
                 {validacion.pedido.items
                   .map((item) => `${item.cantidad}× ${item.titulo}`)
@@ -473,9 +473,19 @@ export function PedidosPanel() {
                     {pedido.usuario
                       ? `Cliente: ${pedido.usuario.nombre} ${pedido.usuario.apellido} · `
                       : ''}
-                    Estado: {ESTADOS[pedido.estado] ?? pedido.estado} · Total:{' '}
-                    {money.format(Number(pedido.total))}
+                    Total: {money.format(Number(pedido.total))}
                   </p>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: 8,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <EstadoPedidoBadge estado={pedido.estado} />
+                  </div>
                   <p>
                     {pedido.items
                       .map((item) => `${item.cantidad}× ${item.producto.titulo}`)
@@ -543,5 +553,25 @@ export function PedidosPanel() {
         </Card>
       </div>
     </main>
+  );
+}
+
+/** Etiqueta en castellano y color semántico para el estado del pedido. */
+function EstadoPedidoBadge({ estado }: { estado: string }) {
+  const meta = metaEstadoPedido(estado);
+
+  return <Badge tone={meta.tone}>{meta.label}</Badge>;
+}
+
+/** Bloque destacado del cobro: el comerciante ve de un vistazo si está pago. */
+function CobroBadge({ estado }: { estado: string | null }) {
+  const meta = metaEstadoPago(estado);
+
+  return (
+    <div className="pedido-cobro" role="group" aria-label="Estado del cobro">
+      <span className="pedido-cobro__label">Cobro</span>
+      <Badge tone={meta.tone}>{meta.label}</Badge>
+      <span className="pedido-cobro__medio">Mercado Pago</span>
+    </div>
   );
 }

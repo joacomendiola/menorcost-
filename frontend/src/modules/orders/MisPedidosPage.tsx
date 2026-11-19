@@ -1,5 +1,5 @@
 import { Loader } from '@mantine/core';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ApiError,
@@ -9,7 +9,8 @@ import {
   type PedidoResumen,
 } from '../../api';
 import { useAuth } from '../../auth/contexto';
-import { Badge, type BadgeTone } from '../../components/ui/Badge';
+import { Badge } from '../../components/ui/Badge';
+import { metaEstadoPedido } from './estadosPedido';
 
 const moneda = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -17,16 +18,6 @@ const moneda = new Intl.NumberFormat('es-AR', {
   minimumFractionDigits: 0,
   maximumFractionDigits: 2,
 });
-
-const ESTADO_META: Record<string, { label: string; tone: BadgeTone }> = {
-  PENDIENTE_DE_RETIRO: { label: 'PENDIENTE_DE_RETIRO', tone: 'pend' },
-  ENTREGADO: { label: 'ENTREGADO', tone: 'ok' },
-  CANCELADO: { label: 'CANCELADO', tone: 'bad' },
-  CANCELADO_POR_FALTA_RETIRO: {
-    label: 'CANCELADO_POR_FALTA_RETIRO',
-    tone: 'bad',
-  },
-};
 
 function mensajeError(error: unknown): string {
   if (error instanceof ApiError) {
@@ -51,42 +42,50 @@ export function MisPedidosPage() {
   const [error, setError] = useState('');
   const [avisos, setAvisos] = useState<Notificacion[]>([]);
 
+  const cargar = useCallback(async () => {
+    if (!token) return;
+
+    try {
+      const data = await pedidosApi.listar(token);
+      setPedidos(data);
+      setError('');
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setCargando(false);
+    }
+  }, [token]);
+
+  const cargarAvisos = useCallback(async () => {
+    if (!token) return;
+
+    try {
+      const data = await notificacionesApi.listar(token);
+      setAvisos(data.filter((n) => !n.leida && n.tipo.startsWith('PEDIDO_')));
+    } catch {
+      // El aviso es secundario: si falla, la lista de pedidos igual se muestra.
+    }
+  }, [token]);
+
   useEffect(() => {
     if (!token) return;
 
-    let activo = true;
-
-    pedidosApi
-      .listar(token)
-      .then((data) => {
-        if (!activo) return;
-
-        setPedidos(data);
-        setError('');
-      })
-      .catch((err: unknown) => {
-        if (activo) setError(mensajeError(err));
-      })
-      .finally(() => {
-        if (activo) setCargando(false);
-      });
-
-    // Avisos de pedidos (entrega / cancelación) al entrar a "Mis pedidos".
-    notificacionesApi
-      .listar(token)
-      .then((data) => {
-        if (!activo) return;
-
-        setAvisos(data.filter((n) => !n.leida && n.tipo.startsWith('PEDIDO_')));
-      })
-      .catch(() => {
-        // El aviso es secundario: si falla, la lista de pedidos igual se muestra.
-      });
-
-    return () => {
-      activo = false;
+    const cargarTodo = async () => {
+      await cargar();
+      await cargarAvisos();
     };
-  }, [token]);
+
+    void cargarTodo();
+
+    // Al volver a la pestaña se revalida: el comercio pudo entregar el pedido
+    // mientras la pantalla estaba abierta.
+    const alVolver = () => {
+      void cargarTodo();
+    };
+    window.addEventListener('focus', alVolver);
+
+    return () => window.removeEventListener('focus', alVolver);
+  }, [token, cargar, cargarAvisos]);
 
   async function descartarAviso(aviso: Notificacion) {
     if (!token) return;
@@ -98,6 +97,9 @@ export function MisPedidosPage() {
     } catch {
       // Si falla, el aviso se vuelve a mostrar en la próxima visita.
     }
+
+    // Se revalida en vez de confiar solo en el estado optimista.
+    await Promise.all([cargar(), cargarAvisos()]);
   }
 
   if (!cargandoSesion && !token) {
@@ -174,10 +176,7 @@ export function MisPedidosPage() {
       ) : (
         <section className="mis-pedidos-lista">
           {pedidos.map((pedido) => {
-            const estado = ESTADO_META[pedido.estado] ?? {
-              label: pedido.estado,
-              tone: 'neutro' as BadgeTone,
-            };
+            const estado = metaEstadoPedido(pedido.estado);
             const esPendiente = pedido.estado === 'PENDIENTE_DE_RETIRO';
             const franja = pedido.franjaHorario
               ? `Retiro ${pedido.franjaHorario.inicio} – ${pedido.franjaHorario.fin}`

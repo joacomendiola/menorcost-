@@ -6,7 +6,8 @@ import QRCode from 'qrcode';
 import { useAuth } from '../../auth/contexto';
 import { ApiError, pedidosApi, reportesApi, reputacionApi } from '../../api';
 import type { PedidoTicket } from '../../api';
-import { Badge, type BadgeTone } from '../../components/ui/Badge';
+import { Badge } from '../../components/ui/Badge';
+import { metaEstadoPago, metaEstadoPedido } from './estadosPedido';
 
 const MOTIVO_OTRO = 'Otro';
 
@@ -25,23 +26,6 @@ const MOTIVOS = [
   },
   { value: MOTIVO_OTRO, label: 'Otro motivo' },
 ];
-
-const ESTADO_META: Record<string, { label: string; tone: BadgeTone }> = {
-  PENDIENTE_DE_RETIRO: { label: 'PENDIENTE_DE_RETIRO', tone: 'pend' },
-  ENTREGADO: { label: 'ENTREGADO', tone: 'ok' },
-  CANCELADO: { label: 'CANCELADO', tone: 'bad' },
-  CANCELADO_POR_FALTA_RETIRO: {
-    label: 'CANCELADO_POR_FALTA_RETIRO',
-    tone: 'bad',
-  },
-};
-
-const ESTADO_PAGO: Record<string, { label: string; tone: BadgeTone }> = {
-  PAGADO: { label: 'PAGADO', tone: 'ok' },
-  PENDIENTE: { label: 'PENDIENTE', tone: 'pend' },
-  RECHAZADO: { label: 'RECHAZADO', tone: 'bad' },
-  REEMBOLSADO: { label: 'REEMBOLSADO', tone: 'neutro' },
-};
 
 const money = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -326,20 +310,14 @@ export function Ticket() {
     );
   }
 
-  const estado = ESTADO_META[pedido.estado] ?? {
-    label: pedido.estado,
-    tone: 'neutro' as BadgeTone,
-  };
+  const estado = metaEstadoPedido(pedido.estado);
   const valorEstrellas = hover || puntaje;
   const reporteAbierto = pedido.misReportes.find((reporte) =>
     ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'].includes(reporte.estado),
   );
   // El cliente solo reporta pedidos ya entregados (CU-2.06).
   const puedeReportar = pedido.estado === 'ENTREGADO';
-  const pagoMeta = ESTADO_PAGO[pedido.pagoEstado ?? ''] ?? {
-    label: pedido.pagoEstado ?? '—',
-    tone: 'neutro' as BadgeTone,
-  };
+  const pagoMeta = metaEstadoPago(pedido.pagoEstado);
 
   return (
     <main className="ticket-wrap">

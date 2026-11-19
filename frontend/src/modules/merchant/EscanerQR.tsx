@@ -28,8 +28,11 @@ export function EscanerQR({
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const montadoRef = useRef(true);
+  const iniciandoRef = useRef(false);
   const onCodigoRef = useRef(onCodigo);
   const [activo, setActivo] = useState(false);
+  const [iniciando, setIniciando] = useState(false);
   const [error, setError] = useState('');
   const [soportado] = useState(() => obtenerDetector() !== null);
 
@@ -44,7 +47,10 @@ export function EscanerQR({
   }
 
   useEffect(() => {
+    montadoRef.current = true;
+
     return () => {
+      montadoRef.current = false;
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     };
@@ -100,19 +106,38 @@ export function EscanerQR({
       return;
     }
 
+    // Evita abrir dos cámaras con doble clic o mientras se pide el permiso.
+    if (iniciandoRef.current || streamRef.current) return;
+
     setError('');
+    iniciandoRef.current = true;
+    setIniciando(true);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
       });
+
+      // El componente se desmontó mientras el navegador pedía permiso:
+      // hay que apagar la cámara antes de salir.
+      if (!montadoRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
+      // El guard de arriba garantiza que no hay un stream previo.
       streamRef.current = stream;
       setActivo(true);
     } catch {
       detener();
-      setError(
-        'No pudimos abrir la cámara. Revisá los permisos o ingresá el código a mano.',
-      );
+      if (montadoRef.current) {
+        setError(
+          'No pudimos abrir la cámara. Revisá los permisos o ingresá el código a mano.',
+        );
+      }
+    } finally {
+      iniciandoRef.current = false;
+      if (montadoRef.current) setIniciando(false);
     }
   }
 
@@ -121,6 +146,7 @@ export function EscanerQR({
       <Button
         type="button"
         variant="default"
+        loading={iniciando}
         onClick={() => (activo ? detener() : void iniciar())}
       >
         {activo ? 'Detener cámara' : 'Escanear QR'}
@@ -148,7 +174,7 @@ export function EscanerQR({
             width: '100%',
             maxWidth: 320,
             borderRadius: 12,
-            background: '#000',
+            background: 'var(--video-bg)',
           }}
         />
       )}

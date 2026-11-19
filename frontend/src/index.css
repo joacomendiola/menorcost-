@@ -9,6 +9,9 @@
   --soft: #f3f5f8;
   --pri: #4a7bf0;
   --pri-d: #2f55c8;
+  --pri-soft: #c7d7fe;
+  --pri-tint: #eff4ff;
+  --video-bg: #000000;
   --mint: #5eead4;
   --mint-tx: #06483f;
   --ok: #16a34a;
@@ -1895,7 +1898,7 @@ h3 {
   align-items: center;
   margin-top: 12px;
   padding: 7px 16px;
-  border: 1px solid #c7d7fe;
+  border: 1px solid var(--pri-soft);
   border-radius: var(--radius-pill);
   background: var(--card);
   color: var(--pri);
@@ -1907,7 +1910,7 @@ h3 {
 }
 
 .mis-pedido__accion:hover {
-  background: #eff4ff;
+  background: var(--pri-tint);
   border-color: var(--pri);
 }
 
@@ -1918,6 +1921,30 @@ h3 {
 
 .mis-pedidos-vacio h2 {
   margin-top: 0;
+}
+
+/* Bloque de cobro del panel del comerciante (CU-2.06). */
+.pedido-cobro {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--bd);
+  border-radius: var(--radius-pill);
+  background: var(--soft);
+}
+
+.pedido-cobro__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mut);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.pedido-cobro__medio {
+  font-size: 12px;
+  color: var(--mut);
 }
 
 @media (max-width: 560px) {

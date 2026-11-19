@@ -92,8 +92,8 @@ describe('MisPedidosPage', () => {
     expect(
       screen.getByText(/Retiro 09:00 – 10:00 · .* · Yogur natural x2, Pan de masa madre x1/),
     ).toBeTruthy();
-    expect(screen.getByText('PENDIENTE_DE_RETIRO')).toBeTruthy();
-    expect(screen.getByText('ENTREGADO')).toBeTruthy();
+    expect(screen.getByText('Pendiente de retiro')).toBeTruthy();
+    expect(screen.getByText('Entregado')).toBeTruthy();
   });
 
   it('muestra "Ver ticket QR" solo para pedidos pendientes', async () => {
@@ -124,7 +124,7 @@ describe('MisPedidosPage', () => {
   });
 
   it('muestra los avisos de pedidos y permite descartarlos', async () => {
-    mocks.listarNotificaciones.mockResolvedValue([
+    const avisos = [
       {
         id: 'n1',
         titulo: 'Pedido cancelado',
@@ -141,7 +141,17 @@ describe('MisPedidosPage', () => {
         leida: false,
         createdAt: '2026-11-18T10:00:00.000Z',
       },
-    ]);
+    ];
+
+    mocks.listarNotificaciones.mockResolvedValue(avisos);
+    // Al marcar como leída, el backend deja de devolverla en la próxima carga.
+    mocks.marcarLeida.mockImplementation(async () => {
+      mocks.listarNotificaciones.mockResolvedValue([
+        { ...avisos[0], leida: true },
+        avisos[1],
+      ]);
+      return {};
+    });
 
     renderizar();
 
@@ -151,6 +161,8 @@ describe('MisPedidosPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Entendido' }));
 
     await waitFor(() => expect(mocks.marcarLeida).toHaveBeenCalledWith('token', 'n1'));
-    expect(screen.queryByText('Pedido cancelado')).toBeNull();
+    await waitFor(() =>
+      expect(screen.queryByText('Pedido cancelado')).toBeNull(),
+    );
   });
 });
