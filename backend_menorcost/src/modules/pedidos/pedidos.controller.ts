@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -62,7 +63,7 @@ export class PedidosController {
   @Roles('COMERCIANTE')
   confirmarEntrega(
     @CurrentUser() usuario: AuthenticatedUser,
-    @Param('id') idPedido: string,
+    @Param('id', ParseUUIDPipe) idPedido: string,
   ) {
     return this.pedidosService.confirmarEntrega(usuario.id, idPedido);
   }
@@ -72,7 +73,7 @@ export class PedidosController {
   @Roles('COMERCIANTE')
   cancelar(
     @CurrentUser() usuario: AuthenticatedUser,
-    @Param('id') idPedido: string,
+    @Param('id', ParseUUIDPipe) idPedido: string,
   ) {
     return this.pedidosService.cancelarPendientePago(usuario.id, idPedido);
   }

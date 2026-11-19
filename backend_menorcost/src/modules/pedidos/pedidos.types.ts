@@ -31,10 +31,12 @@ export interface CheckoutResumen {
   franjas: CheckoutFranja[];
 }
 
+export type EstadoPedidoEnCheckout = EstadoPedidoVisible | 'PENDIENTE_PAGO';
+
 export interface CheckoutConfirmado {
   idPedido: string;
   codigoAlfanumerico: string;
-  estado: 'PENDIENTE_DE_RETIRO';
+  estado: EstadoPedidoEnCheckout;
   total: string;
 }
 

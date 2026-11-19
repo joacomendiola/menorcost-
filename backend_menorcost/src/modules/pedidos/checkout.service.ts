@@ -22,7 +22,11 @@ import {
   PASARELA_PAGO,
   type PasarelaPago,
 } from './pago-simulado.service.js';
-import type { CheckoutConfirmado, CheckoutResumen } from './pedidos.types.js';
+import type {
+  CheckoutConfirmado,
+  CheckoutResumen,
+  EstadoPedidoEnCheckout,
+} from './pedidos.types.js';
 
 type DetalleCheckout = Awaited<
   ReturnType<CanastasService['obtenerCanastaParaCheckout']>
@@ -143,9 +147,12 @@ export class CheckoutService {
     if (claveIdempotencia) {
       const previo = await this.buscarPorIdempotencia(claveIdempotencia);
       if (previo) {
-        if (previo.usuarioId !== usuarioId) {
+        if (
+          previo.usuarioId !== usuarioId ||
+          previo.comercioId !== dto.comercioId
+        ) {
           throw new ConflictException(
-            'La clave de idempotencia ya fue utilizada por otro usuario.',
+            'La clave de idempotencia ya fue utilizada por otro checkout.',
           );
         }
         return this.aConfirmado(previo);
@@ -292,7 +299,18 @@ export class CheckoutService {
       // Doble click con la misma clave: otro request ya creó el pedido.
       if (claveIdempotencia && esConflictoDeIdempotencia(error)) {
         const previo = await this.buscarPorIdempotencia(claveIdempotencia);
-        if (previo) return this.aConfirmado(previo);
+        if (previo) {
+          // Nunca se devuelve el pedido de otro usuario ni de otro comercio.
+          if (
+            previo.usuarioId !== usuarioId ||
+            previo.comercioId !== dto.comercioId
+          ) {
+            throw new ConflictException(
+              'La clave de idempotencia ya fue utilizada por otro checkout.',
+            );
+          }
+          return this.aConfirmado(previo);
+        }
       }
       throw error;
     }
@@ -311,6 +329,7 @@ export class CheckoutService {
       select: {
         id_pedido: true,
         usuarioId: true,
+        comercioId: true,
         codigoAlfanumerico: true,
         total: true,
         estado: true,
@@ -322,11 +341,12 @@ export class CheckoutService {
     id_pedido: string;
     codigoAlfanumerico: string;
     total: Prisma.Decimal;
+    estado: EstadoPedidoEnCheckout;
   }): CheckoutConfirmado {
     return {
       idPedido: pedido.id_pedido,
       codigoAlfanumerico: pedido.codigoAlfanumerico,
-      estado: 'PENDIENTE_DE_RETIRO',
+      estado: pedido.estado,
       total: aMonto(pedido.total),
     };
   }
