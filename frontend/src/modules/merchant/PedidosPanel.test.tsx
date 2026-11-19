@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { StrictMode } from 'react';
 import { PedidosPanel } from './PedidosPanel';
 import type { PedidoReportableComerciante } from '../../api';
 
@@ -69,6 +70,17 @@ function renderPanel() {
   );
 }
 
+/** Igual que `renderPanel`, pero como monta la app real (`main.tsx`). */
+function renderPanelEnStrictMode() {
+  return render(
+    <StrictMode>
+      <MantineProvider>
+        <PedidosPanel />
+      </MantineProvider>
+    </StrictMode>,
+  );
+}
+
 async function elegirMotivo(label: string) {
   fireEvent.click(screen.getByRole('combobox'));
   fireEvent.click(await screen.findByText(label));
@@ -117,6 +129,23 @@ describe('PedidosPanel', () => {
       ),
     );
     expect(mocks.crear).not.toHaveBeenCalled();
+  });
+
+  it('no rompe el panel al escribir en la descripción del reporte', async () => {
+    // StrictMode re-invoca los updaters de estado; antes, leer
+    // `evento.currentTarget` dentro del updater devolvía null y tumbaba la app.
+    renderPanelEnStrictMode();
+    await screen.findByText('Pedido MC-2');
+
+    await elegirMotivo('Otro motivo');
+    const descripcion = screen.getByRole<HTMLTextAreaElement>('textbox', {
+      name: 'Descripción del problema',
+    });
+
+    fireEvent.change(descripcion, { target: { value: 'L' } });
+
+    expect(screen.getByText('Pedido MC-2')).toBeTruthy();
+    expect(descripcion.value).toBe('L');
   });
 
   it('envía un reporte al cliente y muestra el estado del reporte', async () => {

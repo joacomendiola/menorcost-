@@ -522,12 +522,16 @@ export function PedidosPanel() {
                             : 'Descripción (opcional)'
                         }
                         value={descripciones[pedido.id_pedido] ?? ''}
-                        onChange={(evento) =>
+                        onChange={(evento) => {
+                          // El valor se lee acá: dentro del updater el evento
+                          // ya no tiene `currentTarget` (React lo limpia) y en
+                          // desarrollo StrictMode re-invoca el updater.
+                          const valor = evento.currentTarget.value;
                           setDescripciones((actuales) => ({
                             ...actuales,
-                            [pedido.id_pedido]: evento.currentTarget.value,
-                          }))
-                        }
+                            [pedido.id_pedido]: valor,
+                          }));
+                        }}
                         maxLength={300}
                         required={motivos[pedido.id_pedido] === MOTIVO_OTRO}
                         autosize
