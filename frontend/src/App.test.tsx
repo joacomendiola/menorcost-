@@ -66,6 +66,22 @@ describe('Rutas de cliente', () => {
     );
 
     renderizar('/mis-pedidos');
+describe('Rutas de restablecimiento de contraseña', () => {
+  it('/restablecer muestra el formulario aunque haya una sesión activa', () => {
+    renderizar('/restablecer?token=test-token');
+
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Nueva contraseña' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Nueva contraseña')).toBeInTheDocument();
+    expect(screen.getByLabelText('Repetir contraseña')).toBeInTheDocument();
+  });
+});
+
+describe('Rutas de cliente pendientes', () => {
+  it('/mis-pedidos muestra el componente EnConstruccion', () => {
+    const ruta = '/mis-pedidos';
+    renderizar(ruta);
 
     expect(
       screen.getByRole('heading', { level: 1, name: 'Mis pedidos' }),

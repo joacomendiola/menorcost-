@@ -814,6 +814,46 @@ h3 {
   height: auto;
   min-height: 0;
   margin-inline: auto;
+.resumen-card {
+  text-align: left;
+}
+
+.resumen-card__cabecera {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.resumen-card__logo {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  background: var(--soft);
+  object-fit: cover;
+}
+
+.resumen-card__titulo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.resumen-card__datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 6px;
+  color: var(--mut);
+  font-size: 13px;
+}
+
+.resumen-card__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
 }
 
 .resena-item {
