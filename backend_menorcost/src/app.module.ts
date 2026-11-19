@@ -11,6 +11,7 @@ import { DireccionesModule } from './modules/direcciones/direcciones.module.js';
 import { MercadoPagoModule } from './modules/mercado-pago/mercado-pago.module.js';
 import { NotificacionesModule } from './modules/notificaciones/notificaciones.module.js';
 import { OffersModule } from './modules/ofertas/ofertas.module.js';
+import { PedidosModule } from './modules/pedidos/pedidos.module.js';
 import { PlacesModule } from './modules/places/places.module.js';
 import { ReportesModule } from './modules/reportes/reportes.module.js';
 import { ReputacionModule } from './modules/reputacion/reputacion.module.js';
@@ -38,6 +39,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     CanastasModule,
     CatalogoModule,
     MercadoPagoModule,
+    PedidosModule,
   ],
 })
 export class AppModule {}

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MantineProvider } from '@mantine/core';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -37,6 +37,23 @@ function renderizar(entrada: string) {
   );
 }
 
+describe('Rutas de cliente', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('/mis-pedidos muestra el historial de pedidos', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+
+    renderizar('/mis-pedidos');
 describe('Rutas de restablecimiento de contraseña', () => {
   it('/restablecer muestra el formulario aunque haya una sesión activa', () => {
     renderizar('/restablecer?token=test-token');
@@ -59,9 +76,7 @@ describe('Rutas de cliente pendientes', () => {
     ).toBeInTheDocument();
 
     expect(
-      screen.getByText(
-        'Esta sección estará disponible en el próximo módulo.',
-      ),
+      await screen.findByText('Todavía no tenés pedidos'),
     ).toBeInTheDocument();
   });
 });

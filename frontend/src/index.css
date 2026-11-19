@@ -1873,3 +1873,106 @@ h3 {
     justify-self: stretch;
   }
 }
+
+/* ============================================================
+   PANTALLA 23 - MIS PEDIDOS
+   ============================================================ */
+
+.mis-pedidos-page {
+  max-width: 800px;
+}
+
+.mis-pedidos-page__titulo {
+  margin: 18px 0 14px;
+  font-size: 30px;
+  letter-spacing: -0.4px;
+}
+
+.mis-pedidos-lista {
+  display: grid;
+  gap: 14px;
+}
+
+.mis-pedido {
+  padding: 18px 22px;
+}
+
+.mis-pedido__cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mis-pedido__cabecera .badge {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.mis-pedido__titulo {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--tx);
+}
+
+.mis-pedido__codigo {
+  color: var(--pri);
+  font-weight: 700;
+}
+
+.mis-pedido__separador {
+  color: var(--mut);
+}
+
+.mis-pedido__detalle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--mut);
+  line-height: 1.45;
+}
+
+.mis-pedido__accion {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 12px;
+  padding: 7px 16px;
+  border: 1px solid #c7d7fe;
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  color: var(--pri);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.mis-pedido__accion:hover {
+  background: #eff4ff;
+  border-color: var(--pri);
+}
+
+.mis-pedidos-vacio {
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.mis-pedidos-vacio h2 {
+  margin-top: 0;
+}
+
+@media (max-width: 560px) {
+  .mis-pedidos-page__titulo {
+    font-size: 26px;
+  }
+
+  .mis-pedido__cabecera {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .mis-pedido__cabecera .badge {
+    margin-top: 0;
+  }
+}

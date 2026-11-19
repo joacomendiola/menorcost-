@@ -323,6 +323,17 @@ export function CanastaPage() {
               fullWidth
               mt="md"
               onClick={() =>
+                navigate(`/checkout/${comercioId}`)
+              }
+            >
+              Continuar pedido
+            </Button>
+
+            <Button
+              fullWidth
+              mt="xs"
+              variant="default"
+              onClick={() =>
                 navigate(`/comercios/${comercioId}`)
               }
             >

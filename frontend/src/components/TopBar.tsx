@@ -44,6 +44,14 @@ export function TopBar() {
                 >
                   Mis canastas
                 </NavLink>
+                <NavLink
+                  to="/mis-pedidos"
+                  className={({ isActive }) =>
+                    `pill${isActive ? ' pill--active' : ''}`
+                  }
+                >
+                  Mis pedidos
+                </NavLink>
               </>
             )}
             {usuario.rol === 'COMERCIANTE' && (
