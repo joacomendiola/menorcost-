@@ -107,6 +107,13 @@ export function Perfil() {
   const [enviandoBaja, setEnviandoBaja] = useState(false);
   const [bajaEnviada, setBajaEnviada] = useState(false);
 
+  const [cambioPasswordAbierto, setCambioPasswordAbierto] = useState(false);
+  const [passwordActual, setPasswordActual] = useState('');
+  const [passwordNueva, setPasswordNueva] = useState('');
+  const [repetirPasswordNueva, setRepetirPasswordNueva] = useState('');
+  const [errorPassword, setErrorPassword] = useState('');
+  const [guardandoPassword, setGuardandoPassword] = useState(false);
+
   const cargarPerfil = useCallback(async () => {
     if (!token) return;
     try {
@@ -394,18 +401,58 @@ export function Perfil() {
     }
   }
 
-  async function solicitarCambioPassword() {
-    if (!perfil) return;
+  async function cambiarPassword(event: FormEvent) {
+    event.preventDefault();
+    if (!token) return;
+
+    if (!passwordActual) {
+      setErrorPassword('Ingresá tu contraseña actual');
+      return;
+    }
+
+    if (passwordNueva.length < 8) {
+      setErrorPassword('La nueva contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+
+    if (passwordNueva !== repetirPasswordNueva) {
+      setErrorPassword('Las contraseñas nuevas no coinciden');
+      return;
+    }
+
+    setGuardandoPassword(true);
+    setErrorPassword('');
     try {
-      await authApi.olvidarPassword(perfil.email);
-      notificar('Te enviamos un enlace para cambiar la contraseña');
+      await authApi.cambiarPassword(token, passwordActual, passwordNueva);
+      setCambioPasswordAbierto(false);
+      setPasswordActual('');
+      setPasswordNueva('');
+      setRepetirPasswordNueva('');
+      notificar('Contraseña actualizada. Iniciá sesión nuevamente.');
+      cerrarSesion();
+      navigate('/login', { replace: true });
     } catch (err) {
-      notificar(
+      if (err instanceof ApiError && err.status === 401) {
+        cerrarSesion();
+        navigate('/login', { replace: true });
+        return;
+      }
+      setErrorPassword(
         err instanceof ApiError
           ? err.message
-          : 'No pudimos enviar el enlace.',
+          : 'No pudimos actualizar la contraseña. Intentá de nuevo.',
       );
+    } finally {
+      setGuardandoPassword(false);
     }
+  }
+
+  function cancelarCambioPassword() {
+    setCambioPasswordAbierto(false);
+    setPasswordActual('');
+    setPasswordNueva('');
+    setRepetirPasswordNueva('');
+    setErrorPassword('');
   }
 
   function salir() {
@@ -735,11 +782,70 @@ export function Perfil() {
         </div>
       )}
 
-      <div className="card card--left">
+      <div className="card card--left" id="seguridad">
         <h3>Seguridad</h3>
-        <Button variant="default" onClick={solicitarCambioPassword}>
-          Cambiar contraseña
-        </Button>
+
+        {!cambioPasswordAbierto ? (
+          <>
+            <p className="muted" style={{ margin: '4px 0 14px' }}>
+              Cambiá tu contraseña ingresando la clave actual.
+            </p>
+            <Button
+              variant="default"
+              onClick={() => {
+                setErrorPassword('');
+                setCambioPasswordAbierto(true);
+              }}
+            >
+              Cambiar contraseña
+            </Button>
+          </>
+        ) : (
+          <form onSubmit={cambiarPassword}>
+            <Stack gap={12}>
+              <PasswordInput
+                label="Contraseña actual"
+                placeholder="🔒 Tu contraseña actual"
+                autoComplete="current-password"
+                value={passwordActual}
+                onChange={(event) =>
+                  setPasswordActual(event.currentTarget.value)
+                }
+              />
+              <PasswordInput
+                label="Nueva contraseña"
+                placeholder="🔒 Mínimo 8 caracteres"
+                autoComplete="new-password"
+                value={passwordNueva}
+                onChange={(event) =>
+                  setPasswordNueva(event.currentTarget.value)
+                }
+              />
+              <PasswordInput
+                label="Repetir nueva contraseña"
+                placeholder="🔒 Repetí la nueva contraseña"
+                autoComplete="new-password"
+                value={repetirPasswordNueva}
+                onChange={(event) =>
+                  setRepetirPasswordNueva(event.currentTarget.value)
+                }
+              />
+              {errorPassword && (
+                <p style={{ color: 'var(--bad)', fontSize: 12 }} role="alert">
+                  {errorPassword}
+                </p>
+              )}
+              <Group justify="flex-end">
+                <Button variant="default" onClick={cancelarCambioPassword}>
+                  Cancelar
+                </Button>
+                <Button type="submit" loading={guardandoPassword}>
+                  Actualizar clave
+                </Button>
+              </Group>
+            </Stack>
+          </form>
+        )}
       </div>
 
       <div className="card card--left danger-card">

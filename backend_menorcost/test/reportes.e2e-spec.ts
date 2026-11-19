@@ -311,7 +311,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .set(auth(clienteToken))
           .send({
             idPedido: pedidoId,
-            motivo: 'Otro motivo',
+            motivo: 'El producto estaba en mal estado/era diferente',
             tipo_destino: TipoDestinoReporte.COMERCIO,
           })
           .expect(409);
@@ -507,6 +507,13 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
     });
 
     describe('GET /reports/my-reports - Listar mis reportes', () => {
+      beforeAll(async () => {
+        await prisma.usuario.update({
+          where: { id: comerciante.id },
+          data: { estado: 'HABILITADO' },
+        });
+      });
+
       it('cliente ve sus reportes', async () => {
         const res = await request(server())
           .get('/reports/my-reports')
@@ -637,9 +644,9 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
       });
     });
 
-    describe('Umbral 3 reportes → BAJO_INVESTIGACION (ext 4a)', () => {
-      it('acumula 3 reportes y pone usuario en BAJO_INVESTIGACION', async () => {
-        // Crear 3 comerciantes distintos para denunciar al mismo cliente
+    describe('Umbral de más de 3 reportes → BAJO_INVESTIGACION (ext 4a)', () => {
+      it('acumula más de 3 reportes y pone usuario en BAJO_INVESTIGACION', async () => {
+        // Crear 4 comerciantes distintos para denunciar al mismo cliente
         const usuarioObjetivo = await crearUsuario({
           email: 'cliente-umbral@test.com',
           dni: '50000200',
@@ -648,7 +655,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
         const comerciantes: Awaited<ReturnType<typeof crearUsuario>>[] = [];
         const comercios: string[] = [];
 
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 4; i++) {
           const c = await crearUsuario({
             email: `comerciante-umbral-${i}@test.com`,
             dni: `5000010${i}`,
@@ -660,7 +667,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           comercios.push(com.idComercio);
         }
 
-        // Crear 3 pedidos del cliente (uno por comerciante)
+        // Crear 4 pedidos del cliente (uno por comerciante)
         const pedidos: string[] = [];
         for (const comId of comercios) {
           const p = await crearPedido(usuarioObjetivo.id, comId, 'UMBRAL');
@@ -668,7 +675,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
         }
 
         // Cada comerciante denuncia al cliente
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 4; i++) {
           const token = (await login(comerciantes[i].email).expect(200)).body
             .accessToken;
           await request(server())

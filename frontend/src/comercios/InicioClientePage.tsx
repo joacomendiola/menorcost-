@@ -60,19 +60,13 @@ export function InicioClientePage() {
   const [intento, setIntento] = useState(0);
 
   useEffect(() => {
-    if (!token) {
-      setCargando(false);
-      setError(
-        "Iniciá sesión como cliente para explorar los locales cercanos.",
-      );
-      return;
-    }
+    if (!token) return;
 
     let activo = true;
-    setCargando(true);
-    setError("");
 
     void (async () => {
+      setCargando(true);
+      setError("");
       try {
         const direcciones = await direccionesApi.listar(token);
         const predeterminada =
@@ -110,6 +104,12 @@ export function InicioClientePage() {
       activo = false;
     };
   }, [token, intento]);
+
+  const sinSesion = !token;
+  const errorVisible = sinSesion
+    ? "Iniciá sesión como cliente para explorar los locales cercanos."
+    : error;
+  const cargandoVisible = !sinSesion && cargando;
 
   const locales = useMemo(() => {
     const agrupados = new Map<string, LocalCercano>();
@@ -204,17 +204,23 @@ export function InicioClientePage() {
             </Link>
           </div>
 
-          {error ? (
+          {errorVisible ? (
             <div className="inicio-cliente__state" role="alert">
-              <p>{error}</p>
-              <Button
-                variant="default"
-                onClick={() => setIntento((n) => n + 1)}
-              >
-                Reintentar
-              </Button>
+              <p>{errorVisible}</p>
+              {!sinSesion && (
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    setCargando(true);
+                    setError("");
+                    setIntento((n) => n + 1);
+                  }}
+                >
+                  Reintentar
+                </Button>
+              )}
             </div>
-          ) : cargando ? (
+          ) : cargandoVisible ? (
             <div className="inicio-cliente__state" role="status">
               <Loader />
             </div>

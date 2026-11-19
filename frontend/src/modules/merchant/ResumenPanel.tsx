@@ -4,7 +4,8 @@ import { Loader } from '@mantine/core';
 import { reputacionApi, type ReputacionComercio } from '../../api';
 import { useAuth } from '../../auth/contexto';
 import { Card } from '../../components/ui/Card';
-import { comerciosApi, type Comercio, type EstadoComercio } from '../../comercios/api';
+import { comerciosApi, resolverImagen, type Comercio, type EstadoComercio } from '../../comercios/api';
+import { DIAS, formatearRango } from '../../comercios/configuracion';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -97,6 +98,22 @@ export function ResumenPanel() {
   }
 
   const estado = comercio ? ESTADO_COMERCIO[comercio.estado] : null;
+  const logo = resolverImagen(comercio?.logoUrl);
+  const diaHoy = new Date().getDay();
+  const horariosHoy =
+    comercio?.horarios
+      .filter((horario) => horario.diaSemana === diaHoy)
+      .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio)) ?? [];
+  const direccion = comercio
+    ? [
+        comercio.calle,
+        comercio.numero,
+        comercio.piso ? `Piso ${comercio.piso}` : null,
+        comercio.localidad,
+      ]
+        .filter(Boolean)
+        .join(', ')
+    : '';
 
   return (
     <main className="merchant-content">
@@ -108,39 +125,80 @@ export function ResumenPanel() {
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        <Card className="reviews-card">
-          <div className="row" style={{ alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-          <h3 style={{ margin: 0 }}>
-            {comercio?.nombreFantasia ?? 'Comercio sin registrar'}
-          </h3>
-          {estado && (
-            <span className={`badge ${estado.clase}`}>{estado.etiqueta}</span>
-          )}
-          {comercio && (
-            <span
-              className={`badge ${comercio.abierto ? 'badge--ok' : 'badge--pend'}`}
-            >
-              {comercio.abierto ? 'Local abierto' : 'Local cerrado'}
-            </span>
-          )}
-          {comercio && (
-            <span
-              className={`badge ${comercio.mercadoPagoVinculado ? 'badge--ok' : 'badge--bad'}`}
-            >
-              {comercio.mercadoPagoVinculado
-                ? 'Mercado Pago vinculado'
-                : 'Mercado Pago sin vincular'}
-            </span>
-          )}
-        </div>
+        <Card className="resumen-card" padding="sm">
+          <div className="resumen-card__cabecera">
+            {logo && (
+              <img
+                className="resumen-card__logo"
+                src={logo}
+                alt={`Logo de ${comercio?.nombreFantasia ?? 'mi comercio'}`}
+              />
+            )}
+            <div>
+              <div className="resumen-card__titulo">
+                <h3 style={{ margin: 0 }}>
+                  {comercio?.nombreFantasia ?? 'Comercio sin registrar'}
+                </h3>
+                {estado && (
+                  <span className={`badge ${estado.clase}`}>{estado.etiqueta}</span>
+                )}
+                {comercio && (
+                  <span
+                    className={`badge ${comercio.abierto ? 'badge--ok' : 'badge--pend'}`}
+                  >
+                    {comercio.abierto ? 'Local abierto' : 'Local cerrado'}
+                  </span>
+                )}
+                {comercio && (
+                  <span
+                    className={`badge ${comercio.mercadoPagoVinculado ? 'badge--ok' : 'badge--bad'}`}
+                  >
+                    {comercio.mercadoPagoVinculado
+                      ? 'Mercado Pago vinculado'
+                      : 'Mercado Pago sin vincular'}
+                  </span>
+                )}
+              </div>
 
-        {!comercio && (
-          <p className="muted" style={{ marginBottom: 0, marginTop: 12 }}>
-            Todavía no registraste tu comercio.{' '}
-            <Link to="/comercios/registro">Completá el registro</Link> para
-            empezar a publicar ofertas.
-          </p>
-        )}
+              {comercio && (
+                <div className="resumen-card__datos">
+                  <span>{direccion}</span>
+                  <span>{comercio.telefono}</span>
+                  <span>
+                    Hoy ({DIAS[diaHoy]}):{' '}
+                    {horariosHoy.length > 0
+                      ? horariosHoy.map(formatearRango).join(' / ')
+                      : 'sin horario cargado'}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {comercio ? (
+            <div className="resumen-card__acciones">
+              <Link className="ui-chip ui-chip--active" to="/panel/mi-local">
+                Editar local
+              </Link>
+              <Link className="ui-chip" to="/panel/horarios">
+                Ver horarios
+              </Link>
+              <Link className="ui-chip" to={`/comercios/${comercio.id}`}>
+                Ver tienda pública
+              </Link>
+              {!comercio.mercadoPagoVinculado && (
+                <Link className="ui-chip" to="/panel/mi-local">
+                  Vincular Mercado Pago
+                </Link>
+              )}
+            </div>
+          ) : (
+            <p className="muted" style={{ marginBottom: 0, marginTop: 12 }}>
+              Todavía no registraste tu comercio.{' '}
+              <Link to="/comercios/registro">Completá el registro</Link> para
+              empezar a publicar ofertas.
+            </p>
+          )}
         </Card>
       </div>
 
@@ -166,7 +224,7 @@ export function ResumenPanel() {
         />
       </div>
 
-      <Card className="reviews-card">
+      <Card className="resumen-card" padding="sm">
         <h3 style={{ marginTop: 0 }}>Accesos rápidos</h3>
         <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
           <Link className="ui-chip ui-chip--active" to="/panel/productos">

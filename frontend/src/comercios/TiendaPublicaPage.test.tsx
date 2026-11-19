@@ -61,11 +61,14 @@ const tienda = {
 describe('TiendaPublicaPage', () => {
   beforeEach(() => {
     mocks.tienda.mockReset().mockResolvedValue(tienda);
-    globalThis.ResizeObserver = class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    } as typeof ResizeObserver;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
   });
 
   it('presenta categorías y filtra las ofertas del comercio', async () => {

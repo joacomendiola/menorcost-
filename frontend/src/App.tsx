@@ -46,11 +46,12 @@ export default function App() {
       <Routes>
         <Route element={<RutaPublica />}>
           <Route path="/login" element={<Login />} />
-          <Route path="/recuperar" element={<Recuperar />} />
-          <Route path="/restablecer" element={<Restablecer />} />
           <Route path="/registro" element={<Registro />} />
           <Route path="/verificar-correo" element={<VerificarCorreo />} />
         </Route>
+
+        <Route path="/recuperar" element={<Recuperar />} />
+        <Route path="/restablecer" element={<Restablecer />} />
 
         <Route path="/comercios/:id" element={<TiendaPublicaPage />} />
 

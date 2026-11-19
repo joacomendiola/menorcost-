@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { esEstadoUsuarioOperativo } from '../auth/estados-usuario.js';
 import { MailerService } from '../auth/mailer/mailer.service.js';
 import type { EnvioCorreo } from '../auth/mailer/mailer.interface.js';
 import type { CrearReporteDto } from './dto/crear-reporte.dto.js';
@@ -82,7 +83,11 @@ export class ReportesService {
             }),
           ]);
 
-          if (!emisor || emisor.deletedAt !== null || emisor.estado !== 'HABILITADO') {
+          if (
+            !emisor ||
+            emisor.deletedAt !== null ||
+            !esEstadoUsuarioOperativo(emisor.estado)
+          ) {
             throw new ForbiddenException('La cuenta no está habilitada para crear reportes');
           }
           if (!pedido) {

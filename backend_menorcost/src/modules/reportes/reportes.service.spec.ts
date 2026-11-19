@@ -370,6 +370,19 @@ describe('ReportesService.crearReporte', () => {
     });
   });
 
+  it('permite reportar a cuentas bajo investigación', async () => {
+    prismaMock.usuario.findUnique.mockResolvedValue({
+      estado: 'BAJO_INVESTIGACION',
+      deletedAt: null,
+    });
+
+    await expect(
+      service.crearReporte(CLIENTE_ID, 'CLIENTE', dtoBase()),
+    ).resolves.toBeDefined();
+
+    expect(prismaMock.reporte.create).toHaveBeenCalled();
+  });
+
   it('rechaza reportes de cuentas que no están habilitadas', async () => {
     prismaMock.usuario.findUnique.mockResolvedValue({
       estado: 'SOLICITUD_BAJA_PENDIENTE',

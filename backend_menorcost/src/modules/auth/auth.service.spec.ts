@@ -1,13 +1,10 @@
-import {
-  ForbiddenException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { hash } from 'bcryptjs';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { compare, hash } from 'bcryptjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthService } from './auth.service.js';
 
 const prismaMock = {
-  usuario: { findFirst: vi.fn() },
+  usuario: { findFirst: vi.fn(), update: vi.fn() },
 };
 const jwtMock = { signAsync: vi.fn() };
 
@@ -36,6 +33,7 @@ function usuarioBase(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   jwtMock.signAsync.mockResolvedValue('jwt-token');
+  prismaMock.usuario.update.mockResolvedValue({});
 });
 
 describe('AuthService.login', () => {
@@ -117,6 +115,63 @@ describe('AuthService.login', () => {
   });
 });
 
+describe('AuthService.cambiarPassword', () => {
+  it('rechaza si la contraseña actual no coincide', async () => {
+    prismaMock.usuario.findFirst.mockResolvedValue(
+      usuarioBase({ passwordHash: await hash('Actual12345', 10) }),
+    );
+
+    await expect(
+      service.cambiarPassword('u1', {
+        passwordActual: 'Incorrecta123',
+        passwordNueva: 'Nueva12345',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prismaMock.usuario.update).not.toHaveBeenCalled();
+  });
+
+  it('rechaza si el usuario no existe', async () => {
+    prismaMock.usuario.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.cambiarPassword('u1', {
+        passwordActual: 'Actual12345',
+        passwordNueva: 'Nueva12345',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prismaMock.usuario.update).not.toHaveBeenCalled();
+  });
+
+  it('actualiza el hash e invalida las sesiones previas', async () => {
+    prismaMock.usuario.findFirst.mockResolvedValue(
+      usuarioBase({ passwordHash: await hash('Actual12345', 10) }),
+    );
+
+    const resultado = await service.cambiarPassword('u1', {
+      passwordActual: 'Actual12345',
+      passwordNueva: 'Nueva12345',
+    });
+
+    expect(prismaMock.usuario.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: {
+        passwordHash: expect.any(String),
+        tokenVersion: { increment: 1 },
+      },
+    });
+
+    const actualizacion = prismaMock.usuario.update.mock.calls[0][0] as {
+      data: { passwordHash: string };
+    };
+    await expect(
+      compare('Nueva12345', actualizacion.data.passwordHash),
+    ).resolves.toBe(true);
+    expect(resultado.message).toMatch(/Contraseña actualizada/);
+  });
+});
+
 describe('AuthService.validarSesion', () => {
   it('devuelve null si la tokenVersion no coincide', async () => {
     prismaMock.usuario.findFirst.mockResolvedValue(
@@ -133,9 +188,19 @@ describe('AuthService.validarSesion', () => {
     await expect(service.validarSesion('u1', 3)).resolves.toBe(usuario);
   });
 
-  it('invalida sesiones existentes de cuentas que ya no están habilitadas', async () => {
+  it('mantiene la sesión de cuentas bajo investigación', async () => {
+    const usuario = usuarioBase({
+      tokenVersion: 3,
+      estado: 'BAJO_INVESTIGACION',
+    });
+    prismaMock.usuario.findFirst.mockResolvedValue(usuario);
+
+    await expect(service.validarSesion('u1', 3)).resolves.toBe(usuario);
+  });
+
+  it('invalida sesiones existentes de cuentas suspendidas', async () => {
     prismaMock.usuario.findFirst.mockResolvedValue(
-      usuarioBase({ tokenVersion: 3, estado: 'BAJO_INVESTIGACION' }),
+      usuarioBase({ tokenVersion: 3, estado: 'SUSPENDIDO' }),
     );
 
     await expect(service.validarSesion('u1', 3)).resolves.toBeNull();
@@ -167,7 +232,7 @@ describe('AuthService.asegurarCuentaOperativa', () => {
     ).resolves.toBeDefined();
   });
 
-  it('bloquea BAJO_INVESTIGACION', async () => {
+  it('permite BAJO_INVESTIGACION', async () => {
     prismaMock.usuario.findFirst.mockResolvedValue(
       usuarioBase({
         estado: 'BAJO_INVESTIGACION',
@@ -177,6 +242,6 @@ describe('AuthService.asegurarCuentaOperativa', () => {
 
     await expect(
       service.login({ email: 'test@menorcost.local', password: 'Password123' }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    ).resolves.toBeDefined();
   });
 });

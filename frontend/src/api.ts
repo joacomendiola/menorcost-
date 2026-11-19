@@ -197,6 +197,17 @@ export const authApi = {
       method: 'POST',
       body: { token, password },
     }),
+
+  cambiarPassword: (
+    token: string,
+    passwordActual: string,
+    passwordNueva: string,
+  ) =>
+    api<{ message: string }>('/auth/password', {
+      method: 'PATCH',
+      body: { passwordActual, passwordNueva },
+      token,
+    }),
 };
 
 export const simuladorPreciosApi = {
