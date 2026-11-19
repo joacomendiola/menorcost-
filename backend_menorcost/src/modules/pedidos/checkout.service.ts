@@ -22,7 +22,11 @@ import {
   PASARELA_PAGO,
   type PasarelaPago,
 } from './pago-simulado.service.js';
-import type { CheckoutConfirmado, CheckoutResumen } from './pedidos.types.js';
+import type {
+  CheckoutConfirmado,
+  CheckoutResumen,
+  EstadoPedidoEnCheckout,
+} from './pedidos.types.js';
 
 type DetalleCheckout = Awaited<
   ReturnType<CanastasService['obtenerCanastaParaCheckout']>
@@ -42,6 +46,12 @@ interface LineaCalculada {
   nombreHistorico: string;
   fechaVencimientoHistorica: Date;
   baseNetoTotal: Prisma.Decimal;
+}
+
+interface Creado {
+  id_pedido: string;
+  codigoAlfanumerico: string;
+  total: Prisma.Decimal;
 }
 
 interface CalculoPedido {
@@ -126,133 +136,183 @@ export class CheckoutService {
     usuarioId: string,
     dto: CrearPedidoDto,
   ): Promise<CheckoutConfirmado> {
-    // Se valida la franja antes de abrir la transacción: es una lectura idem-
-    // potente y nos deja fallar rápido sin tomar locks.
+    // 1) Lectura y cálculo: se validan franja y stock antes de tocar la base.
     const franja = await this.franjas.validarParaCheckout(
       dto.comercioId,
       dto.franjaHorarioId,
     );
     const resultado = dto.resultadoPagoSimulado ?? 'APROBADO';
+    const claveIdempotencia = dto.idempotencyKey?.trim() || null;
 
-    const creado = await this.conReintentoDeCodigos(() =>
-      this.prisma.$transaction(async (tx) => {
-        const canasta = await tx.canasta.findUnique({
-          where: {
-            usuarioId_comercioId: {
-              usuarioId,
-              comercioId: dto.comercioId,
-            },
-          },
-          select: { idCanasta: true },
-        });
-
-        if (!canasta) {
-          throw new NotFoundException(
-            'No tenés una canasta activa en este comercio.',
+    if (claveIdempotencia) {
+      const previo = await this.buscarPorIdempotencia(claveIdempotencia);
+      if (previo) {
+        if (
+          previo.usuarioId !== usuarioId ||
+          previo.comercioId !== dto.comercioId
+        ) {
+          throw new ConflictException(
+            'La clave de idempotencia ya fue utilizada por otro checkout.',
           );
         }
+        return this.aConfirmado(previo);
+      }
+    }
 
-        const detalle = await this.canastas.obtenerCanastaParaCheckout(
-          canasta.idCanasta,
-          tx,
-        );
-        const calculo = this.calcular(detalle);
+    const canasta = await this.prisma.canasta.findUnique({
+      where: {
+        usuarioId_comercioId: { usuarioId, comercioId: dto.comercioId },
+      },
+      select: { idCanasta: true },
+    });
 
-        const cobro = await this.pasarela.cobrar({
-          total: calculo.total,
-          tasaMp: calculo.tasaMp,
-          resultado,
-        });
+    if (!canasta) {
+      throw new NotFoundException(
+        'No tenés una canasta activa en este comercio.',
+      );
+    }
 
-        if (cobro.aprobado) {
-          await this.descontarStock(tx, detalle);
-        }
-
-        const pedido = await tx.pedido.create({
-          data: {
-            nroPedido: generarNroPedido(),
-            codigoQR: generarCodigoQR(),
-            codigoAlfanumerico: generarCodigoAlfanumerico(),
-            usuarioId,
-            comercioId: dto.comercioId,
-            estado: cobro.aprobado ? 'PENDIENTE_DE_RETIRO' : 'PENDIENTE_PAGO',
-            franjaHorarioId: franja.id,
-            subtotal: calculo.subtotal,
-            tarifa_servicio: calculo.tarifaServicio,
-            comisionMenorcostTasa: calculo.tasaMenorcost,
-            tasaMpEstimada: calculo.tasaMp,
-            total: calculo.total,
-            formaPago: 'SIMULADO',
-            items: {
-              create: calculo.lineas.map((linea) => ({
-                productoId: linea.productoId,
-                nroLinea: linea.nroLinea,
-                cantidad: linea.cantidad,
-                precio_unitario: linea.precioUnitario,
-                precioBaseNetoAplicado: linea.precioBaseNetoAplicado,
-                comisionMenorcostMonto: linea.comisionMenorcostMonto,
-                subtotal: linea.subtotal,
-                nombreHistorico: linea.nombreHistorico,
-                fechaVencimientoHistorica: linea.fechaVencimientoHistorica,
-              })),
-            },
-            pagos: {
-              create: {
-                montoTransaccion: calculo.total,
-                comisionMp: cobro.comisionMp,
-                nroComprobante: cobro.nroComprobante,
-                mpPaymentId: cobro.mpPaymentId,
-                paymentDate: cobro.aprobado ? new Date() : null,
-                estado: cobro.aprobado ? 'PAGADO' : 'RECHAZADO',
-                moneda: 'ARS',
-                splits: cobro.aprobado
-                  ? {
-                      create: [
-                        {
-                          recipientType: 'COMERCIO',
-                          destinatarioId: dto.comercioId,
-                          monto: calculo.splitComercio,
-                        },
-                        {
-                          recipientType: 'MARKETPLACE',
-                          destinatarioId: null,
-                          monto: calculo.total
-                            .minus(cobro.comisionMp)
-                            .minus(calculo.splitComercio),
-                        },
-                      ],
-                    }
-                  : undefined,
-              },
-            },
-          },
-          select: {
-            id_pedido: true,
-            codigoAlfanumerico: true,
-            total: true,
-          },
-        });
-
-        if (cobro.aprobado) {
-          await tx.canasta.delete({
-            where: { idCanasta: canasta.idCanasta },
-          });
-        }
-
-        return { pedido, aprobado: cobro.aprobado };
-      }),
+    const detalle = await this.canastas.obtenerCanastaParaCheckout(
+      canasta.idCanasta,
     );
+    const calculo = this.calcular(detalle);
 
-    if (!creado.aprobado) {
+    // 2) Cobro: SIEMPRE fuera de la transacción. Si falla, no se persiste
+    //    nada y la canasta del cliente queda intacta para reintentar.
+    const cobro = await this.pasarela.cobrar({
+      total: calculo.total,
+      tasaMp: calculo.tasaMp,
+      resultado,
+    });
+
+    if (!cobro.aprobado) {
       throw new HttpException(
         {
-          idPedido: creado.pedido.id_pedido,
           estado: 'RECHAZADO',
           message:
-            'Pago rechazado: no se descontó stock y la canasta sigue disponible.',
+            'Pago rechazado: no se descontó stock y tu canasta sigue disponible.',
         },
         HttpStatus.PAYMENT_REQUIRED,
       );
+    }
+
+    // 3) Persistencia: una única transacción corta, sin llamadas externas.
+    let creado: { pedido: Creado; clave: string | null };
+    try {
+      creado = await this.conReintentoDeCodigos(() =>
+        this.prisma.$transaction(async (tx) => {
+          const canastaTx = await tx.canasta.findUnique({
+            where: {
+              usuarioId_comercioId: {
+                usuarioId,
+                comercioId: dto.comercioId,
+              },
+            },
+            select: { idCanasta: true },
+          });
+
+          if (!canastaTx) {
+            throw new ConflictException(
+              'Este checkout ya fue procesado. Revisá "Mis pedidos".',
+            );
+          }
+
+          const detalleTx = await this.canastas.obtenerCanastaParaCheckout(
+            canastaTx.idCanasta,
+            tx,
+          );
+
+          await this.descontarStock(tx, detalleTx);
+
+          const pedido = await tx.pedido.create({
+            data: {
+              nroPedido: generarNroPedido(),
+              codigoQR: generarCodigoQR(),
+              codigoAlfanumerico: generarCodigoAlfanumerico(),
+              idempotencyKey: claveIdempotencia,
+              usuarioId,
+              comercioId: dto.comercioId,
+              estado: 'PENDIENTE_DE_RETIRO',
+              franjaHorarioId: franja.id,
+              subtotal: calculo.subtotal,
+              tarifa_servicio: calculo.tarifaServicio,
+              comisionMenorcostTasa: calculo.tasaMenorcost,
+              tasaMpEstimada: calculo.tasaMp,
+              total: calculo.total,
+              formaPago: 'SIMULADO',
+              items: {
+                create: calculo.lineas.map((linea) => ({
+                  productoId: linea.productoId,
+                  nroLinea: linea.nroLinea,
+                  cantidad: linea.cantidad,
+                  precio_unitario: linea.precioUnitario,
+                  precioBaseNetoAplicado: linea.precioBaseNetoAplicado,
+                  comisionMenorcostMonto: linea.comisionMenorcostMonto,
+                  subtotal: linea.subtotal,
+                  nombreHistorico: linea.nombreHistorico,
+                  fechaVencimientoHistorica: linea.fechaVencimientoHistorica,
+                })),
+              },
+              pagos: {
+                create: {
+                  montoTransaccion: calculo.total,
+                  comisionMp: cobro.comisionMp,
+                  nroComprobante: cobro.nroComprobante,
+                  mpPaymentId: cobro.mpPaymentId,
+                  paymentDate: new Date(),
+                  estado: 'PAGADO',
+                  moneda: 'ARS',
+                  splits: {
+                    create: [
+                      {
+                        recipientType: 'COMERCIO',
+                        destinatarioId: dto.comercioId,
+                        monto: calculo.splitComercio,
+                      },
+                      {
+                        recipientType: 'MARKETPLACE',
+                        destinatarioId: null,
+                        monto: calculo.total
+                          .minus(cobro.comisionMp)
+                          .minus(calculo.splitComercio),
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+            select: {
+              id_pedido: true,
+              codigoAlfanumerico: true,
+              total: true,
+            },
+          });
+
+          await tx.canasta.delete({
+            where: { idCanasta: canastaTx.idCanasta },
+          });
+
+          return { pedido, clave: claveIdempotencia };
+        }),
+      );
+    } catch (error) {
+      // Doble click con la misma clave: otro request ya creó el pedido.
+      if (claveIdempotencia && esConflictoDeIdempotencia(error)) {
+        const previo = await this.buscarPorIdempotencia(claveIdempotencia);
+        if (previo) {
+          // Nunca se devuelve el pedido de otro usuario ni de otro comercio.
+          if (
+            previo.usuarioId !== usuarioId ||
+            previo.comercioId !== dto.comercioId
+          ) {
+            throw new ConflictException(
+              'La clave de idempotencia ya fue utilizada por otro checkout.',
+            );
+          }
+          return this.aConfirmado(previo);
+        }
+      }
+      throw error;
     }
 
     return {
@@ -260,6 +320,34 @@ export class CheckoutService {
       codigoAlfanumerico: creado.pedido.codigoAlfanumerico,
       estado: 'PENDIENTE_DE_RETIRO',
       total: aMonto(creado.pedido.total),
+    };
+  }
+
+  private async buscarPorIdempotencia(clave: string) {
+    return this.prisma.pedido.findUnique({
+      where: { idempotencyKey: clave },
+      select: {
+        id_pedido: true,
+        usuarioId: true,
+        comercioId: true,
+        codigoAlfanumerico: true,
+        total: true,
+        estado: true,
+      },
+    });
+  }
+
+  private aConfirmado(pedido: {
+    id_pedido: string;
+    codigoAlfanumerico: string;
+    total: Prisma.Decimal;
+    estado: EstadoPedidoEnCheckout;
+  }): CheckoutConfirmado {
+    return {
+      idPedido: pedido.id_pedido,
+      codigoAlfanumerico: pedido.codigoAlfanumerico,
+      estado: pedido.estado,
+      total: aMonto(pedido.total),
     };
   }
 
@@ -342,6 +430,9 @@ export class CheckoutService {
   /**
    * Los códigos del pedido son únicos: ante una colisión (probabilidad muy
    * baja) se reintenta la transacción completa en lugar de fallar.
+   *
+   * Solo se reintenta por los códigos del pedido. Cualquier otro `P2002`
+   * (por ejemplo `idempotency_key`) se propaga.
    */
   private async conReintentoDeCodigos<T>(
     ejecutar: () => Promise<T>,
@@ -354,7 +445,8 @@ export class CheckoutService {
       } catch (error) {
         const colisionDeCodigo =
           error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === 'P2002';
+          error.code === 'P2002' &&
+          esColisionDeCodigoDePedido(error);
 
         if (!colisionDeCodigo || intento === INTENTOS - 1) {
           throw error;
@@ -364,6 +456,40 @@ export class CheckoutService {
 
     throw new Error('No se pudo generar un código único para el pedido.');
   }
+}
+
+function destinoDelError(error: Prisma.PrismaClientKnownRequestError): string {
+  const target = error.meta?.target;
+
+  if (Array.isArray(target)) return target.join(',');
+  if (typeof target === 'string') return target;
+
+  return '';
+}
+
+/** Colisión de `codigoQR`, `codigoAlfanumerico` o `nroPedido`. */
+function esColisionDeCodigoDePedido(
+  error: Prisma.PrismaClientKnownRequestError,
+): boolean {
+  const destino = destinoDelError(error).toLowerCase();
+
+  return (
+    destino.includes('codigo_qr') ||
+    destino.includes('codigo_alfanumerico') ||
+    destino.includes('nro_pedido') ||
+    destino.includes('codigoqr') ||
+    destino.includes('codigoalfanumerico') ||
+    destino.includes('nropedido')
+  );
+}
+
+/** Colisión de la clave de idempotencia del checkout. */
+function esConflictoDeIdempotencia(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002' &&
+    destinoDelError(error).toLowerCase().includes('idempotency')
+  );
 }
 
 function formatearDireccion(comercio: {

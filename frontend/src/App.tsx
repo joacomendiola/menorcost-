@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import {RedirectInicio} from "./auth/RedirectInicio";
+import { RedirectInicio } from "./auth/RedirectInicio";
 import { RutaProtegida, RutaPublica, RutaComerciante, RutaAdmin, RutaCliente } from './auth/Rutas';
 import { DetalleOfertaPage } from './comercios/DetalleOfertaPage';
 import { HorariosComercioPage } from './comercios/HorariosComercioPage';
@@ -98,7 +98,7 @@ export default function App() {
             path="/mis-pedidos"
             element={<MisPedidosPage />}
           />
-         
+
           <Route path="/buscar" element={<ExplorarPage />} />
         </Route>
 

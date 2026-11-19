@@ -6,7 +6,8 @@ import QRCode from 'qrcode';
 import { useAuth } from '../../auth/contexto';
 import { ApiError, pedidosApi, reportesApi, reputacionApi } from '../../api';
 import type { PedidoTicket } from '../../api';
-import { Badge, type BadgeTone } from '../../components/ui/Badge';
+import { Badge } from '../../components/ui/Badge';
+import { metaEstadoPago, metaEstadoPedido } from './estadosPedido';
 
 const MOTIVO_OTRO = 'Otro';
 
@@ -25,16 +26,6 @@ const MOTIVOS = [
   },
   { value: MOTIVO_OTRO, label: 'Otro motivo' },
 ];
-
-const ESTADO_META: Record<string, { label: string; tone: BadgeTone }> = {
-  PENDIENTE_DE_RETIRO: { label: 'PENDIENTE_DE_RETIRO', tone: 'pend' },
-  ENTREGADO: { label: 'ENTREGADO', tone: 'ok' },
-  CANCELADO: { label: 'CANCELADO', tone: 'bad' },
-  CANCELADO_POR_FALTA_RETIRO: {
-    label: 'CANCELADO_POR_FALTA_RETIRO',
-    tone: 'bad',
-  },
-};
 
 const money = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -319,19 +310,14 @@ export function Ticket() {
     );
   }
 
-  const estado = ESTADO_META[pedido.estado] ?? {
-    label: pedido.estado,
-    tone: 'neutro' as BadgeTone,
-  };
+  const estado = metaEstadoPedido(pedido.estado);
   const valorEstrellas = hover || puntaje;
   const reporteAbierto = pedido.misReportes.find((reporte) =>
     ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'].includes(reporte.estado),
   );
-  const puedeReportar = [
-    'ENTREGADO',
-    'PENDIENTE_DE_RETIRO',
-    'CANCELADO',
-  ].includes(pedido.estado);
+  // El cliente solo reporta pedidos ya entregados (CU-2.06).
+  const puedeReportar = pedido.estado === 'ENTREGADO';
+  const pagoMeta = metaEstadoPago(pedido.pagoEstado);
 
   return (
     <main className="ticket-wrap">
@@ -394,10 +380,22 @@ export function Ticket() {
           <div className="ticket-row">
             <dt>Pago</dt>
             <dd>
-              <span className="ticket-paid">PAGADO</span> ·{' '}
+              <Badge tone={pagoMeta.tone}>{pagoMeta.label}</Badge> ·{' '}
               {money.format(pedido.total)}
             </dd>
           </div>
+
+          {pedido.fechaEntrega && (
+            <div className="ticket-row">
+              <dt>Entregado</dt>
+              <dd>
+                {new Intl.DateTimeFormat('es-AR', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                }).format(new Date(pedido.fechaEntrega))}
+              </dd>
+            </div>
+          )}
 
           {pedido.items.map((item) => (
             <div className="ticket-row" key={item.id}>

@@ -31,10 +31,12 @@ export interface CheckoutResumen {
   franjas: CheckoutFranja[];
 }
 
+export type EstadoPedidoEnCheckout = EstadoPedidoVisible | 'PENDIENTE_PAGO';
+
 export interface CheckoutConfirmado {
   idPedido: string;
   codigoAlfanumerico: string;
-  estado: 'PENDIENTE_DE_RETIRO';
+  estado: EstadoPedidoEnCheckout;
   total: string;
 }
 
@@ -86,12 +88,14 @@ export interface PedidoTicket {
   codigoQR: string;
   estado: EstadoPedidoVisible;
   fechaPedido: string;
+  fechaEntrega: string | null;
   subtotal: number;
   tarifaServicio: number;
   total: number;
   comercio: { idComercio: string; nombre: string } | null;
   franjaHorario: { inicio: string; fin: string } | null;
   localAbierto: boolean | null;
+  pagoEstado: string | null;
   items: PedidoTicketItem[];
   calificacion: {
     id: number;
@@ -105,4 +109,29 @@ export interface PedidoTicket {
     estado: string;
     fecha: string;
   }>;
+}
+
+export interface PedidoComercioItem {
+  titulo: string;
+  cantidad: number;
+}
+
+/** Pedido visible para el panel de mostrador del comerciante (CU-2.06). */
+export interface PedidoComercio {
+  idPedido: string;
+  codigoAlfanumerico: string;
+  estado: EstadoPedidoVisible | 'PENDIENTE_PAGO';
+  fechaPedido: string;
+  fechaEntrega: string | null;
+  total: number;
+  cliente: { nombre: string; apellido: string } | null;
+  pagoEstado: string | null;
+  items: PedidoComercioItem[];
+}
+
+/** Resultado de validar un código en el mostrador antes de entregar. */
+export interface EntregaValidada {
+  pedido: PedidoComercio;
+  puedeEntregar: boolean;
+  motivo: string | null;
 }

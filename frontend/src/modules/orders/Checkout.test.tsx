@@ -133,6 +133,7 @@ describe('Checkout', () => {
     expect(mocks.pagar).toHaveBeenCalledWith('token', {
       comercioId,
       franjaHorarioId: 'f1',
+      idempotencyKey: expect.any(String),
       resultadoPagoSimulado: 'APROBADO',
     });
   });

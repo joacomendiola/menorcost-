@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { StrictMode } from 'react';
 import { PedidosPanel } from './PedidosPanel';
 import type { PedidoReportableComerciante } from '../../api';
 
@@ -10,6 +11,10 @@ const mocks = vi.hoisted(() => ({
   crear: vi.fn(),
   show: vi.fn(),
   cerrarSesion: vi.fn(),
+  comercio: vi.fn(),
+  validarEntrega: vi.fn(),
+  entregar: vi.fn(),
+  cancelar: vi.fn(),
 }));
 
 vi.mock('../../api', () => ({
@@ -24,6 +29,12 @@ vi.mock('../../api', () => ({
   reportesApi: {
     pedidosComerciante: mocks.pedidosComerciante,
     crear: mocks.crear,
+  },
+  pedidosApi: {
+    comercio: mocks.comercio,
+    validarEntrega: mocks.validarEntrega,
+    entregar: mocks.entregar,
+    cancelar: mocks.cancelar,
   },
 }));
 
@@ -59,6 +70,17 @@ function renderPanel() {
   );
 }
 
+/** Igual que `renderPanel`, pero como monta la app real (`main.tsx`). */
+function renderPanelEnStrictMode() {
+  return render(
+    <StrictMode>
+      <MantineProvider>
+        <PedidosPanel />
+      </MantineProvider>
+    </StrictMode>,
+  );
+}
+
 async function elegirMotivo(label: string) {
   fireEvent.click(screen.getByRole('combobox'));
   fireEvent.click(await screen.findByText(label));
@@ -67,6 +89,7 @@ async function elegirMotivo(label: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.pedidosComerciante.mockResolvedValue([pedido()]);
+  mocks.comercio.mockResolvedValue([]);
   mocks.crear.mockResolvedValue({
     id_reporte: 10,
     motivo: 'El cliente no se presentó a retirar el producto',
@@ -106,6 +129,23 @@ describe('PedidosPanel', () => {
       ),
     );
     expect(mocks.crear).not.toHaveBeenCalled();
+  });
+
+  it('no rompe el panel al escribir en la descripción del reporte', async () => {
+    // StrictMode re-invoca los updaters de estado; antes, leer
+    // `evento.currentTarget` dentro del updater devolvía null y tumbaba la app.
+    renderPanelEnStrictMode();
+    await screen.findByText('Pedido MC-2');
+
+    await elegirMotivo('Otro motivo');
+    const descripcion = screen.getByRole<HTMLTextAreaElement>('textbox', {
+      name: 'Descripción del problema',
+    });
+
+    fireEvent.change(descripcion, { target: { value: 'L' } });
+
+    expect(screen.getByText('Pedido MC-2')).toBeTruthy();
+    expect(descripcion.value).toBe('L');
   });
 
   it('envía un reporte al cliente y muestra el estado del reporte', async () => {
@@ -179,6 +219,112 @@ describe('PedidosPanel', () => {
           message: 'SMTP caído',
         }),
       ),
+    );
+  });
+
+  it('valida el código y confirma la entrega en mostrador', async () => {
+    mocks.validarEntrega.mockResolvedValue({
+      pedido: {
+        idPedido: 'p1',
+        codigoAlfanumerico: 'MC-1',
+        estado: 'PENDIENTE_DE_RETIRO',
+        fechaPedido: '2026-01-01T00:00:00.000Z',
+        fechaEntrega: null,
+        total: 1500,
+        cliente: { nombre: 'Ana', apellido: 'Paz' },
+        pagoEstado: 'PAGADO',
+        items: [{ titulo: 'Producto', cantidad: 1 }],
+      },
+      puedeEntregar: true,
+      motivo: null,
+    });
+    mocks.entregar.mockResolvedValue({
+      idPedido: 'p1',
+      estado: 'ENTREGADO',
+      yaEntregado: false,
+    });
+
+    renderPanel();
+    fireEvent.change(screen.getByLabelText('Código del pedido'), {
+      target: { value: 'MC-1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar código' }));
+
+    await screen.findByRole('button', { name: 'Confirmar entrega' });
+    expect(mocks.validarEntrega).toHaveBeenCalledWith('token', 'MC-1');
+    // La spec exige badges con color y el bloque de cobro destacado.
+    expect(screen.getByText('Pendiente de retiro')).toBeTruthy();
+    expect(screen.getByText('Cobro')).toBeTruthy();
+    expect(screen.getByText('Pagado')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar entrega' }));
+
+    await waitFor(() =>
+      expect(mocks.entregar).toHaveBeenCalledWith('token', 'p1'),
+    );
+    expect(mocks.show).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Entrega confirmada' }),
+    );
+  });
+
+  it('no permite entregar si el pago no está aprobado', async () => {
+    mocks.validarEntrega.mockResolvedValue({
+      pedido: {
+        idPedido: 'p1',
+        codigoAlfanumerico: 'MC-1',
+        estado: 'PENDIENTE_DE_RETIRO',
+        fechaPedido: '2026-01-01T00:00:00.000Z',
+        fechaEntrega: null,
+        total: 1500,
+        cliente: null,
+        pagoEstado: 'PENDIENTE',
+        items: [],
+      },
+      puedeEntregar: false,
+      motivo: 'El pedido no tiene un pago aprobado.',
+    });
+
+    renderPanel();
+    fireEvent.change(screen.getByLabelText('Código del pedido'), {
+      target: { value: 'MC-1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar código' }));
+
+    await screen.findByText('El pedido no tiene un pago aprobado.');
+    expect(
+      screen.queryByRole('button', { name: 'Confirmar entrega' }),
+    ).toBeNull();
+  });
+
+  it('permite cancelar un pedido pendiente de pago', async () => {
+    mocks.comercio.mockResolvedValue([
+      {
+        idPedido: 'p3',
+        codigoAlfanumerico: 'MC-3',
+        estado: 'PENDIENTE_PAGO',
+        fechaPedido: '2026-01-01T00:00:00.000Z',
+        fechaEntrega: null,
+        total: 900,
+        cliente: null,
+        pagoEstado: 'PENDIENTE',
+        items: [],
+      },
+    ]);
+    mocks.cancelar.mockResolvedValue({
+      idPedido: 'p3',
+      estado: 'CANCELADO',
+      stockRestaurado: true,
+    });
+
+    renderPanel();
+    await screen.findByText('Pedidos pendientes de pago');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar pedido' }));
+
+    await waitFor(() =>
+      expect(mocks.cancelar).toHaveBeenCalledWith('token', 'p3'),
+    );
+    expect(mocks.show).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Pedido cancelado' }),
     );
   });
 });

@@ -37,6 +37,18 @@ function renderizar(entrada: string) {
   );
 }
 
+describe('Rutas de restablecimiento de contraseña', () => {
+  it('/restablecer muestra el formulario aunque haya una sesión activa', () => {
+    renderizar('/restablecer?token=test-token');
+
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Nueva contraseña' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Nueva contraseña')).toBeInTheDocument();
+    expect(screen.getByLabelText('Repetir contraseña')).toBeInTheDocument();
+  });
+});
+
 describe('Rutas de cliente', () => {
   afterEach(() => {
     vi.unstubAllGlobals();

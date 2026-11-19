@@ -35,6 +35,9 @@ describe('CheckoutService', () => {
     comercio: {
       findUnique: vi.fn(),
     },
+    pedido: {
+      findUnique: vi.fn(),
+    },
     $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) =>
       callback(tx),
     ),
@@ -93,6 +96,7 @@ describe('CheckoutService', () => {
     );
 
     prisma.canasta.findUnique.mockResolvedValue({ idCanasta: canastaId });
+    prisma.pedido.findUnique.mockResolvedValue(null);
     prisma.comercio.findUnique.mockResolvedValue({
       nombreFantasia: 'Almacén del Centro',
       calle: 'Av. San Martín',
@@ -236,11 +240,9 @@ describe('CheckoutService', () => {
 
       expect(tx.producto.updateMany).not.toHaveBeenCalled();
       expect(tx.canasta.delete).not.toHaveBeenCalled();
-
-      const data = tx.pedido.create.mock.calls[0][0].data;
-      expect(data.estado).toBe('PENDIENTE_PAGO');
-      expect(data.pagos.create.estado).toBe('RECHAZADO');
-      expect(data.pagos.create.splits).toBeUndefined();
+      // El cobro ocurre fuera de la transacción: un rechazo no toca la base.
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(tx.pedido.create).not.toHaveBeenCalled();
     });
 
     it('revierte con 409 si el stock cambió antes de escribir', async () => {
@@ -278,7 +280,136 @@ describe('CheckoutService', () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
   });
+
+  describe('idempotencia del checkout', () => {
+    const clave = 'clave-idempotente-1';
+    const pedidoPrevio = {
+      id_pedido: '88888888-8888-4888-8888-888888888888',
+      usuarioId,
+      comercioId,
+      codigoAlfanumerico: 'PREV1234',
+      total: new Prisma.Decimal('100.00'),
+      estado: 'PENDIENTE_DE_RETIRO',
+    };
+
+    it('devuelve el pedido previo del mismo usuario y comercio sin cobrar de nuevo', async () => {
+      prisma.pedido.findUnique.mockResolvedValue(pedidoPrevio);
+
+      const resultado = await service.pagar(usuarioId, {
+        comercioId,
+        franjaHorarioId: franjaId,
+        idempotencyKey: clave,
+      });
+
+      expect(resultado).toEqual({
+        idPedido: pedidoPrevio.id_pedido,
+        codigoAlfanumerico: 'PREV1234',
+        estado: 'PENDIENTE_DE_RETIRO',
+        total: '100.00',
+      });
+      expect(pasarela.cobrar).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('devuelve el estado real del pedido previo, no un estado fijo', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        ...pedidoPrevio,
+        estado: 'CANCELADO',
+      });
+
+      const resultado = await service.pagar(usuarioId, {
+        comercioId,
+        franjaHorarioId: franjaId,
+        idempotencyKey: clave,
+      });
+
+      expect(resultado.estado).toBe('CANCELADO');
+    });
+
+    it('rechaza la clave si pertenece a otro usuario', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        ...pedidoPrevio,
+        usuarioId: '99999999-9999-4999-8999-999999999999',
+      });
+
+      await expect(
+        service.pagar(usuarioId, {
+          comercioId,
+          franjaHorarioId: franjaId,
+          idempotencyKey: clave,
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(pasarela.cobrar).not.toHaveBeenCalled();
+    });
+
+    it('rechaza la clave si pertenece a otro comercio', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        ...pedidoPrevio,
+        comercioId: '99999999-9999-4999-8999-999999999999',
+      });
+
+      await expect(
+        service.pagar(usuarioId, {
+          comercioId,
+          franjaHorarioId: franjaId,
+          idempotencyKey: clave,
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(pasarela.cobrar).not.toHaveBeenCalled();
+    });
+
+    it('ante P2002, recupera solo el pedido del mismo usuario y comercio', async () => {
+      pasarela.cobrar.mockResolvedValue({
+        aprobado: true,
+        nroComprobante: 'SIM-20261117-ABCD1234',
+        mpPaymentId: null,
+        comisionMp: new Prisma.Decimal('611.77'),
+      });
+      prisma.$transaction.mockRejectedValueOnce(conflictoDeIdempotencia());
+      prisma.pedido.findUnique.mockResolvedValue(pedidoPrevio);
+
+      const resultado = await service.pagar(usuarioId, {
+        comercioId,
+        franjaHorarioId: franjaId,
+        idempotencyKey: clave,
+      });
+
+      expect(resultado.idPedido).toBe(pedidoPrevio.id_pedido);
+    });
+
+    it('ante P2002, no devuelve el pedido de otro usuario', async () => {
+      pasarela.cobrar.mockResolvedValue({
+        aprobado: true,
+        nroComprobante: 'SIM-20261117-ABCD1234',
+        mpPaymentId: null,
+        comisionMp: new Prisma.Decimal('611.77'),
+      });
+      prisma.$transaction.mockRejectedValueOnce(conflictoDeIdempotencia());
+      prisma.pedido.findUnique.mockResolvedValue({
+        ...pedidoPrevio,
+        usuarioId: '99999999-9999-4999-8999-999999999999',
+      });
+
+      await expect(
+        service.pagar(usuarioId, {
+          comercioId,
+          franjaHorarioId: franjaId,
+          idempotencyKey: clave,
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
 });
+
+function conflictoDeIdempotencia() {
+  return new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+    code: 'P2002',
+    clientVersion: '7.0.0',
+    meta: { target: ['idempotency_key'] },
+  });
+}
 
 /** Excepción centinela: solo verifica que se corta antes de la transacción. */
 class BadRequestExceptionProbe extends Error {}

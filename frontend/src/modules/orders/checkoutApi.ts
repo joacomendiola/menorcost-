@@ -31,10 +31,18 @@ export interface CheckoutResumen {
   franjas: CheckoutFranja[];
 }
 
+export type EstadoCheckoutConfirmado =
+  | 'PENDIENTE_DE_RETIRO'
+  | 'PENDIENTE_PAGO'
+  | 'ENTREGADO'
+  | 'CANCELADO'
+  | 'CANCELADO_POR_FALTA_RETIRO';
+
 export interface CheckoutConfirmado {
   idPedido: string;
   codigoAlfanumerico: string;
-  estado: 'PENDIENTE_DE_RETIRO';
+  /** Puede no ser PENDIENTE_DE_RETIRO si el reintento devuelve un pedido previo. */
+  estado: EstadoCheckoutConfirmado;
   total: string;
 }
 
@@ -44,6 +52,8 @@ export type ResultadoPagoSimulado = 'APROBADO' | 'RECHAZADO';
 export interface CrearPedidoPayload {
   comercioId: string;
   franjaHorarioId: string;
+  /** Clave estable por intento de checkout: evita pedidos duplicados. */
+  idempotencyKey: string;
   resultadoPagoSimulado?: ResultadoPagoSimulado;
 }
 

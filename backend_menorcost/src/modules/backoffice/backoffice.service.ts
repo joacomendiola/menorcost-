@@ -9,6 +9,7 @@ import type { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { MailerService } from '../auth/mailer/mailer.service.js';
 import type { EnvioCorreo } from '../auth/mailer/mailer.interface.js';
+import { notificarPedido } from '../pedidos/pedido-notificaciones.js';
 import type { AlcanceSancion } from './dto/sancionar-reporte.dto.js';
 
 const USUARIO_PUBLICO_SELECT = {
@@ -491,8 +492,28 @@ export class BackofficeService {
 
       await this.restaurarSiCorresponde(tx, reporte.id_denunciado, idReporte);
 
-      return { success: true };
+      // CU-Extra 02: si el comercio denunció que el cliente no retiró y el
+      // admin resuelve a favor, el pedido se cierra por falta de retiro.
+      const pedidoCancelado =
+        estadoFinal === 'RESUELTO'
+          ? await this.cancelarPedidoPorFaltaDeRetiro(
+              tx,
+              reporte.id_pedido,
+              reporte.id_emisor,
+            )
+          : null;
+
+      return { success: true, pedidoCancelado };
     });
+
+    if (resultado.pedidoCancelado) {
+      await notificarPedido(this.prisma, {
+        usuarioId: resultado.pedidoCancelado.usuarioId,
+        tipo: 'PEDIDO_CANCELADO_POR_FALTA_RETIRO',
+        titulo: 'Pedido cancelado por falta de retiro',
+        mensaje: `El pedido ${resultado.pedidoCancelado.codigoAlfanumerico} fue cancelado porque no se retiró en el plazo acordado.`,
+      });
+    }
 
     const notificaciones = await this.notificarCierreReporte(
       reporte.emisor,
@@ -532,6 +553,46 @@ export class BackofficeService {
     return {
       emisor: notificacionEmisor,
       denunciado: notificacionDenunciado,
+    };
+  }
+
+  /**
+   * Cierra el pedido como `CANCELADO_POR_FALTA_RETIRO` cuando el admin resuelve
+   * a favor un reporte de no-show emitido por el comercio.
+   *
+   * No restaura stock ni genera reembolso (regla del proyecto).
+   */
+  private async cancelarPedidoPorFaltaDeRetiro(
+    tx: Prisma.TransactionClient,
+    idPedido: string,
+    idEmisor: string,
+  ) {
+    const pedido = await tx.pedido.findUnique({
+      where: { id_pedido: idPedido },
+      select: {
+        id_pedido: true,
+        usuarioId: true,
+        estado: true,
+        codigoAlfanumerico: true,
+        comercio: { select: { userId: true } },
+      },
+    });
+
+    if (!pedido) return null;
+    if (pedido.estado !== 'PENDIENTE_DE_RETIRO') return null;
+    // Solo aplica si el reporte lo emitió el comercio (no-show contra el cliente).
+    if (pedido.comercio?.userId !== idEmisor) return null;
+
+    const actualizados = await tx.pedido.updateMany({
+      where: { id_pedido: idPedido, estado: 'PENDIENTE_DE_RETIRO' },
+      data: { estado: 'CANCELADO_POR_FALTA_RETIRO' },
+    });
+
+    if (actualizados.count === 0) return null;
+
+    return {
+      usuarioId: pedido.usuarioId,
+      codigoAlfanumerico: pedido.codigoAlfanumerico,
     };
   }
 

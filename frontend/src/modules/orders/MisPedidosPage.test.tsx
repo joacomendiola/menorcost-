@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,11 +14,17 @@ import type { PedidoResumen } from '../../api';
 
 const mocks = vi.hoisted(() => ({
   listar: vi.fn(),
+  listarNotificaciones: vi.fn(),
+  marcarLeida: vi.fn(),
 }));
 
 vi.mock('../../api', () => ({
   ApiError: class ApiError extends Error {},
   pedidosApi: { listar: mocks.listar },
+  notificacionesApi: {
+    listar: mocks.listarNotificaciones,
+    marcarLeida: mocks.marcarLeida,
+  },
 }));
 
 vi.mock('../../auth/contexto', () => ({
@@ -64,6 +76,8 @@ describe('MisPedidosPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.listar.mockResolvedValue(pedidos);
+    mocks.listarNotificaciones.mockResolvedValue([]);
+    mocks.marcarLeida.mockResolvedValue({});
   });
 
   afterEach(() => {
@@ -78,8 +92,8 @@ describe('MisPedidosPage', () => {
     expect(
       screen.getByText(/Retiro 09:00 – 10:00 · .* · Yogur natural x2, Pan de masa madre x1/),
     ).toBeTruthy();
-    expect(screen.getByText('PENDIENTE_DE_RETIRO')).toBeTruthy();
-    expect(screen.getByText('ENTREGADO')).toBeTruthy();
+    expect(screen.getByText('Pendiente de retiro')).toBeTruthy();
+    expect(screen.getByText('Entregado')).toBeTruthy();
   });
 
   it('muestra "Ver ticket QR" solo para pedidos pendientes', async () => {
@@ -107,5 +121,48 @@ describe('MisPedidosPage', () => {
     renderizar();
 
     expect(await screen.findByText('Todavía no tenés pedidos')).toBeTruthy();
+  });
+
+  it('muestra los avisos de pedidos y permite descartarlos', async () => {
+    const avisos = [
+      {
+        id: 'n1',
+        titulo: 'Pedido cancelado',
+        mensaje: 'El comercio canceló tu pedido MC-1.',
+        tipo: 'PEDIDO_CANCELADO',
+        leida: false,
+        createdAt: '2026-11-18T10:00:00.000Z',
+      },
+      {
+        id: 'n2',
+        titulo: 'Oferta vencida',
+        mensaje: 'No es un aviso de pedido.',
+        tipo: 'OFERTA_VENCIDA',
+        leida: false,
+        createdAt: '2026-11-18T10:00:00.000Z',
+      },
+    ];
+
+    mocks.listarNotificaciones.mockResolvedValue(avisos);
+    // Al marcar como leída, el backend deja de devolverla en la próxima carga.
+    mocks.marcarLeida.mockImplementation(async () => {
+      mocks.listarNotificaciones.mockResolvedValue([
+        { ...avisos[0], leida: true },
+        avisos[1],
+      ]);
+      return {};
+    });
+
+    renderizar();
+
+    expect(await screen.findByText('Pedido cancelado')).toBeTruthy();
+    expect(screen.queryByText('Oferta vencida')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Entendido' }));
+
+    await waitFor(() => expect(mocks.marcarLeida).toHaveBeenCalledWith('token', 'n1'));
+    await waitFor(() =>
+      expect(screen.queryByText('Pedido cancelado')).toBeNull(),
+    );
   });
 });
