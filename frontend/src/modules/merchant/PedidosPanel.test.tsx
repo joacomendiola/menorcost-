@@ -223,6 +223,10 @@ describe('PedidosPanel', () => {
 
     await screen.findByRole('button', { name: 'Confirmar entrega' });
     expect(mocks.validarEntrega).toHaveBeenCalledWith('token', 'MC-1');
+    // La spec exige badges con color y el bloque de cobro destacado.
+    expect(screen.getByText('Pendiente de retiro')).toBeTruthy();
+    expect(screen.getByText('Cobro')).toBeTruthy();
+    expect(screen.getByText('Pagado')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar entrega' }));
 
