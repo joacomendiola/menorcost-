@@ -26,11 +26,12 @@ export interface PasarelaPago {
 }
 
 /**
- * Pasarela simulada: no habla con Mercado Pago ni genera QR.
+ * Pasarela simulada (implementación heredada).
  *
- * Es la única pieza que hay que reemplazar cuando se integre el Split Payment
- * real. Todo el checkout consume `PasarelaPago`, así que alcanza con registrar
- * otra implementación en `pedidos.module.ts`.
+ * @deprecated Queda solo porque `checkout.service.ts` todavía la inyecta.
+ * La implementación vigente vive en `modulos/pago-pedido/` detrás del puerto
+ * `PUERTO_PAGOS`; este archivo se elimina en la etapa B3, cuando el checkout
+ * pase a crear el pedido pendiente y confirmar por el puerto nuevo.
  */
 @Injectable()
 export class PagoSimuladoService implements PasarelaPago {
