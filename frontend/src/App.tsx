@@ -19,6 +19,7 @@ import { Reviews } from './modules/merchant/Reviews';
 import { Checkout } from './modules/orders/Checkout';
 import { Ticket } from './modules/orders/Ticket';
 import { MisPedidosPage } from './modules/orders/MisPedidosPage';
+import { MisReportesPage } from './modules/orders/MisReportesPage';
 import { ComercioEstadoPage } from './pages/ComercioEstadoPage';
 import { Login } from './pages/Login';
 import { Perfil } from './pages/Perfil';
@@ -97,6 +98,10 @@ export default function App() {
           <Route
             path="/mis-pedidos"
             element={<MisPedidosPage />}
+          />
+          <Route
+            path="/mis-reportes"
+            element={<MisReportesPage />}
           />
 
           <Route path="/buscar" element={<ExplorarPage />} />
