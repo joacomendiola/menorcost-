@@ -1,6 +1,9 @@
 import * as maplibregl from 'maplibre-gl';
 import type { Map, Marker } from 'maplibre-gl';
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import 'maplibre-gl/dist/maplibre-gl.css';
+
+maplibregl.setWorkerUrl(workerUrl);
 
 export const ESTILO_MAPA = 'https://tiles.openfreemap.org/styles/liberty';
 
