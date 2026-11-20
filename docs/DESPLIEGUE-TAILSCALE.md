@@ -115,10 +115,9 @@ Servicios esperados: `menorcost_db` (healthy), `menorcost_backend`, `menorcost_f
   ```bash
   docker compose logs -f backend
   ```
-- **Seed (manual, recomendado solo sobre base vacía):**
+- **Seed (manual, recomendado solo sobre base vacía):** ejecuta la seed unificada (categorías, datos demo y backoffice).
   ```bash
   docker compose exec backend npm run seed
-  # opcional: docker compose exec backend npm run seed:backoffice
   ```
 
 ### Verificación local (antes de exponer)

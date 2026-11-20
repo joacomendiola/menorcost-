@@ -187,17 +187,16 @@ La notificación puede consultarse desde la campana del panel del comerciante.
 
 ### Datos de prueba del backoffice
 
-Además de la seed general, el backend incluye una seed específica para probar el panel de administración: altas de comercios, solicitudes de baja y denuncias.
+La seed unificada (`npm run seed`) también crea los datos para probar el panel de administración: altas de comercios, solicitudes de baja y denuncias.
 
 Desde la carpeta del backend:
 
 ```powershell
 cd backend_menorcost
 npm run seed
-npm run seed:backoffice
 ```
 
-La seed de backoffice es idempotente: vuelve a crear únicamente sus datos de prueba y no modifica el resto de la base. Requiere que `npm run seed` se haya ejecutado antes. Para restaurar los datos a su estado inicial, volvé a ejecutar `npm run seed:backoffice`.
+La seed es idempotente: sincroniza categorías/datos demo y recrea los datos de prueba de backoffice en cada ejecución. Para restaurar los datos a su estado inicial, volvé a ejecutar `npm run seed`.
 
 Datos que genera:
 
@@ -213,7 +212,7 @@ Administrador: admin@test.com / Password123
 Usuarios de backoffice: bo.*@test.com / Password123
 ```
 
-Los usuarios de backoffice usan correos ficticios `@test.com`; no son cuentas de Gmail. El detalle de cada usuario y sus datos asociados está en `backend_menorcost/prisma/seed-backoffice.ts`.
+Los usuarios de backoffice usan correos ficticios `@test.com`; no son cuentas de Gmail. El detalle de cada usuario y sus datos asociados está en `backend_menorcost/prisma/seed.ts`.
 
 CU-1.02 no almacena documentación: el comerciante la envía a `menorcost@gmail.com` y la revisión es externa. El Backoffice registra únicamente la resolución del alta: administrador, fecha y motivo de rechazo (CU-5.03).
 
