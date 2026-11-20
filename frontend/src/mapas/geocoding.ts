@@ -4,6 +4,7 @@ interface PhotonProperties {
   name?: string;
   street?: string;
   housenumber?: string;
+  type?: string;
   city?: string;
   town?: string;
   village?: string;
@@ -45,7 +46,9 @@ function identificar(feature: PhotonFeature, indice: number): string {
 
 function normalizar(feature: PhotonFeature, id: string): PlacesDetalle {
   const propiedades = feature.properties;
-  const calle = propiedades.street ?? '';
+  const calle =
+    propiedades.street ??
+    (propiedades.type === 'street' ? propiedades.name ?? '' : '');
   const numero = propiedades.housenumber ?? '';
   const localidad = valorLocalidad(propiedades);
   const provincia = propiedades.state ?? '';
@@ -75,7 +78,7 @@ export async function buscarLugares(
 ): Promise<PlacesSugerencia[]> {
   const parametros = new URLSearchParams({
     q: texto,
-    lang: 'es',
+    lang: 'default',
     limit: '6',
     bbox: '-73.5,-55.5,-53,-21',
   });
@@ -104,6 +107,35 @@ export async function buscarLugares(
   });
 
   return resultados;
+}
+
+export async function detallePorCoordenadas(
+  latitud: number,
+  longitud: number,
+  signal?: AbortSignal,
+): Promise<PlacesDetalle | null> {
+  const parametros = new URLSearchParams({
+    lon: String(longitud),
+    lat: String(latitud),
+    limit: '1',
+  });
+
+  const respuesta = await fetch(
+    `https://photon.komoot.io/reverse?${parametros.toString()}`,
+    { signal, headers: { Accept: 'application/json' } },
+  );
+
+  if (!respuesta.ok) {
+    throw new Error('No pudimos consultar OpenStreetMap.');
+  }
+
+  const datos = (await respuesta.json()) as PhotonResponse;
+  const feature = datos.features[0];
+  if (!feature) return null;
+
+  const detalle = normalizar(feature, identificar(feature, 0));
+  detalles.set(detalle.placeId, detalle);
+  return detalle;
 }
 
 export function detalleLugar(placeId: string): PlacesDetalle | null {

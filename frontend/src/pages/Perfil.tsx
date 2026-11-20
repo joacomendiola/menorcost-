@@ -671,6 +671,14 @@ export function Perfil() {
                           longitud: longitud.toFixed(6),
                         }))
                       }
+                      onDireccion={(detalle) =>
+                        setFormDireccion((prev) => ({
+                          ...prev,
+                          calle: detalle.calle || prev.calle,
+                          numero: detalle.numero || prev.numero,
+                          localidad: detalle.localidad || prev.localidad,
+                        }))
+                      }
                     />
 
                     <div className="row">
@@ -683,7 +691,8 @@ export function Perfil() {
                         {ubicando ? 'Ubicando…' : '📍 Usar mi ubicación'}
                       </button>
                       <span className="help">
-                        Arrastrá el pin o tocá el mapa para ajustar la ubicación.
+                        Arrastrá el pin o tocá el mapa: la dirección se completa
+                        automáticamente cuando OpenStreetMap la conoce.
                       </span>
                     </div>
 

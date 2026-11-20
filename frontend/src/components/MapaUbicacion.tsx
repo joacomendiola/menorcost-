@@ -1,27 +1,36 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Map, Marker } from 'maplibre-gl';
+import { detallePorCoordenadas } from '../mapas/geocoding';
 import { crearMapa, crearMarcador } from '../mapas/maplibre';
+import type { PlacesDetalle } from '../comercios/api';
 
 interface MapaUbicacionProps {
   latitud: number;
   longitud: number;
   onChange: (latitud: number, longitud: number) => void;
+  onDireccion?: (detalle: PlacesDetalle) => void;
 }
 
 export function MapaUbicacion({
   latitud,
   longitud,
   onChange,
+  onDireccion,
 }: MapaUbicacionProps) {
   const contenedor = useRef<HTMLDivElement>(null);
   const mapa = useRef<Map | null>(null);
   const marcador = useRef<Marker | null>(null);
   const onChangeRef = useRef(onChange);
+  const onDireccionRef = useRef(onDireccion);
+  const controlador = useRef<AbortController | null>(null);
   const [error, setError] = useState('');
+  const [buscandoDireccion, setBuscandoDireccion] = useState(false);
+  const [errorDireccion, setErrorDireccion] = useState('');
 
   useEffect(() => {
     onChangeRef.current = onChange;
-  }, [onChange]);
+    onDireccionRef.current = onDireccion;
+  }, [onChange, onDireccion]);
 
   useEffect(() => {
     if (!contenedor.current) return;
@@ -35,15 +44,43 @@ export function MapaUbicacion({
           arrastrable: true,
         }).addTo(instancia);
 
+        const actualizar = (lat: number, lng: number) => {
+          onChangeRef.current(lat, lng);
+          if (!onDireccionRef.current) return;
+
+          controlador.current?.abort();
+          const peticion = new AbortController();
+          controlador.current = peticion;
+          setBuscandoDireccion(true);
+          setErrorDireccion('');
+
+          detallePorCoordenadas(lat, lng, peticion.signal)
+            .then((detalle) => {
+              if (peticion.signal.aborted || !detalle) return;
+              onDireccionRef.current?.(detalle);
+            })
+            .catch((err: unknown) => {
+              if ((err as Error).name === 'AbortError') return;
+              setErrorDireccion(
+                'No pudimos completar la dirección automáticamente.',
+              );
+            })
+            .finally(() => {
+              if (controlador.current === peticion) {
+                setBuscandoDireccion(false);
+              }
+            });
+        };
+
         instancia.on('click', (evento) => {
           const { lat, lng } = evento.lngLat;
           pin.setLngLat([lng, lat]);
-          onChangeRef.current(lat, lng);
+          actualizar(lat, lng);
         });
 
         pin.on('dragend', () => {
           const posicion = pin.getLngLat();
-          onChangeRef.current(posicion.lat, posicion.lng);
+          actualizar(posicion.lat, posicion.lng);
         });
 
         mapa.current = instancia;
@@ -62,6 +99,7 @@ export function MapaUbicacion({
 
   useEffect(
     () => () => {
+      controlador.current?.abort();
       marcador.current?.remove();
       mapa.current?.remove();
       marcador.current = null;
@@ -104,6 +142,27 @@ export function MapaUbicacion({
         style={{ height: 240, width: '100%', borderRadius: 12 }}
         aria-label="Mapa de la dirección"
       />
+
+      {(buscandoDireccion || errorDireccion) && (
+        <div
+          className="help"
+          role={errorDireccion ? 'alert' : undefined}
+          style={{
+            position: 'absolute',
+            left: 10,
+            bottom: 10,
+            margin: 0,
+            padding: '4px 8px',
+            borderRadius: 8,
+            background: 'rgba(255, 255, 255, 0.9)',
+            pointerEvents: 'none',
+          }}
+        >
+          {buscandoDireccion
+            ? 'Completando dirección…'
+            : errorDireccion}
+        </div>
+      )}
     </div>
   );
 }
