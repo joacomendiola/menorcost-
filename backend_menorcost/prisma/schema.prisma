@@ -551,6 +551,12 @@ model MpOauthState {
 model Pago {
   idPago           String     @id @default(uuid()) @map("id_pago") @db.Uuid
   pedidoId         String     @map("id_pedido") @db.Uuid
+  // Orden de Mercado Pago (Orders API) asociada a este intento de pago.
+  // Único porque una orden de MP pertenece a un solo intento.
+  mpOrderId        String?    @unique @map("mp_order_id") @db.VarChar(64)
+  // Estado crudo informado por Mercado Pago (`created`, `processed`, `action_required`, ...).
+  mpStatus         String?    @map("mp_status") @db.VarChar(40)
+  mpStatusDetail   String?    @map("mp_status_detail") @db.VarChar(80)
   mpPaymentId      String?    @unique @map("mp_payment_id") @db.VarChar(64)
   nroComprobante   String?    @map("nro_comprobante") @db.VarChar(64)
   montoTransaccion Decimal    @map("monto_transaccion") @db.Decimal(10, 2)
@@ -588,4 +594,26 @@ model SplitPago {
   @@index([pagoId])
   @@index([credencialId])
   @@map("splits_pagos")
+}
+
+// Registro de notificaciones (webhooks) de Mercado Pago.
+// `clave_unica` es la clave de idempotencia: Mercado Pago puede enviar el
+// mismo evento más de una vez y solo debe procesarse una.
+model NotificacionMercadoPago {
+  id                String    @id @default(uuid()) @db.Uuid
+  claveUnica        String    @unique @map("clave_unica") @db.VarChar(120)
+  topico            String    @db.VarChar(40)
+  accion            String?   @db.VarChar(60)
+  idRecurso         String?   @map("id_recurso") @db.VarChar(80)
+  // `external_reference` que enviamos al crear la orden: permite ubicar el
+  // pedido aunque el recurso de MP todavía no esté persistido.
+  referenciaExterna String?   @map("referencia_externa") @db.VarChar(80)
+  payload           Json?
+  recibidaEn        DateTime  @default(now()) @map("recibida_en")
+  procesadaEn       DateTime? @map("procesada_en")
+  error             String?   @db.Text
+
+  @@index([recibidaEn])
+  @@index([topico])
+  @@map("notificaciones_mercadopago")
 }
