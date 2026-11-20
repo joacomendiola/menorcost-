@@ -814,6 +814,8 @@ h3 {
   height: auto;
   min-height: 0;
   margin-inline: auto;
+}
+
 .resumen-card {
   text-align: left;
 }
