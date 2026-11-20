@@ -1,6 +1,16 @@
+# Entornos locales (no commitear secretos)
 .env
-/docs/
+.env.*
+*.env.local
+!.env.example
+!**/.env.example
+
+# Herramientas/agentes locales
 opencode.jsonc
 /.agents
 /skills-lock.json
 graphify-out/
+
+# Artefactos generales
+.DS_Store
+*.log
