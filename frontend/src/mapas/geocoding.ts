@@ -117,7 +117,7 @@ export async function detallePorCoordenadas(
   const parametros = new URLSearchParams({
     lon: String(longitud),
     lat: String(latitud),
-    limit: '1',
+    limit: '8',
   });
 
   const respuesta = await fetch(
@@ -130,7 +130,9 @@ export async function detallePorCoordenadas(
   }
 
   const datos = (await respuesta.json()) as PhotonResponse;
-  const feature = datos.features[0];
+  const feature =
+    datos.features.find((item) => item.properties.housenumber) ??
+    datos.features[0];
   if (!feature) return null;
 
   const detalle = normalizar(feature, identificar(feature, 0));
