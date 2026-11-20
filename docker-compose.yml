@@ -6,10 +6,80 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
+    # Puerto en localhost para acceso/debug desde el host (opcional). La app en Docker usa la red interna.
     ports:
-      - "${DB_LOCAL_PORT}:5432"
+      - "127.0.0.1:${DB_LOCAL_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-menorcost}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend_menorcost
+      dockerfile: Dockerfile
+    container_name: menorcost_backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT:-3000}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
+      TZ: America/Argentina/Ushuaia
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      MAIL_PROVIDER: ${MAIL_PROVIDER:-console}
+      MAIL_FROM: ${MAIL_FROM:-Menorcost <no-reply@menorcost.local>}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_SECURE: ${MAIL_SECURE:-false}
+      MAIL_USER: ${MAIL_USER:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MP_CLIENT_ID: ${MP_CLIENT_ID:-}
+      MP_CLIENT_SECRET: ${MP_CLIENT_SECRET:-}
+      MP_REDIRECT_URI: ${MP_REDIRECT_URI:-}
+      MP_OAUTH_STATE_SECRET: ${MP_OAUTH_STATE_SECRET:-}
+      MP_TOKENS_ENCRYPTION_KEY: ${MP_TOKENS_ENCRYPTION_KEY:-}
+      MP_PKCE_ENABLED: ${MP_PKCE_ENABLED:-false}
+      MP_TIMEOUT_MS: ${MP_TIMEOUT_MS:-10000}
+      MP_WEBHOOK_URL: ${MP_WEBHOOK_URL:-}
+      MP_WEBHOOK_SECRET: ${MP_WEBHOOK_SECRET:-}
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+    volumes:
+      - backend_uploads:/app/uploads
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
+        VITE_CARTO_BASEMAP_API_KEY: ${VITE_CARTO_BASEMAP_API_KEY:-}
+    container_name: menorcost_frontend
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: menorcost_caddy
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "127.0.0.1:8081:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  backend_uploads:
