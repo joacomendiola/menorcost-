@@ -327,18 +327,3 @@ export const comerciosApi = {
       { method: 'PUT', body: payload, token },
     ),
 };
-
-export const placesApi = {
-  autocompletar: (token: string, texto: string, signal?: AbortSignal) => {
-    const parametros = new URLSearchParams({ texto });
-    return pedir<PlacesSugerencia[]>(
-      `/places/autocompletar?${parametros.toString()}`,
-      { token, signal },
-    );
-  },
-
-  detalle: (token: string, placeId: string) =>
-    pedir<PlacesDetalle>(`/places/detalle/${encodeURIComponent(placeId)}`, {
-      token,
-    }),
-};

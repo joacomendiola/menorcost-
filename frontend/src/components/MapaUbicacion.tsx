@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { cargarGoogleMaps } from '../comercios/googleMaps';
+import type { Map, Marker } from 'maplibre-gl';
+import { crearMapa, crearMarcador } from '../mapas/maplibre';
 
 interface MapaUbicacionProps {
   latitud: number;
@@ -13,8 +14,8 @@ export function MapaUbicacion({
   onChange,
 }: MapaUbicacionProps) {
   const contenedor = useRef<HTMLDivElement>(null);
-  const mapa = useRef<google.maps.Map | null>(null);
-  const marcador = useRef<google.maps.Marker | null>(null);
+  const mapa = useRef<Map | null>(null);
+  const marcador = useRef<Marker | null>(null);
   const onChangeRef = useRef(onChange);
   const [error, setError] = useState('');
 
@@ -23,67 +24,51 @@ export function MapaUbicacion({
   }, [onChange]);
 
   useEffect(() => {
-    let activo = true;
+    if (!contenedor.current) return;
 
-    cargarGoogleMaps()
-      .then((sdk) => {
-        if (!activo || !contenedor.current) return;
+    try {
+      if (!mapa.current) {
+        const instancia = crearMapa(contenedor.current, latitud, longitud, 15);
+        const pin = crearMarcador({
+          latitud,
+          longitud,
+          arrastrable: true,
+        }).addTo(instancia);
 
-        if (!mapa.current) {
-          const nuevoMapa = new sdk.maps.Map(contenedor.current, {
-            center: { lat: latitud, lng: longitud },
-            zoom: 15,
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: false,
-            clickableIcons: false,
-          });
+        instancia.on('click', (evento) => {
+          const { lat, lng } = evento.lngLat;
+          pin.setLngLat([lng, lat]);
+          onChangeRef.current(lat, lng);
+        });
 
-          const nuevoMarcador = new sdk.maps.Marker({
-            map: nuevoMapa,
-            position: { lat: latitud, lng: longitud },
-            draggable: true,
-          });
+        pin.on('dragend', () => {
+          const posicion = pin.getLngLat();
+          onChangeRef.current(posicion.lat, posicion.lng);
+        });
 
-          nuevoMapa.addListener('click', (event: google.maps.MapMouseEvent) => {
-            if (!event.latLng) return;
-            const nuevaLatitud = event.latLng.lat();
-            const nuevaLongitud = event.latLng.lng();
-            nuevoMarcador.setPosition({
-              lat: nuevaLatitud,
-              lng: nuevaLongitud,
-            });
-            onChangeRef.current(nuevaLatitud, nuevaLongitud);
-          });
+        mapa.current = instancia;
+        marcador.current = pin;
+        return;
+      }
 
-          nuevoMarcador.addListener('dragend', () => {
-            const posicion = nuevoMarcador.getPosition();
-            if (!posicion) return;
-            onChangeRef.current(posicion.lat(), posicion.lng());
-          });
-
-          mapa.current = nuevoMapa;
-          marcador.current = nuevoMarcador;
-          return;
-        }
-
-        const posicion = { lat: latitud, lng: longitud };
-        mapa.current.panTo(posicion);
-        marcador.current?.setPosition(posicion);
-      })
-      .catch((err: unknown) => {
-        if (!activo) return;
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'No pudimos cargar el mapa de Google.',
-        );
-      });
-
-    return () => {
-      activo = false;
-    };
+      mapa.current.easeTo({ center: [longitud, latitud] });
+      marcador.current?.setLngLat([longitud, latitud]);
+    } catch (err) {
+      const mensaje =
+        err instanceof Error ? err.message : 'No pudimos cargar el mapa.';
+      queueMicrotask(() => setError(mensaje));
+    }
   }, [latitud, longitud]);
+
+  useEffect(
+    () => () => {
+      marcador.current?.remove();
+      mapa.current?.remove();
+      marcador.current = null;
+      mapa.current = null;
+    },
+    [],
+  );
 
   if (error) {
     return (

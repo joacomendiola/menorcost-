@@ -608,7 +608,7 @@ export function PerfilComercioPage() {
           >
             {editandoUbicacion
               ? 'Cancelar búsqueda de ubicación'
-              : 'Cambiar ubicación con Google Places'}
+              : 'Cambiar ubicación con OpenStreetMap'}
           </Button>
 
           {editandoUbicacion && (

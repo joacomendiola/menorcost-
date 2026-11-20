@@ -172,7 +172,7 @@ export function RegistroComercioPage() {
 
   function validarPasoUbicacion(): boolean {
     if (!ubicacion) {
-      setError('Buscá y seleccioná tu local en Google Places.');
+      setError('Buscá y seleccioná tu local en OpenStreetMap.');
       return false;
     }
     if (!direccion.calle.trim() || !direccion.numero.trim()) {
