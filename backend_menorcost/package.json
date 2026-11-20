@@ -22,6 +22,8 @@
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
     "seed": "tsx prisma/seed.ts",
     "seed:backoffice": "tsx prisma/seed-backoffice.ts",
+    "seed:visual": "tsx prisma/seed-visual-demo.ts",
+    "seed:visual:clear": "tsx prisma/seed-visual-demo.ts --clear",
     "vencimiento:ofertas": "tsx prisma/run-oferta-vencimiento.ts"
   },
   "dependencies": {

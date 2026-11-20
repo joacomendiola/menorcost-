@@ -6,7 +6,7 @@ type Notification = {
   id: string;
   titulo: string;
   mensaje: string;
-  tipo: 'OFERTA_VENCIDA';
+  tipo: string;
   leida: boolean;
   createdAt: string;
 };

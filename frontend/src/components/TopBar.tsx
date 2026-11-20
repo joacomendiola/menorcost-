@@ -1,6 +1,7 @@
 import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../auth/contexto';
 import { Logo } from './Logo';
+import { NotificationsBell } from './layout/NotificacionCampana';
 
 export function TopBar() {
   const { usuario, cargando } = useAuth();
@@ -96,6 +97,8 @@ export function TopBar() {
                 </NavLink>
               </>
             )}
+
+            <NotificationsBell />
 
             <Link to="/perfil" className="pill">
               <span aria-hidden="true">👤</span>
