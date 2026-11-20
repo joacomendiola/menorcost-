@@ -9,7 +9,8 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
-RUN npm ci
+# Build requires devDependencies (prisma CLI, Nest CLI, TypeScript). NODE_ENV is production in base.
+RUN npm ci --include=dev
 
 FROM deps AS build
 COPY tsconfig*.json nest-cli.json ./
