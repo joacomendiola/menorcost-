@@ -11,7 +11,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { useCallback, useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ApiError,
   authApi,
@@ -518,6 +518,11 @@ export function Perfil() {
 
       <div className="perfil-encabezado">
         <h1>👤 Mi Perfil y Configuración</h1>
+        {esCliente && (
+          <Link className="chip" to="/mis-reportes">
+            Mis reportes
+          </Link>
+        )}
         <button type="button" className="chip chip--danger" onClick={salir}>
           Cerrar sesión
         </button>

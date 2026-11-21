@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Switch } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { Logo } from '../Logo';
+import { NotificationsBell } from './NotificacionCampana';
 import { Chip } from '../ui/Chip';
 import { Badge } from '../ui/Badge';
 import { useAuth } from '../../auth/contexto';
@@ -99,6 +100,7 @@ export function MerchantHeader() {
       </nav>
 
       <div className="merchant-header__right">
+        <NotificationsBell />
         <Badge tone={abierto === null ? 'neutro' : abierto ? 'ok' : 'bad'}>
           {abierto === null
             ? 'Local sin estado'
