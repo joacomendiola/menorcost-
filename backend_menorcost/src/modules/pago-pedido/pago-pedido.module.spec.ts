@@ -1,5 +1,5 @@
 import { ServiceUnavailableException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { describe, expect, it } from 'vitest';
 import { ConfiguracionPagoPedido } from './configuracion-pago-pedido.js';
@@ -40,8 +40,14 @@ function solicitudBase(
 }
 
 async function armarModulo(valores: Record<string, string>) {
+  // `ConfigModule` es global en `AppModule` (`ConfigModule.forRoot`), así que en
+  // producción `ConfigService` llega sin importarlo. En el test hay que
+  // registrarlo para poder reemplazarlo por valores fijos.
   const modulo = await Test.createTestingModule({
-    imports: [PagoPedidoModule],
+    imports: [
+      ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
+      PagoPedidoModule,
+    ],
   })
     .overrideProvider(ConfigService)
     .useValue(configCon(valores))
