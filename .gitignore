@@ -4,3 +4,5 @@ opencode.jsonc
 /.agents
 /skills-lock.json
 graphify-out/
+.postman/
+postman/
