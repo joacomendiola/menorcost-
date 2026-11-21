@@ -14,3 +14,5 @@ graphify-out/
 # Artefactos generales
 .DS_Store
 *.log
+
+docs/
