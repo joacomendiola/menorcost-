@@ -1,11 +1,11 @@
 import { Loader, TextInput } from '@mantine/core';
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { ApiError } from '../api';
-import { placesApi, type PlacesDetalle, type PlacesSugerencia } from './api';
+import { buscarLugares, detalleLugar } from '../mapas/geocoding';
+import type { PlacesDetalle, PlacesSugerencia } from './api';
 
 interface BuscadorComercioProps {
-  token: string;
+  token?: string;
   onSeleccion: (detalle: PlacesDetalle) => void;
 }
 
@@ -46,25 +46,11 @@ function IconoPin() {
   );
 }
 
-function mensajeDeError(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (error.status === 503) {
-      return 'Google Places no está configurado. Avisá al equipo para habilitar la búsqueda de locales.';
-    }
-    return error.message;
-  }
-  return 'No pudimos buscar comercios. Intentá de nuevo.';
-}
-
-export function BuscadorComercio({
-  token,
-  onSeleccion,
-}: BuscadorComercioProps) {
+export function BuscadorComercio({ onSeleccion }: BuscadorComercioProps) {
   const [texto, setTexto] = useState('');
   const [sugerencias, setSugerencias] = useState<PlacesSugerencia[]>([]);
   const [abierto, setAbierto] = useState(false);
   const [buscando, setBuscando] = useState(false);
-  const [seleccionando, setSeleccionando] = useState(false);
   const [error, setError] = useState('');
   const contenedorRef = useRef<HTMLDivElement>(null);
 
@@ -79,11 +65,7 @@ export function BuscadorComercio({
       setError('');
 
       try {
-        const resultados = await placesApi.autocompletar(
-          token,
-          consulta,
-          controlador.signal,
-        );
+        const resultados = await buscarLugares(consulta, controlador.signal);
         if (controlador.signal.aborted) return;
         setSugerencias(resultados);
         setAbierto(true);
@@ -91,11 +73,9 @@ export function BuscadorComercio({
         if ((err as Error).name === 'AbortError') return;
         setSugerencias([]);
         setAbierto(true);
-        setError(mensajeDeError(err));
+        setError('No pudimos buscar ubicaciones. Intentá de nuevo.');
       } finally {
-        if (!controlador.signal.aborted) {
-          setBuscando(false);
-        }
+        if (!controlador.signal.aborted) setBuscando(false);
       }
     }, 350);
 
@@ -103,7 +83,7 @@ export function BuscadorComercio({
       clearTimeout(temporizador);
       controlador.abort();
     };
-  }, [texto, token]);
+  }, [texto]);
 
   useEffect(() => {
     function alClicFuera(evento: MouseEvent) {
@@ -128,35 +108,30 @@ export function BuscadorComercio({
     }
   }
 
-  async function seleccionar(sugerencia: PlacesSugerencia) {
-    setTexto(sugerencia.descripcion);
-    setAbierto(false);
-    setSeleccionando(true);
-    setError('');
-
-    try {
-      const detalle = await placesApi.detalle(token, sugerencia.placeId);
-      onSeleccion(detalle);
-    } catch (err) {
-      setError(mensajeDeError(err));
-      setAbierto(true);
-    } finally {
-      setSeleccionando(false);
+  function seleccionar(sugerencia: PlacesSugerencia) {
+    const detalle = detalleLugar(sugerencia.placeId);
+    if (!detalle) {
+      setError('No pudimos cargar esa ubicación. Buscala de nuevo.');
+      return;
     }
+
+    setTexto(detalle.nombre || detalle.direccion);
+    setAbierto(false);
+    setError('');
+    onSeleccion(detalle);
   }
 
   const mostrarLista = abierto && texto.trim().length >= 3;
-  const cargando = buscando || seleccionando;
 
   return (
     <div className="buscador" ref={contenedorRef}>
       <TextInput
-        label="Buscar el local en Google Places"
+        label="Buscar el local en OpenStreetMap"
         placeholder="Nombre del comercio o dirección"
-        aria-label="Buscar el local en Google Places"
+        aria-label="Buscar el local en OpenStreetMap"
         leftSection={<IconoLupa />}
         leftSectionPointerEvents="none"
-        rightSection={cargando ? <Loader size="xs" /> : undefined}
+        rightSection={buscando ? <Loader size="xs" /> : undefined}
         autoComplete="off"
         value={texto}
         onChange={cambiarTexto}
@@ -167,7 +142,7 @@ export function BuscadorComercio({
           if (evento.key === 'Escape') setAbierto(false);
           if (evento.key === 'Enter' && sugerencias.length > 0) {
             evento.preventDefault();
-            void seleccionar(sugerencias[0]);
+            seleccionar(sugerencias[0]);
           }
         }}
       />
@@ -197,7 +172,7 @@ export function BuscadorComercio({
                   className="buscador__item"
                   role="option"
                   aria-selected={false}
-                  onClick={() => void seleccionar(sugerencia)}
+                  onClick={() => seleccionar(sugerencia)}
                 >
                   <span className="buscador__pin">
                     <IconoPin />

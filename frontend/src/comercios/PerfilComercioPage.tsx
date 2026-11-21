@@ -11,10 +11,10 @@ import { notifications } from '@mantine/notifications';
 import { useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { MapaUbicacion } from '../components/MapaUbicacion';
 import { ApiError } from '../api';
 import { useAuth } from '../auth/contexto';
 import { BuscadorComercio } from './BuscadorComercio';
-import { MapaComercio } from './MapaComercio';
 import { MercadoPagoBoton } from './MercadoPagoBoton';
 import {
   comerciosApi,
@@ -234,6 +234,22 @@ export function PerfilComercioPage() {
     });
   }
 
+  function completarDesdeMapa(detalle: PlacesDetalle) {
+    setFormulario((prev) =>
+      prev
+        ? {
+            ...prev,
+            calle: detalle.calle || detalle.direccion || prev.calle,
+            numero: detalle.numero || prev.numero,
+            localidad: detalle.localidad || prev.localidad,
+            provincia: detalle.provincia || prev.provincia,
+            codigoPostal: detalle.codigoPostal || prev.codigoPostal,
+          }
+        : prev,
+    );
+    setErrorFormulario('');
+  }
+
   async function cambiarApertura(abierto: boolean) {
     if (!token) return;
     setCambiandoApertura(true);
@@ -307,7 +323,8 @@ export function PerfilComercioPage() {
       setErrorFormulario('La razón social es obligatoria.');
       return;
     }
-    if (!/^\d{11}$/.test(formulario.cuit.trim())) {
+    const cuit = formulario.cuit.replace(/\D/g, '');
+    if (!/^\d{11}$/.test(cuit)) {
       setErrorFormulario('El CUIT debe tener 11 dígitos.');
       return;
     }
@@ -327,7 +344,7 @@ export function PerfilComercioPage() {
     const payload: Partial<ComercioPayload> = {
       nombreFantasia: formulario.nombreFantasia.trim(),
       razonSocial: formulario.razonSocial.trim(),
-      cuit: formulario.cuit.replace(/\D/g, ''),
+      cuit,
       telefono: formulario.telefono.trim(),
       descripcion: formulario.descripcion.trim() || undefined,
       calle: formulario.calle.trim(),
@@ -562,8 +579,9 @@ export function PerfilComercioPage() {
           <div className="grid-2">
             <TextInput
               label="CUIT"
+              description="Con o sin guiones."
               required
-              maxLength={11}
+              maxLength={13}
               value={formulario.cuit}
               onChange={campo('cuit')}
             />
@@ -607,8 +625,8 @@ export function PerfilComercioPage() {
             onClick={() => setEditandoUbicacion((prev) => !prev)}
           >
             {editandoUbicacion
-              ? 'Cancelar búsqueda de ubicación'
-              : 'Cambiar ubicación con Google Places'}
+              ? 'Ocultar buscador de direcciones'
+              : 'Buscar dirección con OpenStreetMap'}
           </Button>
 
           {editandoUbicacion && (
@@ -618,10 +636,21 @@ export function PerfilComercioPage() {
             />
           )}
 
-          <MapaComercio
+          <MapaUbicacion
             latitud={formulario.latitud}
             longitud={formulario.longitud}
+            onChange={(latitud, longitud) =>
+              setFormulario((prev) =>
+                prev ? { ...prev, latitud, longitud } : prev,
+              )
+            }
+            onDireccion={completarDesdeMapa}
           />
+
+          <p className="help" style={{ margin: 0 }}>
+            Arrastrá el pin o tocá el mapa: la dirección se completa
+            automáticamente cuando OpenStreetMap la conoce.
+          </p>
 
           <div className="grid-2">
             <TextInput
