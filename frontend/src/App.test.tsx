@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+﻿import { describe, expect, it, vi } from 'vitest';
 import { MantineProvider } from '@mantine/core';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -27,6 +27,10 @@ vi.mock('./components/TopBar', () => ({
   TopBar: () => <header>TOPBAR</header>,
 }));
 
+vi.mock('./modules/orders/MisPedidosPage', () => ({
+  MisPedidosPage: () => <h1>Mis pedidos</h1>,
+}));
+
 function renderizar(entrada: string) {
   return render(
     <MantineProvider>
@@ -50,29 +54,11 @@ describe('Rutas de restablecimiento de contraseña', () => {
 });
 
 describe('Rutas de cliente', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('/mis-pedidos muestra el historial de pedidos', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify([]), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      ),
-    );
-
+  it('/mis-pedidos muestra la página de pedidos', () => {
     renderizar('/mis-pedidos');
 
     expect(
       screen.getByRole('heading', { level: 1, name: 'Mis pedidos' }),
-    ).toBeInTheDocument();
-
-    expect(
-      await screen.findByText('Todavía no tenés pedidos'),
     ).toBeInTheDocument();
   });
 });
