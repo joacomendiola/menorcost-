@@ -258,4 +258,12 @@ describe('NotificacionesMercadoPagoService', () => {
     expect(prisma.notificacionMercadoPago.findUnique).not.toHaveBeenCalled();
     expect(mercadoPago.obtenerOrden).not.toHaveBeenCalled();
   });
+
+  it('un POST sin body también se rechaza por firma, sin error 500', async () => {
+    await expect(
+      servicio.procesar({ type: 'order' }, undefined as never, {}),
+    ).rejects.toThrow(InvalidWebhookSignatureError);
+
+    expect(prisma.notificacionMercadoPago.create).not.toHaveBeenCalled();
+  });
 });
