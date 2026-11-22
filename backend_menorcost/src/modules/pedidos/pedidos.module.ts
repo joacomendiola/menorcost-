@@ -6,27 +6,17 @@ import { CheckoutService } from './checkout.service.js';
 import { FranjasService } from './franjas.service.js';
 import { PedidosController } from './pedidos.controller.js';
 import { PedidosService } from './pedidos.service.js';
-import {
-  PASARELA_PAGO,
-  PagoSimuladoService,
-} from './pago-simulado.service.js';
 
 /**
  * Módulo de checkout de CU-3.03.
  *
- * `PASARELA_PAGO` es el único punto de intercambio: cuando entre el Split
- * Payment real de Mercado Pago, se registra otra implementación acá y el resto
- * del módulo no cambia.
+ * El cobro se resuelve con Mercado Pago: el checkout solo arma el resumen y,
+ * cuando la integración esté conectada, delega la creación de la orden y la
+ * confirmación del pago al módulo `pago-pedido`.
  */
 @Module({
   imports: [AuthModule, CanastasModule],
   controllers: [CheckoutController, PedidosController],
-  providers: [
-    CheckoutService,
-    PedidosService,
-    FranjasService,
-    PagoSimuladoService,
-    { provide: PASARELA_PAGO, useExisting: PagoSimuladoService },
-  ],
+  providers: [CheckoutService, PedidosService, FranjasService],
 })
 export class PedidosModule {}

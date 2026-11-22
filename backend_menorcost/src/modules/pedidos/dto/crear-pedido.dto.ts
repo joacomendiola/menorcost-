@@ -1,8 +1,4 @@
-import { IsIn, IsOptional, IsUUID, MaxLength } from 'class-validator';
-import {
-  RESULTADOS_PAGO_SIMULADO,
-  type ResultadoPagoSimulado,
-} from './resultado-pago-simulado.js';
+import { IsOptional, IsUUID, MaxLength } from 'class-validator';
 
 export class CrearPedidoDto {
   @IsUUID()
@@ -18,13 +14,4 @@ export class CrearPedidoDto {
   @IsOptional()
   @MaxLength(64)
   idempotencyKey?: string;
-
-  /**
-   * Solo para el modo simulación: define si el pago mock se aprueba o se
-   * rechaza. El frontend nunca decide el monto, solo el resultado del cobro.
-   * Cuando se integre Mercado Pago, este campo desaparece.
-   */
-  @IsOptional()
-  @IsIn(RESULTADOS_PAGO_SIMULADO)
-  resultadoPagoSimulado?: ResultadoPagoSimulado;
 }

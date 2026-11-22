@@ -8,7 +8,6 @@ import {
   Divider,
   Group,
   Loader,
-  Modal,
   Paper,
   SimpleGrid,
   Stack,
@@ -18,11 +17,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { ApiError } from '../../api';
 import { useAuth } from '../../auth/contexto';
-import {
-  checkoutApi,
-  type CheckoutResumen,
-  type ResultadoPagoSimulado,
-} from './checkoutApi';
+import { checkoutApi, type CheckoutResumen } from './checkoutApi';
 
 const moneda = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -34,7 +29,7 @@ function mensajeError(error: unknown): string {
     return error.message;
   }
 
-  return 'No pudimos completar el pago.';
+  return 'No pudimos iniciar el pago.';
 }
 
 /** Clave estable por intento de checkout (se rota al recargar la pantalla). */
@@ -55,7 +50,6 @@ export function Checkout() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [franjaId, setFranjaId] = useState<string | null>(null);
-  const [confirmando, setConfirmando] = useState(false);
   const [pagando, setPagando] = useState(false);
   const [idempotencyKey] = useState(nuevaClaveIdempotencia);
 
@@ -91,7 +85,7 @@ export function Checkout() {
     [franjaId, resumen],
   );
 
-  async function pagar(resultado: ResultadoPagoSimulado) {
+  async function pagar() {
     if (!token || !comercioId || !franjaId) return;
 
     setPagando(true);
@@ -101,19 +95,16 @@ export function Checkout() {
         comercioId,
         franjaHorarioId: franjaId,
         idempotencyKey,
-        resultadoPagoSimulado: resultado,
       });
 
-      setConfirmando(false);
       navigate(`/pedido/${pedido.codigoAlfanumerico}`);
     } catch (err) {
-      setConfirmando(false);
       const mensaje = mensajeError(err);
 
       setError(mensaje);
       notifications.show({
         color: 'red',
-        title: 'Pago rechazado',
+        title: 'No se pudo iniciar el pago',
         message: mensaje,
       });
     } finally {
@@ -247,52 +238,16 @@ export function Checkout() {
 
         {error && <Alert color="red">{error}</Alert>}
 
-        <Alert color="blue">
-          Pago de prueba: no se cobra dinero real. Podés aprobar o rechazar el
-          cobro para ver el circuito completo.
-        </Alert>
-
         <Button
           fullWidth
           size="lg"
           disabled={!franjaId}
           loading={pagando}
-          onClick={() => setConfirmando(true)}
+          onClick={() => void pagar()}
         >
           PAGAR
         </Button>
       </Stack>
-
-      <Modal
-        opened={confirmando}
-        onClose={() => (pagando ? undefined : setConfirmando(false))}
-        title="Simular pago"
-        centered
-      >
-        <Stack gap="md">
-          <Text>
-            Total a cobrar:{' '}
-            <strong>{moneda.format(Number(resumen.total))}</strong>
-          </Text>
-          <Text size="sm" c="dimmed">
-            Elegí el resultado que devolvería la pasarela.
-          </Text>
-
-          <Group grow>
-            <Button
-              color="red"
-              variant="light"
-              loading={pagando}
-              onClick={() => void pagar('RECHAZADO')}
-            >
-              Rechazar
-            </Button>
-            <Button loading={pagando} onClick={() => void pagar('APROBADO')}>
-              Aprobar
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
     </main>
   );
 }

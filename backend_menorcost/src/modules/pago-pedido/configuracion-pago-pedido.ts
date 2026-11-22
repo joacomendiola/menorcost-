@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { ModoPago } from './puerto-pagos.js';
 
 const MINUTOS_EXPIRACION_POR_DEFECTO = 60;
+const MINUTOS_GRACIA_POR_DEFECTO = 5;
 const RUTA_RESULTADO_PAGO = '/checkout/resultado';
 
 export interface UrlsRetornoPago {
@@ -16,28 +16,18 @@ export interface UrlsRetornoPago {
  *
  * Se lee de forma perezosa a propósito: la aplicación arranca aunque falten
  * las variables de Mercado Pago y el error aparece recién al usar el flujo
- * real (mismo criterio que CU-1.09).
+ * real (mismo criterio que CU-1.09). No hay modo simulado.
  *
  * Variables:
- * - `PAGOS_MERCADOPAGO_MODO`: `simulado` (por defecto) o `mercadopago`.
  * - `MP_URL_PUBLICA`: URL HTTPS del backend, para el webhook.
  * - `MP_WEBHOOK_SECRET`: clave secreta del panel de webhooks.
  * - `FRONTEND_URL`: base de las URLs de retorno.
  * - `PAGOS_MINUTOS_EXPIRACION`: reserva de stock (60 por defecto).
+ * - `PAGOS_MINUTOS_GRACIA`: margen extra antes de que el reaper cancele (5).
  */
 @Injectable()
 export class ConfiguracionPagoPedido {
   constructor(private readonly config: ConfigService) {}
-
-  modo(): ModoPago {
-    const crudo = (this.config.get<string>('PAGOS_MERCADOPAGO_MODO') ?? '')
-      .trim()
-      .toLowerCase();
-
-    if (crudo === 'mercadopago' || crudo === 'real') return 'mercadopago';
-
-    return 'simulado';
-  }
 
   /**
    * Ventana de reserva de stock. Por defecto 60 minutos porque Mercado Pago
@@ -45,13 +35,21 @@ export class ConfiguracionPagoPedido {
    * más corta se podría cancelar un pedido que después se cobra.
    */
   minutosExpiracion(): number {
-    const crudo = Number(
-      this.config.get<string>('PAGOS_MINUTOS_EXPIRACION') ?? '',
+    return this.enteroPositivo(
+      this.config.get<string>('PAGOS_MINUTOS_EXPIRACION'),
+      MINUTOS_EXPIRACION_POR_DEFECTO,
     );
+  }
 
-    return Number.isFinite(crudo) && crudo > 0
-      ? Math.ceil(crudo)
-      : MINUTOS_EXPIRACION_POR_DEFECTO;
+  /**
+   * Margen que espera el reaper después del vencimiento: cubre el desfasaje
+   * entre el reloj local, el de Mercado Pago y el webhook en vuelo.
+   */
+  minutosGracia(): number {
+    return this.enteroPositivo(
+      this.config.get<string>('PAGOS_MINUTOS_GRACIA'),
+      MINUTOS_GRACIA_POR_DEFECTO,
+    );
   }
 
   frontendUrl(): string {
@@ -78,6 +76,12 @@ export class ConfiguracionPagoPedido {
 
   secretoWebhook(): string {
     return this.requerida('MP_WEBHOOK_SECRET');
+  }
+
+  private enteroPositivo(crudo: string | undefined, porDefecto: number): number {
+    const valor = Number(crudo ?? '');
+
+    return Number.isFinite(valor) && valor > 0 ? Math.ceil(valor) : porDefecto;
   }
 
   private requerida(clave: string): string {

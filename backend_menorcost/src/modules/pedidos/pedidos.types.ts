@@ -40,12 +40,6 @@ export interface CheckoutConfirmado {
   total: string;
 }
 
-export interface CheckoutRechazado {
-  idPedido: string;
-  estado: 'RECHAZADO';
-  message: string;
-}
-
 export type EstadoPedidoVisible =
   | 'PENDIENTE_DE_RETIRO'
   | 'ENTREGADO'

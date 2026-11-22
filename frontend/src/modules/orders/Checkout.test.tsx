@@ -113,7 +113,7 @@ describe('Checkout', () => {
     });
   });
 
-  it('al aprobar el pago navega al ticket con QR', async () => {
+  it('al pagar navega al ticket con QR', async () => {
     mocks.pagar.mockResolvedValue({
       idPedido: 'pedido-1',
       codigoAlfanumerico: 'ABCD2345',
@@ -127,20 +127,17 @@ describe('Checkout', () => {
     fireEvent.click(screen.getByText('Mar 24/11 · 10:00 a 11:00'));
     fireEvent.click(screen.getByRole('button', { name: 'PAGAR' }));
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Aprobar' }));
-
     expect(await screen.findByText('Ticket QR')).toBeTruthy();
     expect(mocks.pagar).toHaveBeenCalledWith('token', {
       comercioId,
       franjaHorarioId: 'f1',
       idempotencyKey: expect.any(String),
-      resultadoPagoSimulado: 'APROBADO',
     });
   });
 
-  it('al rechazar el pago muestra el error y no confirma el pedido', async () => {
+  it('si el pago falla muestra el error y no confirma el pedido', async () => {
     mocks.pagar.mockRejectedValue(
-      new Error('Pago rechazado: no se descontó stock y la canasta sigue disponible.'),
+      new Error('El pago con Mercado Pago todavía no está disponible.'),
     );
 
     renderizar();
@@ -149,12 +146,10 @@ describe('Checkout', () => {
     fireEvent.click(screen.getByText('Mar 24/11 · 10:00 a 11:00'));
     fireEvent.click(screen.getByRole('button', { name: 'PAGAR' }));
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Rechazar' }));
-
     await waitFor(() => {
       expect(mocks.show).toHaveBeenCalled();
     });
 
-    expect(screen.queryByText('¡Pago aprobado!')).toBeNull();
+    expect(screen.queryByText('Ticket QR')).toBeNull();
   });
 });

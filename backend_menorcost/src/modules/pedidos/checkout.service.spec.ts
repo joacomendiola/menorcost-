@@ -1,11 +1,8 @@
 import {
-  ConflictException,
-  HttpException,
-  HttpStatus,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Prisma } from '../../generated/prisma/client.js';
 import { CheckoutService } from './checkout.service.js';
 
 describe('CheckoutService', () => {
@@ -15,19 +12,6 @@ describe('CheckoutService', () => {
   const franjaId = '44444444-4444-4444-8444-444444444444';
   const productoId = '55555555-5555-4555-8555-555555555555';
 
-  const tx = {
-    canasta: {
-      findUnique: vi.fn(),
-      delete: vi.fn(),
-    },
-    producto: {
-      updateMany: vi.fn(),
-    },
-    pedido: {
-      create: vi.fn(),
-    },
-  };
-
   const prisma = {
     canasta: {
       findUnique: vi.fn(),
@@ -35,12 +19,7 @@ describe('CheckoutService', () => {
     comercio: {
       findUnique: vi.fn(),
     },
-    pedido: {
-      findUnique: vi.fn(),
-    },
-    $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) =>
-      callback(tx),
-    ),
+    $transaction: vi.fn(),
   };
 
   const detalle = {
@@ -80,10 +59,6 @@ describe('CheckoutService', () => {
     validarParaCheckout: vi.fn(),
   };
 
-  const pasarela = {
-    cobrar: vi.fn(),
-  };
-
   let service: CheckoutService;
 
   beforeEach(() => {
@@ -92,11 +67,9 @@ describe('CheckoutService', () => {
       prisma as never,
       canastas as never,
       franjas as never,
-      pasarela as never,
     );
 
     prisma.canasta.findUnique.mockResolvedValue({ idCanasta: canastaId });
-    prisma.pedido.findUnique.mockResolvedValue(null);
     prisma.comercio.findUnique.mockResolvedValue({
       nombreFantasia: 'Almacén del Centro',
       calle: 'Av. San Martín',
@@ -108,23 +81,6 @@ describe('CheckoutService', () => {
     });
     canastas.obtenerCanastaParaCheckout.mockResolvedValue(detalle);
     franjas.listarParaCheckout.mockResolvedValue([]);
-    franjas.validarParaCheckout.mockResolvedValue({
-      id: franjaId,
-      diaSemana: 2,
-      horaInicio: '10:00',
-      horaFin: '11:00',
-      fechaRetiro: '2026-11-24',
-      etiqueta: 'Mar 24/11 · 10:00 a 11:00',
-    });
-
-    tx.canasta.findUnique.mockResolvedValue({ idCanasta: canastaId });
-    tx.producto.updateMany.mockResolvedValue({ count: 1 });
-    tx.canasta.delete.mockResolvedValue({});
-    tx.pedido.create.mockResolvedValue({
-      id_pedido: '77777777-7777-4777-8777-777777777777',
-      codigoAlfanumerico: 'ABCD2345',
-      total: new Prisma.Decimal('9411.78'),
-    });
   });
 
   describe('obtenerResumen', () => {
@@ -148,6 +104,7 @@ describe('CheckoutService', () => {
           subtotal: '9411.78',
         }),
       );
+      expect(franjas.listarParaCheckout).toHaveBeenCalledWith(comercioId);
     });
 
     it('devuelve 404 si el usuario no tiene canasta en ese comercio', async () => {
@@ -156,260 +113,37 @@ describe('CheckoutService', () => {
       await expect(
         service.obtenerResumen(usuarioId, comercioId),
       ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(canastas.obtenerCanastaParaCheckout).not.toHaveBeenCalled();
+    });
+
+    it('devuelve 404 si el comercio no existe', async () => {
+      prisma.comercio.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.obtenerResumen(usuarioId, comercioId),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
   describe('pagar', () => {
-    it('aprueba el pago, descuenta stock y vacía la canasta', async () => {
-      pasarela.cobrar.mockResolvedValue({
-        aprobado: true,
-        nroComprobante: 'SIM-20261117-ABCD1234',
-        mpPaymentId: null,
-        comisionMp: new Prisma.Decimal('611.77'),
-      });
-
-      const resultado = await service.pagar(usuarioId, {
-        comercioId,
-        franjaHorarioId: franjaId,
-        resultadoPagoSimulado: 'APROBADO',
-      });
-
-      expect(resultado).toEqual({
-        idPedido: '77777777-7777-4777-8777-777777777777',
-        codigoAlfanumerico: 'ABCD2345',
-        estado: 'PENDIENTE_DE_RETIRO',
-        total: '9411.78',
-      });
-
-      expect(franjas.validarParaCheckout).toHaveBeenCalledWith(
-        comercioId,
-        franjaId,
-      );
-      expect(tx.producto.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ stock: { gte: 2 } }),
-          data: { stock: { decrement: 2 } },
-        }),
-      );
-
-      const data = tx.pedido.create.mock.calls[0][0].data;
-      expect(data).toMatchObject({
-        estado: 'PENDIENTE_DE_RETIRO',
-        formaPago: 'SIMULADO',
-        franjaHorarioId: franjaId,
-        subtotal: expect.anything(),
-        tarifa_servicio: expect.anything(),
-        total: expect.anything(),
-      });
-      expect(data.tarifa_servicio.toString()).toBe('200');
-      expect(data.items.create).toHaveLength(1);
-      expect(data.pagos.create.estado).toBe('PAGADO');
-      expect(data.pagos.create.splits.create).toHaveLength(2);
-
-      const [splitComercio, splitMarketplace] =
-        data.pagos.create.splits.create;
-      expect(splitComercio.recipientType).toBe('COMERCIO');
-      expect(splitComercio.monto.toString()).toBe('2000');
-      expect(splitMarketplace.recipientType).toBe('MARKETPLACE');
-      // 9411.78 - 611.77 - 2000.00 = 6800.01
-      expect(splitMarketplace.monto.toString()).toBe('6800.01');
-
-      expect(tx.canasta.delete).toHaveBeenCalledWith({
-        where: { idCanasta: canastaId },
-      });
-    });
-
-    it('rechaza el pago con 402 sin descontar stock ni vaciar la canasta', async () => {
-      pasarela.cobrar.mockResolvedValue({
-        aprobado: false,
-        nroComprobante: null,
-        mpPaymentId: null,
-        comisionMp: new Prisma.Decimal(0),
-      });
-
+    it('todavía no cobra: responde 503 sin tocar la canasta ni el stock', async () => {
       const promesa = service.pagar(usuarioId, {
         comercioId,
         franjaHorarioId: franjaId,
-        resultadoPagoSimulado: 'RECHAZADO',
+        idempotencyKey: 'clave-1',
       });
 
-      await expect(promesa).rejects.toBeInstanceOf(HttpException);
-      await expect(promesa).rejects.toMatchObject({
-        status: HttpStatus.PAYMENT_REQUIRED,
-      });
-
-      expect(tx.producto.updateMany).not.toHaveBeenCalled();
-      expect(tx.canasta.delete).not.toHaveBeenCalled();
-      // El cobro ocurre fuera de la transacción: un rechazo no toca la base.
-      expect(prisma.$transaction).not.toHaveBeenCalled();
-      expect(tx.pedido.create).not.toHaveBeenCalled();
-    });
-
-    it('revierte con 409 si el stock cambió antes de escribir', async () => {
-      pasarela.cobrar.mockResolvedValue({
-        aprobado: true,
-        nroComprobante: 'SIM-20261117-ABCD1234',
-        mpPaymentId: null,
-        comisionMp: new Prisma.Decimal('611.77'),
-      });
-      tx.producto.updateMany.mockResolvedValue({ count: 0 });
-
-      await expect(
-        service.pagar(usuarioId, {
-          comercioId,
-          franjaHorarioId: franjaId,
-        }),
-      ).rejects.toBeInstanceOf(ConflictException);
-
-      expect(tx.pedido.create).not.toHaveBeenCalled();
-      expect(tx.canasta.delete).not.toHaveBeenCalled();
-    });
-
-    it('no deja pagar si la franja no es válida', async () => {
-      franjas.validarParaCheckout.mockRejectedValue(
-        new BadRequestExceptionProbe(),
+      await expect(promesa).rejects.toBeInstanceOf(
+        ServiceUnavailableException,
       );
-
-      await expect(
-        service.pagar(usuarioId, {
-          comercioId,
-          franjaHorarioId: '99999999-9999-4999-8999-999999999999',
-        }),
-      ).rejects.toBeInstanceOf(BadRequestExceptionProbe);
+      await expect(promesa).rejects.toMatchObject({
+        status: 503,
+        message: expect.stringContaining('Mercado Pago'),
+      });
 
       expect(prisma.$transaction).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('idempotencia del checkout', () => {
-    const clave = 'clave-idempotente-1';
-    const pedidoPrevio = {
-      id_pedido: '88888888-8888-4888-8888-888888888888',
-      usuarioId,
-      comercioId,
-      codigoAlfanumerico: 'PREV1234',
-      total: new Prisma.Decimal('100.00'),
-      estado: 'PENDIENTE_DE_RETIRO',
-    };
-
-    it('devuelve el pedido previo del mismo usuario y comercio sin cobrar de nuevo', async () => {
-      prisma.pedido.findUnique.mockResolvedValue(pedidoPrevio);
-
-      const resultado = await service.pagar(usuarioId, {
-        comercioId,
-        franjaHorarioId: franjaId,
-        idempotencyKey: clave,
-      });
-
-      expect(resultado).toEqual({
-        idPedido: pedidoPrevio.id_pedido,
-        codigoAlfanumerico: 'PREV1234',
-        estado: 'PENDIENTE_DE_RETIRO',
-        total: '100.00',
-      });
-      expect(pasarela.cobrar).not.toHaveBeenCalled();
-      expect(prisma.$transaction).not.toHaveBeenCalled();
-    });
-
-    it('devuelve el estado real del pedido previo, no un estado fijo', async () => {
-      prisma.pedido.findUnique.mockResolvedValue({
-        ...pedidoPrevio,
-        estado: 'CANCELADO',
-      });
-
-      const resultado = await service.pagar(usuarioId, {
-        comercioId,
-        franjaHorarioId: franjaId,
-        idempotencyKey: clave,
-      });
-
-      expect(resultado.estado).toBe('CANCELADO');
-    });
-
-    it('rechaza la clave si pertenece a otro usuario', async () => {
-      prisma.pedido.findUnique.mockResolvedValue({
-        ...pedidoPrevio,
-        usuarioId: '99999999-9999-4999-8999-999999999999',
-      });
-
-      await expect(
-        service.pagar(usuarioId, {
-          comercioId,
-          franjaHorarioId: franjaId,
-          idempotencyKey: clave,
-        }),
-      ).rejects.toBeInstanceOf(ConflictException);
-
-      expect(pasarela.cobrar).not.toHaveBeenCalled();
-    });
-
-    it('rechaza la clave si pertenece a otro comercio', async () => {
-      prisma.pedido.findUnique.mockResolvedValue({
-        ...pedidoPrevio,
-        comercioId: '99999999-9999-4999-8999-999999999999',
-      });
-
-      await expect(
-        service.pagar(usuarioId, {
-          comercioId,
-          franjaHorarioId: franjaId,
-          idempotencyKey: clave,
-        }),
-      ).rejects.toBeInstanceOf(ConflictException);
-
-      expect(pasarela.cobrar).not.toHaveBeenCalled();
-    });
-
-    it('ante P2002, recupera solo el pedido del mismo usuario y comercio', async () => {
-      pasarela.cobrar.mockResolvedValue({
-        aprobado: true,
-        nroComprobante: 'SIM-20261117-ABCD1234',
-        mpPaymentId: null,
-        comisionMp: new Prisma.Decimal('611.77'),
-      });
-      prisma.$transaction.mockRejectedValueOnce(conflictoDeIdempotencia());
-      prisma.pedido.findUnique.mockResolvedValue(pedidoPrevio);
-
-      const resultado = await service.pagar(usuarioId, {
-        comercioId,
-        franjaHorarioId: franjaId,
-        idempotencyKey: clave,
-      });
-
-      expect(resultado.idPedido).toBe(pedidoPrevio.id_pedido);
-    });
-
-    it('ante P2002, no devuelve el pedido de otro usuario', async () => {
-      pasarela.cobrar.mockResolvedValue({
-        aprobado: true,
-        nroComprobante: 'SIM-20261117-ABCD1234',
-        mpPaymentId: null,
-        comisionMp: new Prisma.Decimal('611.77'),
-      });
-      prisma.$transaction.mockRejectedValueOnce(conflictoDeIdempotencia());
-      prisma.pedido.findUnique.mockResolvedValue({
-        ...pedidoPrevio,
-        usuarioId: '99999999-9999-4999-8999-999999999999',
-      });
-
-      await expect(
-        service.pagar(usuarioId, {
-          comercioId,
-          franjaHorarioId: franjaId,
-          idempotencyKey: clave,
-        }),
-      ).rejects.toBeInstanceOf(ConflictException);
+      expect(canastas.obtenerCanastaParaCheckout).not.toHaveBeenCalled();
     });
   });
 });
-
-function conflictoDeIdempotencia() {
-  return new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-    code: 'P2002',
-    clientVersion: '7.0.0',
-    meta: { target: ['idempotency_key'] },
-  });
-}
-
-/** Excepción centinela: solo verifica que se corta antes de la transacción. */
-class BadRequestExceptionProbe extends Error {}
