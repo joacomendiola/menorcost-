@@ -5,7 +5,11 @@ import { resolve } from 'node:path';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    // El webhook de Mercado Pago valida la firma con `data.id` + headers, pero
+    // dejamos el body crudo disponible para auditar la notificación recibida.
+    rawBody: true,
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({

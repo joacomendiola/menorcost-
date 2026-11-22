@@ -4,6 +4,7 @@ import type { PrismaService } from '../../prisma/prisma.service.js';
 const logger = new Logger('NotificacionesPedido');
 
 export type TipoNotificacionPedido =
+  | 'PEDIDO_PAGADO'
   | 'PEDIDO_ENTREGADO'
   | 'PEDIDO_CANCELADO'
   | 'PEDIDO_CANCELADO_POR_FALTA_RETIRO';
