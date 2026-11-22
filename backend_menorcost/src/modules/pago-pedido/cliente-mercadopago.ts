@@ -1,39 +1,41 @@
 import { Injectable, Logger } from '@nestjs/common';
+import {
+  MercadoPagoConfig,
+  MercadoPagoError,
+  MPAuthenticationError,
+  MPConnectionError,
+  MPDependencyError,
+  MPForbiddenError,
+  MPNotFoundError,
+  MPRateLimitError,
+  MPResourceLockedError,
+  MPServerError,
+  OAuth,
+  Order,
+} from 'mercadopago';
 import { MercadoPagoConfigService } from '../mercado-pago/mercado-pago.config.js';
 import { ErrorPagoMercadoPago } from './error-pago-mercadopago.js';
 
-const URL_API = 'https://api.mercadopago.com';
-const URL_TOKEN = `${URL_API}/oauth/token`;
+/** Body de `POST /v1/orders`, tipado por el SDK oficial. */
+export type CuerpoOrdenMp = Parameters<Order['create']>[0]['body'];
+/** Orden de Mercado Pago (Orders API) tal como la devuelve el SDK. */
+export type RespuestaOrdenMp = Awaited<ReturnType<Order['create']>>;
 
-/** Respuesta cruda de `POST /v1/orders` y `GET /v1/orders/{id}`. */
-export interface RespuestaOrdenMp {
-  id?: string;
-  status?: string;
-  status_detail?: string;
-  external_reference?: string;
-  total_amount?: string;
-  total_paid_amount?: string;
-  checkout_url?: string;
-  transactions?: { payments?: Array<{ id?: string | number; status?: string }> };
-  payments?: Array<{ id?: string | number; status?: string }>;
-}
-
-export interface RespuestaRefreshTokenMp {
-  access_token?: string;
-  refresh_token?: string;
-  expires_in?: number;
-  scope?: string;
-  live_mode?: boolean;
-  error?: string;
-  message?: string;
+export interface TokenRenovadoMp {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
 }
 
 /**
- * Cliente HTTP de Mercado Pago (Orders API + OAuth).
+ * Adaptador del SDK oficial de Mercado Pago (Orders API + OAuth).
  *
- * Se usa `fetch` en vez del SDK oficial porque el backend es ESM estricto y el
- * flujo OAuth ya funciona así: una sola forma de hablar con Mercado Pago, con
- * timeout explícito y errores traducidos.
+ * Es el único archivo que conoce al SDK: el checkout y las credenciales hablan
+ * con esta interfaz y reciben errores de dominio (`ErrorPagoMercadoPago`), así
+ * un error HTTP de Mercado Pago nunca se filtra como respuesta al cliente.
+ *
+ * Los imports son nombrados a propósito: el paquete es CommonJS y el backend es
+ * ESM estricto, donde el `import default` no devuelve la clase.
  */
 @Injectable()
 export class ClienteMercadoPago {
@@ -44,16 +46,24 @@ export class ClienteMercadoPago {
   /** `POST /v1/orders`: crea la orden de Checkout Pro con el token del vendedor. */
   async crearOrden(
     accessToken: string,
-    cuerpo: Record<string, unknown>,
+    cuerpo: CuerpoOrdenMp,
     claveIdempotencia: string,
     comercioId: string,
   ): Promise<RespuestaOrdenMp> {
-    return this.enviar('/v1/orders', accessToken, {
-      method: 'POST',
-      headers: { 'X-Idempotency-Key': claveIdempotencia },
-      body: JSON.stringify(cuerpo),
-      detalle: `crear orden (comercio ${comercioId})`,
-    });
+    try {
+      return await this.orden(accessToken).create({
+        body: cuerpo,
+        requestOptions: {
+          timeout: this.config.timeoutMs(),
+          // La reserva de stock ya se hizo: reintentar acá podría duplicar la
+          // orden. La idempotencia la maneja la clave del pedido.
+          maxRetries: 0,
+          idempotencyKey: claveIdempotencia,
+        },
+      });
+    } catch (error) {
+      throw this.traducir(error, `crear orden (comercio ${comercioId})`);
+    }
   }
 
   /** `GET /v1/orders/{id}`: estado real de la orden (el webhook no lo trae). */
@@ -61,55 +71,56 @@ export class ClienteMercadoPago {
     accessToken: string,
     mpOrderId: string,
   ): Promise<RespuestaOrdenMp> {
-    return this.enviar(
-      `/v1/orders/${encodeURIComponent(mpOrderId)}`,
-      accessToken,
-      { method: 'GET', detalle: 'consultar orden' },
-    );
+    try {
+      return await this.orden(accessToken).get({
+        id: mpOrderId,
+        requestOptions: {
+          timeout: this.config.timeoutMs(),
+          maxRetries: 0,
+        },
+      });
+    } catch (error) {
+      throw this.traducir(error, 'consultar orden');
+    }
   }
 
   /**
    * `POST /oauth/token` con `grant_type=refresh_token`.
-   * Mercado Pago rota también el refresh token: el llamador debe persistir
-   * ambos tokens cifrados.
+   *
+   * El SDK exige un access token para armar el encabezado `Authorization`
+   * aunque este endpoint no lo valide: se manda el token vigente (o vencido)
+   * del comercio. Mercado Pago rota también el refresh token, así que el
+   * llamador tiene que persistir ambos cifrados.
    */
   async refrescarToken(
+    accessToken: string,
     refreshToken: string,
-  ): Promise<Required<Pick<RespuestaRefreshTokenMp, 'access_token' | 'refresh_token' | 'expires_in'>>> {
-    let respuesta: Response;
+  ): Promise<TokenRenovadoMp> {
+    const oauth = new OAuth(new MercadoPagoConfig({ accessToken }));
+    let renovado: Awaited<ReturnType<OAuth['refresh']>>;
 
     try {
-      respuesta = await fetch(URL_TOKEN, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({
+      renovado = await oauth.refresh({
+        body: {
           client_id: this.config.clientId(),
           client_secret: this.config.clientSecret(),
-          grant_type: 'refresh_token',
           refresh_token: refreshToken,
-        }),
-        signal: AbortSignal.timeout(this.config.timeoutMs()),
+        },
+        requestOptions: {
+          timeout: this.config.timeoutMs(),
+          maxRetries: 0,
+        },
       });
-    } catch {
-      throw new ErrorPagoMercadoPago(
-        'mp_no_disponible',
-        'No pudimos conectarnos con Mercado Pago para renovar la vinculación. Intentá de nuevo en unos minutos.',
-      );
-    }
+    } catch (error) {
+      if (this.esTransitorio(error)) {
+        throw new ErrorPagoMercadoPago(
+          'mp_no_disponible',
+          'No pudimos conectarnos con Mercado Pago para renovar la vinculación. Intentá de nuevo en unos minutos.',
+        );
+      }
 
-    const datos = await this.leerJson(respuesta);
-
-    if (
-      !respuesta.ok ||
-      !datos.access_token ||
-      !datos.refresh_token ||
-      !datos.expires_in
-    ) {
       this.logger.warn(
-        `Mercado Pago rechazó la renovación del token (HTTP ${respuesta.status}, error ${datos.error ?? 'desconocido'})`,
+        `Mercado Pago rechazó la renovación del token (${this.describir(error)})`,
       );
       throw new ErrorPagoMercadoPago(
         'credencial_invalida',
@@ -117,106 +128,90 @@ export class ClienteMercadoPago {
       );
     }
 
+    if (
+      !renovado.access_token ||
+      !renovado.refresh_token ||
+      !renovado.expires_in
+    ) {
+      throw new ErrorPagoMercadoPago(
+        'respuesta_invalida',
+        'Mercado Pago devolvió una respuesta incompleta al renovar la vinculación.',
+      );
+    }
+
     return {
-      access_token: datos.access_token,
-      refresh_token: datos.refresh_token,
-      expires_in: datos.expires_in,
+      access_token: renovado.access_token,
+      refresh_token: renovado.refresh_token,
+      expires_in: renovado.expires_in,
     };
   }
 
-  private async enviar(
-    ruta: string,
-    accessToken: string,
-    opciones: {
-      method: 'GET' | 'POST';
-      headers?: Record<string, string>;
-      body?: string;
-      detalle: string;
-    },
-  ): Promise<RespuestaOrdenMp> {
-    let respuesta: Response;
+  private orden(accessToken: string): Order {
+    return new Order(new MercadoPagoConfig({ accessToken }));
+  }
 
-    try {
-      respuesta = await fetch(`${URL_API}${ruta}`, {
-        method: opciones.method,
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-          ...opciones.headers,
-        },
-        body: opciones.body,
-        signal: AbortSignal.timeout(this.config.timeoutMs()),
-      });
-    } catch {
-      throw new ErrorPagoMercadoPago(
+  /** Errores de red, límite de pedidos o fallas de MP: se puede reintentar. */
+  private esTransitorio(error: unknown): boolean {
+    return (
+      error instanceof MPConnectionError ||
+      error instanceof MPRateLimitError ||
+      error instanceof MPServerError ||
+      error instanceof MPResourceLockedError ||
+      error instanceof MPDependencyError
+    );
+  }
+
+  private traducir(error: unknown, detalle: string): ErrorPagoMercadoPago {
+    if (this.esTransitorio(error)) {
+      return new ErrorPagoMercadoPago(
         'mp_no_disponible',
         'No pudimos conectarnos con Mercado Pago. Intentá de nuevo en unos minutos.',
-        opciones.detalle,
+        detalle,
       );
     }
 
-    const datos = await this.leerJson(respuesta);
-
-    if (!respuesta.ok) {
-      const mensaje = this.mensajeDeError(datos);
+    if (error instanceof MercadoPagoError) {
       this.logger.warn(
-        `Mercado Pago rechazó ${opciones.detalle} (HTTP ${respuesta.status}${mensaje ? `: ${mensaje}` : ''})`,
+        `Mercado Pago rechazó ${detalle} (${this.describir(error)})`,
       );
 
-      if (respuesta.status === 401 || respuesta.status === 403) {
-        throw new ErrorPagoMercadoPago(
+      if (
+        error instanceof MPAuthenticationError ||
+        error instanceof MPForbiddenError
+      ) {
+        return new ErrorPagoMercadoPago(
           'credencial_invalida',
           'La vinculación con Mercado Pago no es válida. El comercio debe volver a vincular su cuenta.',
-          mensaje,
+          detalle,
         );
       }
 
-      if (respuesta.status === 404) {
-        throw new ErrorPagoMercadoPago(
+      if (error instanceof MPNotFoundError) {
+        return new ErrorPagoMercadoPago(
           'orden_no_encontrada',
           'La orden de Mercado Pago no existe.',
-          mensaje,
+          detalle,
         );
       }
 
-      if (respuesta.status === 429 || respuesta.status >= 500) {
-        throw new ErrorPagoMercadoPago(
-          'mp_no_disponible',
-          'Mercado Pago está con problemas momentáneos. Intentá de nuevo en unos minutos.',
-          mensaje,
-        );
-      }
-
-      throw new ErrorPagoMercadoPago(
+      return new ErrorPagoMercadoPago(
         'respuesta_invalida',
         'Mercado Pago rechazó la operación. Revisá la configuración de la aplicación.',
-        mensaje,
+        detalle,
       );
     }
 
-    return datos as RespuestaOrdenMp;
+    // Error inesperado (no viene del SDK): no se disfraza de error de negocio.
+    throw error;
   }
 
-  private async leerJson(
-    respuesta: Response,
-  ): Promise<Record<string, unknown> & RespuestaRefreshTokenMp> {
-    const texto = await respuesta.text();
-
-    if (!texto) return {};
-
-    try {
-      return JSON.parse(texto) as Record<string, unknown> &
-        RespuestaRefreshTokenMp;
-    } catch {
-      return {};
+  /** Status y mensaje de la API; nunca tokens ni datos del comprador. */
+  private describir(error: unknown): string {
+    if (error instanceof MercadoPagoError) {
+      const mensaje = (error.message || error.error || '').slice(0, 300);
+      return `HTTP ${error.status}${mensaje ? `: ${mensaje}` : ''}`;
     }
-  }
 
-  /** Los errores de Mercado Pago traen `message` o `error`; nunca tokens. */
-  private mensajeDeError(datos: Record<string, unknown>): string {
-    const mensaje = datos.message ?? datos.error;
-
-    return typeof mensaje === 'string' ? mensaje.slice(0, 300) : '';
+    return error instanceof Error ? error.name : 'error desconocido';
   }
 }

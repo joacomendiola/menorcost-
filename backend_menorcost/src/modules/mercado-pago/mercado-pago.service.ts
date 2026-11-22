@@ -81,6 +81,9 @@ export class MercadoPagoService {
     url.searchParams.set('platform_id', 'mp');
     url.searchParams.set('state', state);
     url.searchParams.set('redirect_uri', this.config.redirectUri());
+    // Sin `offline_access` Mercado Pago no entrega un refresh token utilizable
+    // y la vinculación dejaría de funcionar a los 180 días.
+    url.searchParams.set('scope', 'offline_access');
 
     if (codeVerifier) {
       url.searchParams.set(

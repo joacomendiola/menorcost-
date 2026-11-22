@@ -82,6 +82,7 @@ export class CredencialMercadoPagoService {
 
     try {
       token = await this.cliente.refrescarToken(
+        this.crypto.descifrar(credencial.accessToken),
         this.crypto.descifrar(credencial.refreshToken),
       );
     } catch (error) {

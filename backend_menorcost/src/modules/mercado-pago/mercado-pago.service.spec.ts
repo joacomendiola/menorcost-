@@ -92,6 +92,7 @@ describe('MercadoPagoService', () => {
       expect(parametros.get('redirect_uri')).toBe(
         'http://localhost:3000/mercadopago/oauth/callback',
       );
+      expect(parametros.get('scope')).toBe('offline_access');
       expect(parametros.get('code_challenge')).toBeNull();
       expect(state.crear).toHaveBeenCalledWith(
         USUARIO_ID,

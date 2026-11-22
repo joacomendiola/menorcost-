@@ -71,7 +71,10 @@ describe('CredencialMercadoPagoService', () => {
     const antes = Date.now();
     const resultado = await servicio.obtenerCredencialActiva(COMERCIO_ID);
 
-    expect(cliente.refrescarToken).toHaveBeenCalledWith('refresh-viejo');
+    expect(cliente.refrescarToken).toHaveBeenCalledWith(
+      'access-viejo',
+      'refresh-viejo',
+    );
     expect(resultado).toEqual({
       idCredencial: CREDENCIAL_ID,
       accessToken: 'access-nuevo',

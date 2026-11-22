@@ -26,5 +26,6 @@ import { MercadoPagoStateService } from './mercado-pago-state.service.js';
     JwtAuthGuard,
     RolesGuard,
   ],
+  exports: [MercadoPagoConfigService, MercadoPagoCryptoService],
 })
 export class MercadoPagoModule {}
