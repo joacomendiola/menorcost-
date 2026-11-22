@@ -58,14 +58,19 @@ export class ConfiguracionPagoPedido {
     ).replace(/\/+$/, '');
   }
 
-  /** URLs a las que Mercado Pago devuelve al comprador. */
-  urlsRetorno(): UrlsRetornoPago {
+  /**
+   * URLs a las que Mercado Pago devuelve al comprador (`config.online`).
+   * Llevan el id del pedido para que la pantalla de resultado pueda consultar
+   * el estado real del pago en lugar de confiar en el query param de MP.
+   */
+  urlsRetorno(idPedido: string): UrlsRetornoPago {
     const base = `${this.frontendUrl()}${RUTA_RESULTADO_PAGO}`;
+    const pedido = `idPedido=${encodeURIComponent(idPedido)}`;
 
     return {
-      exito: `${base}?estado=aprobado`,
-      fallo: `${base}?estado=rechazado`,
-      pendiente: `${base}?estado=pendiente`,
+      exito: `${base}?estado=aprobado&${pedido}`,
+      fallo: `${base}?estado=rechazado&${pedido}`,
+      pendiente: `${base}?estado=pendiente&${pedido}`,
     };
   }
 

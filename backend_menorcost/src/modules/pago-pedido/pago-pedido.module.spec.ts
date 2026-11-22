@@ -37,19 +37,19 @@ describe('ConfiguracionPagoPedido', () => {
     ).toBe(10);
   });
 
-  it('arma las URLs de retorno sobre FRONTEND_URL', () => {
+  it('arma las URLs de retorno sobre FRONTEND_URL con el id del pedido', () => {
     const urls = new ConfiguracionPagoPedido(
       configCon({ FRONTEND_URL: 'https://menorcost.test/' }),
-    ).urlsRetorno();
+    ).urlsRetorno('pedido-1');
 
     expect(urls.exito).toBe(
-      'https://menorcost.test/checkout/resultado?estado=aprobado',
+      'https://menorcost.test/checkout/resultado?estado=aprobado&idPedido=pedido-1',
     );
     expect(urls.fallo).toBe(
-      'https://menorcost.test/checkout/resultado?estado=rechazado',
+      'https://menorcost.test/checkout/resultado?estado=rechazado&idPedido=pedido-1',
     );
     expect(urls.pendiente).toBe(
-      'https://menorcost.test/checkout/resultado?estado=pendiente',
+      'https://menorcost.test/checkout/resultado?estado=pendiente&idPedido=pedido-1',
     );
   });
 
