@@ -55,9 +55,13 @@ const service = new BackofficeService(
 function reporteBase(overrides: Record<string, unknown> = {}) {
   return {
     id_reporte: 7,
+    id_pedido: 'pedido-1',
     id_denunciado: DENUNCIADO.id,
     id_emisor: EMISOR.id,
     estado_reporte: 'PENDIENTE_REVISION',
+    tipo_destino: 'CLIENTE',
+    motivo: 'El cliente no se presentó a retirar el producto',
+    motivoCodigo: 'CLIENTE_NO_RETIRO',
     emisor: EMISOR,
     denunciado: DENUNCIADO,
     ...overrides,
@@ -361,6 +365,67 @@ describe('BackofficeService.cerrarReporte', () => {
 
     expect(prismaMock.pedido.updateMany).not.toHaveBeenCalled();
     expect(resultado.pedidoCancelado).toBeNull();
+  });
+
+  it('no cancela el pedido si el motivo no es falta de retiro', async () => {
+    prismaMock.reporte.findUnique.mockResolvedValue(
+      reporteBase({
+        id_pedido: 'pedido-1',
+        id_emisor: 'comercio-user-1',
+        motivoCodigo: 'CANCELACION_INDEBIDA',
+        motivo: 'Cancelación indebida en mostrador',
+      }),
+    );
+
+    const resultado = await service.resolver(7, 'admin-1');
+
+    expect(prismaMock.pedido.updateMany).not.toHaveBeenCalled();
+    expect(resultado.pedidoCancelado).toBeNull();
+  });
+
+  it('no cancela el pedido si el reporte apunta al comercio', async () => {
+    prismaMock.reporte.findUnique.mockResolvedValue(
+      reporteBase({
+        id_pedido: 'pedido-1',
+        id_emisor: 'comercio-user-1',
+        tipo_destino: 'COMERCIO',
+      }),
+    );
+
+    const resultado = await service.resolver(7, 'admin-1');
+
+    expect(prismaMock.pedido.updateMany).not.toHaveBeenCalled();
+    expect(resultado.pedidoCancelado).toBeNull();
+  });
+
+  it('cancela reportes legacy de no-show sin motivoCodigo', async () => {
+    prismaMock.reporte.findUnique.mockResolvedValue(
+      reporteBase({
+        id_pedido: 'pedido-1',
+        id_emisor: 'comercio-user-1',
+        motivoCodigo: null,
+        motivo: 'El cliente no se presentó a retirar el producto',
+      }),
+    );
+    prismaMock.pedido.findUnique.mockResolvedValue({
+      id_pedido: 'pedido-1',
+      usuarioId: 'cliente-1',
+      estado: 'PENDIENTE_DE_RETIRO',
+      codigoAlfanumerico: 'MC-1',
+      comercio: { userId: 'comercio-user-1' },
+    });
+    prismaMock.pedido.updateMany.mockResolvedValue({ count: 1 });
+
+    const resultado = await service.resolver(7, 'admin-1');
+
+    expect(prismaMock.pedido.updateMany).toHaveBeenCalledWith({
+      where: { id_pedido: 'pedido-1', estado: 'PENDIENTE_DE_RETIRO' },
+      data: { estado: 'CANCELADO_POR_FALTA_RETIRO' },
+    });
+    expect(resultado.pedidoCancelado).toEqual({
+      usuarioId: 'cliente-1',
+      codigoAlfanumerico: 'MC-1',
+    });
   });
 });
 
