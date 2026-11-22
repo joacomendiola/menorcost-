@@ -41,7 +41,7 @@ function ordenAprobada() {
 }
 
 function encabezadosValidos() {
-  const ts = Date.now();
+  const ts = Math.floor(Date.now() / 1000);
   const manifiesto = `id:${ORDER_ID};request-id:req-1;ts:${ts};`;
   const v1 = createHmac('sha256', SECRETO).update(manifiesto).digest('hex');
 
@@ -50,6 +50,7 @@ function encabezadosValidos() {
 
 const query = { 'data.id': ORDER_ID, type: 'order' };
 const cuerpo = {
+  id: 'evento-1',
   action: 'order.processed',
   type: 'order',
   data: { id: ORDER_ID, external_reference: 'pedido-1' },
@@ -160,6 +161,25 @@ describe('NotificacionesMercadoPagoService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it('usa el id único del evento para deduplicar aunque cambie la acción', async () => {
+    prisma.notificacionMercadoPago.findUnique.mockResolvedValue({
+      id: 'notif-1',
+      procesadaEn: new Date(),
+    });
+
+    const resultado = await servicio.procesar(
+      query,
+      { ...cuerpo, action: 'order.updated' },
+      encabezadosValidos(),
+    );
+
+    expect(resultado.duplicada).toBe(true);
+    expect(prisma.notificacionMercadoPago.findUnique).toHaveBeenCalledWith({
+      where: { claveUnica: 'evento:order:evento-1' },
+      select: { id: true, procesadaEn: true },
+    });
+  });
+
   it('pago rechazado: marca el intento y deja el pedido pendiente para reintento', async () => {
     mercadoPago.obtenerOrden.mockResolvedValue({
       id: ORDER_ID,
@@ -213,6 +233,13 @@ describe('NotificacionesMercadoPagoService', () => {
     expect(tx.pedido.updateMany).not.toHaveBeenCalled();
     expect(tx.splitPago.createMany).toHaveBeenCalled();
     expect(prisma.notificacion.create).not.toHaveBeenCalled();
+    expect(prisma.notificacionMercadoPago.update).toHaveBeenLastCalledWith({
+      where: { id: 'notif-1' },
+      data: {
+        procesadaEn: expect.any(Date),
+        error: expect.stringContaining('Pago tardío sobre pedido pedido-1'),
+      },
+    });
   });
 
   it('si no encuentra el pedido registra el error y no llama a MP', async () => {
@@ -227,6 +254,25 @@ describe('NotificacionesMercadoPagoService', () => {
       where: { id: 'notif-1' },
       data: {
         error: expect.stringContaining('No se encontró pedido'),
+        procesadaEn: expect.any(Date),
+      },
+    });
+  });
+
+  it('no acredita si la Order remota pertenece a otro pedido', async () => {
+    mercadoPago.obtenerOrden.mockResolvedValue({
+      ...ordenAprobada(),
+      external_reference: 'pedido-ajeno',
+    });
+
+    const resultado = await servicio.procesar(query, cuerpo, encabezadosValidos());
+
+    expect(resultado).toMatchObject({ procesada: false, resultado: 'error' });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.notificacionMercadoPago.update).toHaveBeenCalledWith({
+      where: { id: 'notif-1' },
+      data: {
+        error: expect.stringContaining('no corresponde al pedido localizado'),
         procesadaEn: expect.any(Date),
       },
     });

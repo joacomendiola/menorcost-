@@ -7,7 +7,11 @@ import {
 
 const SECRETO = 'secreto-del-panel-de-webhooks';
 
-function encabezados(dataId: string, requestId: string, ts = Date.now()) {
+function encabezados(
+  dataId: string,
+  requestId: string,
+  ts = Math.floor(Date.now() / 1000),
+) {
   const manifiesto = `id:${dataId};request-id:${requestId};ts:${ts};`;
   const v1 = createHmac('sha256', SECRETO).update(manifiesto).digest('hex');
 
@@ -42,7 +46,7 @@ describe('validarFirmaWebhook', () => {
   });
 
   it('rechaza una firma vieja (replay fuera de tolerancia)', () => {
-    const ts = Date.now() - 10 * 60 * 1000;
+    const ts = Math.floor(Date.now() / 1000) - 10 * 60;
 
     expect(() =>
       validarFirmaWebhook(encabezados('ORD-1', 'req-1', ts), 'ORD-1', SECRETO),

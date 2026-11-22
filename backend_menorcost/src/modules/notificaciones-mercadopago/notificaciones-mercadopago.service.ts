@@ -86,12 +86,13 @@ export class NotificacionesMercadoPagoService {
 
   async procesar(
     query: NotificacionMercadoPagoQueryDto,
-    cuerpo: CuerpoNotificacionMercadoPago,
+    cuerpo: CuerpoNotificacionMercadoPago = {},
     encabezados: EncabezadosFirmaMp,
   ): Promise<RecepcionNotificacion> {
-    // `data.id` del EVENTO (query o body), no el id del recurso de otro topic.
-    const orderId = query['data.id'] ?? cuerpo.data?.id;
-    const topico = query.type ?? cuerpo.type ?? 'order';
+    // MP firma el `data.id` de la query. No se usa el body para autenticar ni
+    // para decidir qué recurso consultar.
+    const orderId = query['data.id'];
+    const topico = query.type ?? 'order';
 
     validarFirmaWebhook(encabezados, orderId, this.config.secretoWebhook());
 
@@ -99,7 +100,7 @@ export class NotificacionesMercadoPagoService {
       throw new BadRequestException('La notificación no trae data.id.');
     }
 
-    const claveUnica = `${topico}:${orderId}:${cuerpo.action ?? 'sin_accion'}`;
+    const claveUnica = this.claveUnica(topico, orderId, cuerpo);
     const registro = await this.registrar(
       claveUnica,
       topico,
@@ -164,10 +165,24 @@ export class NotificacionesMercadoPagoService {
       return { recibida: true, procesada: false, resultado: 'error' };
     }
 
+    if (!this.ordenCorrespondeAlPedido(orden, orderId, localizado.pedido)) {
+      await this.marcarError(
+        idNotificacion,
+        `La order ${orderId} no corresponde al pedido localizado.`,
+        true,
+      );
+      return { recibida: true, procesada: false, resultado: 'error' };
+    }
+
     const resultado = resultadoDeOrden(orden);
 
+    let alerta: string | undefined;
     if (resultado === 'pagado') {
-      await this.confirmarPago(localizado.pedido, localizado.pago, orden);
+      alerta = await this.confirmarPago(
+        localizado.pedido,
+        localizado.pago,
+        orden,
+      );
     } else if (resultado === 'rechazado') {
       await this.marcarRechazado(localizado.pago, orden);
     } else {
@@ -180,7 +195,7 @@ export class NotificacionesMercadoPagoService {
       });
     }
 
-    await this.marcarProcesada(idNotificacion);
+    await this.marcarProcesada(idNotificacion, alerta);
 
     return { recibida: true, procesada: true, resultado };
   }
@@ -234,6 +249,22 @@ export class NotificacionesMercadoPagoService {
     }
   }
 
+  /**
+   * MP identifica de forma única cada notificación en el campo `id` del body.
+   * El fallback mantiene la deduplicación para payloads incompletos.
+   */
+  private claveUnica(
+    topico: string,
+    orderId: string,
+    cuerpo: CuerpoNotificacionMercadoPago,
+  ): string {
+    if (cuerpo.id !== undefined && cuerpo.id !== null) {
+      return `evento:${topico}:${String(cuerpo.id)}`;
+    }
+
+    return `recurso:${topico}:${orderId}:${cuerpo.action ?? 'sin_accion'}`;
+  }
+
   private async buscarPagoYPedido(
     orderId: string,
     referencia?: string,
@@ -272,11 +303,28 @@ export class NotificacionesMercadoPagoService {
     return { pago: ultimoPago, pedido };
   }
 
+  /**
+   * La consulta remota es la fuente de verdad. La referencia fue enviada al
+   * crear la Order y debe apuntar al mismo pedido que se obtuvo localmente.
+   */
+  private ordenCorrespondeAlPedido(
+    orden: RespuestaOrdenMp,
+    orderId: string,
+    pedido: PedidoParaConfirmar,
+  ): boolean {
+    if (orden.id && orden.id !== orderId) return false;
+
+    return (
+      !orden.external_reference ||
+      orden.external_reference === pedido.id_pedido
+    );
+  }
+
   private async confirmarPago(
     pedido: PedidoParaConfirmar,
     pago: PagoParaConfirmar,
     orden: RespuestaOrdenMp,
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     const pagoMp = ultimoPagoDeOrden(orden);
 
     // La Orders API no expone el fee real de MP: se usa la comisión estimada
@@ -348,7 +396,7 @@ export class NotificacionesMercadoPagoService {
         mensaje: `Tu pedido ${pedido.codigoAlfanumerico} ya está pago. Presentá el código QR en el comercio dentro de la franja elegida para retirarlo.`,
       });
 
-      return;
+      return undefined;
     }
 
     if (
@@ -357,10 +405,12 @@ export class NotificacionesMercadoPagoService {
     ) {
       // Pago tardío: se registra el cobro, pero NO se reabre el pedido ni se
       // repone stock. Queda la alerta para revisión manual.
-      this.logger.warn(
-        `ALERTA: pago tardío sobre pedido ${pedido.id_pedido} en estado ${pedido.estado} (order ${orden.id}). Pago ${pago.idPago} marcado PAGADO sin reabrir el pedido.`,
-      );
+      const alerta = `Pago tardío sobre pedido ${pedido.id_pedido} en estado ${pedido.estado}; order ${orden.id ?? 'sin_id'} acreditada sin reabrir el pedido.`;
+      this.logger.warn(alerta);
+      return alerta;
     }
+
+    return undefined;
   }
 
   /** Rechazo: el pedido sigue pendiente y el cliente puede reintentar. */
@@ -381,10 +431,13 @@ export class NotificacionesMercadoPagoService {
     });
   }
 
-  private async marcarProcesada(idNotificacion: string): Promise<void> {
+  private async marcarProcesada(
+    idNotificacion: string,
+    alerta?: string,
+  ): Promise<void> {
     await this.prisma.notificacionMercadoPago.update({
       where: { id: idNotificacion },
-      data: { procesadaEn: new Date(), error: null },
+      data: { procesadaEn: new Date(), error: alerta?.slice(0, 500) ?? null },
     });
   }
 

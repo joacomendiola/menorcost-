@@ -13,6 +13,8 @@ export class NotificacionMercadoPagoQueryDto {
 
 /** Parte del body que usa el flujo (el resto se guarda completo en `payload`). */
 export interface CuerpoNotificacionMercadoPago {
+  /** Identificador único de la notificación enviado por Mercado Pago. */
+  id?: string | number;
   action?: string;
   type?: string;
   data?: {

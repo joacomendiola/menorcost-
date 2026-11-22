@@ -12,14 +12,21 @@ export function ultimoPagoDeOrden(
 ): PagoDeOrden | undefined {
   const pagos = orden.transactions?.payments ?? [];
 
-  return pagos[pagos.length - 1];
+  return pagos.reduce<PagoDeOrden | undefined>((ultimo, pago) => {
+    if (!ultimo) return pago;
+
+    const intentoActual = pago.attempt_number ?? Number.NEGATIVE_INFINITY;
+    const intentoUltimo = ultimo.attempt_number ?? Number.NEGATIVE_INFINITY;
+
+    return intentoActual >= intentoUltimo ? pago : ultimo;
+  }, undefined);
 }
 
 /**
  * Traduce el estado de la order de Mercado Pago al efecto sobre nuestro pedido.
  *
  * - `pagado`: order `processed` o pago `approved` (status_detail `accredited`).
- * - `rechazado`: pago `rejected` u order `cancelled`/`expired`. El pedido sigue
+ * - `rechazado`: pago `rejected` u order terminal fallida. El pedido sigue
  *   `PENDIENTE_PAGO` y el intento queda cerrado para permitir el reintento.
  * - `pendiente`: todo lo demás (`created`, `action_required`, pendientes de
  *   acreditación). No se toca el estado del pedido.
@@ -27,12 +34,18 @@ export function ultimoPagoDeOrden(
 export function resultadoDeOrden(orden: RespuestaOrdenMp): ResultadoOrdenMp {
   const pago = ultimoPagoDeOrden(orden);
 
-  if (pago?.status === 'approved' || orden.status === 'processed') {
+  if (
+    pago?.status === 'approved' ||
+    orden.status === 'processed' ||
+    orden.status === 'approved'
+  ) {
     return 'pagado';
   }
 
   if (
     pago?.status === 'rejected' ||
+    orden.status === 'rejected' ||
+    orden.status === 'failed' ||
     orden.status === 'cancelled' ||
     orden.status === 'expired'
   ) {

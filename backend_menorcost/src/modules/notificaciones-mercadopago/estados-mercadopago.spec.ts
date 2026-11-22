@@ -27,7 +27,9 @@ describe('resultadoDeOrden', () => {
     ).toBe('rechazado');
   });
 
-  it('order cancelled o expired cierra el intento', () => {
+  it('orders rechazadas, canceladas o vencidas cierran el intento', () => {
+    expect(resultadoDeOrden({ status: 'rejected' })).toBe('rechazado');
+    expect(resultadoDeOrden({ status: 'failed' })).toBe('rechazado');
     expect(resultadoDeOrden({ status: 'cancelled' })).toBe('rechazado');
     expect(resultadoDeOrden({ status: 'expired' })).toBe('rechazado');
   });
@@ -46,13 +48,13 @@ describe('ultimoPagoDeOrden', () => {
     const orden = {
       transactions: {
         payments: [
-          { id: 'PAY-1', status: 'rejected' },
-          { id: 'PAY-2', status: 'approved' },
+          { id: 'PAY-1', status: 'approved', attempt_number: 1 },
+          { id: 'PAY-2', status: 'rejected', attempt_number: 2 },
         ],
       },
     };
 
     expect(ultimoPagoDeOrden(orden)?.id).toBe('PAY-2');
-    expect(resultadoDeOrden(orden)).toBe('pagado');
+    expect(resultadoDeOrden(orden)).toBe('rechazado');
   });
 });
