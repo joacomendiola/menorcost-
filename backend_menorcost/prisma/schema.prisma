@@ -415,6 +415,11 @@ model Pedido {
   fechaExpiracionPago DateTime?    @map("fecha_expiracion_pago")
   // CU-2.06: fecha/hora en que el comerciante confirmó la entrega en mostrador.
   fecha_entrega       DateTime?    @map("fecha_entrega") @db.Timestamp(0)
+  // Auditoría de la reserva: se setea una sola vez al liberar el stock
+  // (vencimiento del pago o cancelación). Evita restituir dos veces.
+  stockLiberadoEn     DateTime?    @map("stock_liberado_en")
+  // Motivo de la cancelación: EXPIRADO, PAGO_NO_INICIADO, CANCELADO_POR_COMERCIO.
+  motivoCancelacion   String?      @map("motivo_cancelacion") @db.VarChar(40)
   franjaHorarioId     String?      @map("franja_horario_id") @db.Uuid
   subtotal            Decimal      @db.Decimal(10, 2)
 
@@ -442,6 +447,8 @@ model Pedido {
   @@index([usuarioId, estado])
   @@index([comercioId, estado])
   @@index([estado])
+  // Consulta del reaper de pagos vencidos (`estado` + `fechaExpiracionPago`).
+  @@index([estado, fechaExpiracionPago])
   @@map("pedido")
 }
 
@@ -528,6 +535,7 @@ model CredencialMp {
 
   comercio Comercio @relation(fields: [comercioId], references: [idComercio], onDelete: Cascade)
   splits   SplitPago[]
+  pagos    Pago[]
 
   @@map("credenciales_mp")
 }
@@ -551,6 +559,8 @@ model MpOauthState {
 model Pago {
   idPago           String     @id @default(uuid()) @map("id_pago") @db.Uuid
   pedidoId         String     @map("id_pedido") @db.Uuid
+  // Credencial del vendedor con la que se cobró este intento (OAuth del comercio).
+  credencialId     String?    @map("id_credencial") @db.Uuid
   // Orden de Mercado Pago (Orders API) asociada a este intento de pago.
   // Único porque una orden de MP pertenece a un solo intento.
   mpOrderId        String?    @unique @map("mp_order_id") @db.VarChar(64)
@@ -569,9 +579,11 @@ model Pago {
 
   pedido Pedido      @relation(fields: [pedidoId], references: [id_pedido], onDelete: Restrict)
   splits SplitPago[]
+  credencial CredencialMp? @relation(fields: [credencialId], references: [idCredencial], onDelete: SetNull)
 
   @@index([pedidoId])
   @@index([estado])
+  @@index([credencialId])
   @@map("pagos")
 }
 
@@ -609,6 +621,9 @@ model NotificacionMercadoPago {
   // pedido aunque el recurso de MP todavía no esté persistido.
   referenciaExterna String?   @map("referencia_externa") @db.VarChar(80)
   payload           Json?
+  // Encabezados relevantes para depurar firmas (x-signature, x-request-id).
+  // Nunca se guarda el secreto de Webhooks.
+  encabezados       Json?
   recibidaEn        DateTime  @default(now()) @map("recibida_en")
   procesadaEn       DateTime? @map("procesada_en")
   error             String?   @db.Text
