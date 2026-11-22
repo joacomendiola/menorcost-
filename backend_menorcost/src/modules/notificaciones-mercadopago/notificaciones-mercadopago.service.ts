@@ -6,7 +6,10 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { ClienteMercadoPago } from '../pagos-mercadopago/cliente-mercadopago.js';
+import {
+  ClienteMercadoPago,
+  type RespuestaOrdenMp,
+} from '../pagos-mercadopago/cliente-mercadopago.js';
 import { ConfiguracionPagoPedido } from '../pagos-mercadopago/configuracion-pago-pedido.js';
 import { CredencialMercadoPagoService } from '../pagos-mercadopago/credencial-mercadopago.service.js';
 import { ErrorPagoMercadoPago } from '../pagos-mercadopago/error-pago-mercadopago.js';
@@ -44,6 +47,21 @@ const PEDIDO_PARA_CONFIRMAR = {
     select: { precioBaseNetoAplicado: true, cantidad: true },
   },
 } as const;
+
+type PedidoParaConfirmar = Prisma.PedidoGetPayload<{
+  select: typeof PEDIDO_PARA_CONFIRMAR;
+}>;
+
+type PagoParaConfirmar = {
+  idPago: string;
+  estado: 'PENDIENTE' | 'PAGADO' | 'RECHAZADO' | 'REEMBOLSADO';
+  credencialId: string | null;
+};
+
+interface PagoYPedido {
+  pago: PagoParaConfirmar;
+  pedido: PedidoParaConfirmar;
+}
 
 /**
  * Webhook de Mercado Pago (tópico `order`).
@@ -216,7 +234,10 @@ export class NotificacionesMercadoPagoService {
     }
   }
 
-  private async buscarPagoYPedido(orderId: string, referencia?: string) {
+  private async buscarPagoYPedido(
+    orderId: string,
+    referencia?: string,
+  ): Promise<PagoYPedido | null> {
     const pago = await this.prisma.pago.findUnique({
       where: { mpOrderId: orderId },
       select: {
@@ -251,7 +272,11 @@ export class NotificacionesMercadoPagoService {
     return { pago: ultimoPago, pedido };
   }
 
-  private async confirmarPago(pedido, pago, orden) {
+  private async confirmarPago(
+    pedido: PedidoParaConfirmar,
+    pago: PagoParaConfirmar,
+    orden: RespuestaOrdenMp,
+  ): Promise<void> {
     const pagoMp = ultimoPagoDeOrden(orden);
 
     // La Orders API no expone el fee real de MP: se usa la comisión estimada
@@ -339,7 +364,10 @@ export class NotificacionesMercadoPagoService {
   }
 
   /** Rechazo: el pedido sigue pendiente y el cliente puede reintentar. */
-  private async marcarRechazado(pago, orden): Promise<void> {
+  private async marcarRechazado(
+    pago: PagoParaConfirmar,
+    orden: RespuestaOrdenMp,
+  ): Promise<void> {
     // Una notificación vieja nunca revierte un pago ya acreditado.
     if (pago.estado === 'PAGADO') return;
 
