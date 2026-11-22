@@ -509,7 +509,7 @@ describe('BackofficeService.sancionar', () => {
       where: { userId: DENUNCIADO.id, estado: { not: 'SUSPENDIDO' } },
       data: { estado: 'SUSPENDIDO' },
     });
-    expect(resultado.comercioSuspendido).toBe(true);
+    expect(resultado).toMatchObject({ comercioSuspendido: true });
   });
 
   it('devuelve advertencia si falla el correo del emisor', async () => {
