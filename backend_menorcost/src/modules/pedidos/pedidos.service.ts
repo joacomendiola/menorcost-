@@ -35,10 +35,8 @@ export class PedidosService {
 
   async listar(usuarioId: string): Promise<PedidoResumen[]> {
     const pedidos = await this.prisma.pedido.findMany({
-      where: {
-        usuarioId,
-        estado: { not: 'PENDIENTE_PAGO' },
-      },
+      // Incluye `PENDIENTE_PAGO`: desde "Mis pedidos" se reintenta el pago.
+      where: { usuarioId },
       orderBy: { fecha_pedido: 'desc' },
       select: {
         id_pedido: true,
@@ -62,7 +60,7 @@ export class PedidosService {
     return pedidos.map((pedido) => ({
       idPedido: pedido.id_pedido,
       codigoAlfanumerico: pedido.codigoAlfanumerico,
-      estado: pedido.estado as EstadoPedidoVisible,
+      estado: pedido.estado,
       fechaPedido: pedido.fecha_pedido.toISOString(),
       total: pedido.total.toNumber(),
       comercio: pedido.comercio
