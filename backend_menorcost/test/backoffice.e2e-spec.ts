@@ -826,6 +826,64 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
 
         await prisma.reporte.delete({ where: { id_reporte: r.id_reporte } });
       });
+
+      it('cancela el pedido si el reporte es de no-show del cliente', async () => {
+        const pedido = await crearPedido(cliente.id, comercioHabilitadoId);
+        await prisma.pedido.update({
+          where: { id_pedido: pedido.id_pedido },
+          data: { estado: 'PENDIENTE_DE_RETIRO' },
+        });
+        const r = await prisma.reporte.create({
+          data: {
+            id_pedido: pedido.id_pedido,
+            motivo: 'El cliente no se presentó a retirar el producto',
+            motivoCodigo: 'CLIENTE_NO_RETIRO',
+            tipo_destino: 'CLIENTE',
+            estado_reporte: 'PENDIENTE_REVISION',
+            id_emisor: comercianteHabilitado.id,
+            id_denunciado: cliente.id,
+          },
+        });
+
+        await request(server())
+          .patch(`/admin/denuncias/${r.id_reporte}/resolver`)
+          .set(auth(adminToken))
+          .expect(200);
+
+        const actualizado = await prisma.pedido.findUnique({
+          where: { id_pedido: pedido.id_pedido },
+        });
+        expect(actualizado?.estado).toBe('CANCELADO_POR_FALTA_RETIRO');
+      });
+
+      it('no cancela el pedido si el reporte no es de no-show', async () => {
+        const pedido = await crearPedido(cliente.id, comercioHabilitadoId);
+        await prisma.pedido.update({
+          where: { id_pedido: pedido.id_pedido },
+          data: { estado: 'PENDIENTE_DE_RETIRO' },
+        });
+        const r = await prisma.reporte.create({
+          data: {
+            id_pedido: pedido.id_pedido,
+            motivo: 'Cancelación indebida en mostrador',
+            motivoCodigo: 'CANCELACION_INDEBIDA',
+            tipo_destino: 'CLIENTE',
+            estado_reporte: 'PENDIENTE_REVISION',
+            id_emisor: comercianteHabilitado.id,
+            id_denunciado: cliente.id,
+          },
+        });
+
+        await request(server())
+          .patch(`/admin/denuncias/${r.id_reporte}/resolver`)
+          .set(auth(adminToken))
+          .expect(200);
+
+        const actualizado = await prisma.pedido.findUnique({
+          where: { id_pedido: pedido.id_pedido },
+        });
+        expect(actualizado?.estado).toBe('PENDIENTE_DE_RETIRO');
+      });
     });
 
     describe('PATCH /admin/denuncias/:id/sancionar - Dar de baja publicación', () => {

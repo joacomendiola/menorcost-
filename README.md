@@ -20,10 +20,10 @@ MENORCOST es una plataforma web orientada al comercio minorista de cercanía (ki
 
 ## 🛠️ Stack Tecnológico
 
-- **Frontend:** React + Vite, TypeScript, Mantine UI, OpenStreetMap (CartoDB Tiles).
+- **Frontend:** React + Vite, TypeScript, Mantine UI, MapLibre GL JS.
 * **Backend:** Node.js, NestJS (Modular Monolith, Arquitectura en capas), TypeScript, JWT.
 * **Persistencia y ORM:** PostgreSQL (vía Docker) y Prisma ORM.
-* **Integraciones Externas:** Mercado Pago Checkout & Split Payment API (OAuth), Google Places API (validación geográfica), Nodemailer / Gmail API.
+* **Integraciones Externas:** Mercado Pago Checkout & Split Payment API (OAuth), OpenStreetMap / Photon (mapas y geocodificación), Nodemailer / Gmail API.
 * **Infraestructura Local:** Docker & Docker Compose.
 
 ---
@@ -86,14 +86,13 @@ Crea otro archivo llamado .env y pega lo siguiente (esto conecta Prisma con la b
 DATABASE_URL="postgresql://postgres:menorcostpassword@localhost:5433/menorcost?schema=public"
 
 C. En la carpeta del frontend (/frontend):
-Crea un archivo `frontend/.env.local` para conectar React con NestJS y configurar los mapas:
+Crea un archivo `frontend/.env.local` para conectar React con NestJS:
 
 ```env
 VITE_API_URL=http://localhost:3000
-VITE_GOOGLE_MAPS_API_KEY=tu_clave_de_google_maps
 ```
 
-La clave de Google Maps se solicita en [Google Maps Platform](https://developers.google.com/maps/get-started). Se usa para cargar los mapas de inicio, exploración, ubicación y comercios. Vite expone las variables `VITE_*` al navegador; restringí la clave a los dominios de la aplicación desde Google Cloud y no la publiques en el repositorio. `frontend/.env.local` está excluido de Git.
+Los mapas usan MapLibre GL JS con tiles de OpenFreeMap y geocodificación de Photon (OpenStreetMap), por lo que no requieren API key. Vite expone las variables `VITE_*` al navegador; no publiques secretos en el repositorio. `frontend/.env.local` está excluido de Git.
 
 Después de crear o modificar este archivo, reiniciá el frontend (`npm run dev` dentro de `/frontend`) para que Vite vuelva a cargar las variables.
 

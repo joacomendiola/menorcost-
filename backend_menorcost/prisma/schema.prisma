@@ -327,6 +327,16 @@ enum TipoDestinoReporte {
   CLIENTE
 }
 
+enum MotivoReporte {
+  PRODUCTO_MAL_ESTADO
+  COMERCIO_CERRADO
+  PRECIO_NO_RESPETADO
+  CLIENTE_NO_RETIRO
+  CANCELACION_INDEBIDA
+  COMPORTAMIENTO_INADECUADO
+  OTRO
+}
+
 model Calificacion {
   id_calificacion Int      @id @default(autoincrement())
   puntaje         Int // Escala obligatoria de 1 a 5
@@ -343,6 +353,7 @@ model Calificacion {
 model Reporte {
   id_reporte       Int                @id @default(autoincrement())
   motivo           String // Categoría seleccionada en el select
+  motivoCodigo     MotivoReporte?     @map("motivo_codigo")
   descripcion      String?            @db.VarChar(300) // Máximo 300 caracteres según CU-5.02
   estado_reporte   EstadoReporte      @default(PENDIENTE_REVISION)
   tipo_destino     TipoDestinoReporte // Hacia quién va dirigida la denuncia

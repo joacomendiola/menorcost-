@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { cargarGoogleMaps } from './googleMaps';
+import type { Map, Marker } from 'maplibre-gl';
+import { crearMapa, crearMarcador } from '../mapas/maplibre';
 
 interface MapaComercioProps {
   latitud: number;
@@ -8,51 +9,40 @@ interface MapaComercioProps {
 
 export function MapaComercio({ latitud, longitud }: MapaComercioProps) {
   const contenedor = useRef<HTMLDivElement>(null);
-  const mapa = useRef<google.maps.Map | null>(null);
-  const marcador = useRef<google.maps.Marker | null>(null);
+  const mapa = useRef<Map | null>(null);
+  const marcador = useRef<Marker | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    let activo = true;
+    if (!contenedor.current) return;
 
-    cargarGoogleMaps()
-      .then((sdk) => {
-        if (!activo || !contenedor.current) return;
-
-        if (!mapa.current) {
-          mapa.current = new sdk.maps.Map(contenedor.current, {
-            center: { lat: latitud, lng: longitud },
-            zoom: 16,
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: false,
-            clickableIcons: false,
-          });
-
-          marcador.current = new sdk.maps.Marker({
-            map: mapa.current,
-            position: { lat: latitud, lng: longitud },
-          });
-          return;
-        }
-
-        mapa.current.panTo({ lat: latitud, lng: longitud });
-        mapa.current.setZoom(16);
-        marcador.current?.setPosition({ lat: latitud, lng: longitud });
-      })
-      .catch((err: unknown) => {
-        if (!activo) return;
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'No pudimos cargar el mapa de Google.',
+    try {
+      if (!mapa.current) {
+        mapa.current = crearMapa(contenedor.current, latitud, longitud, 16);
+        marcador.current = crearMarcador({ latitud, longitud }).addTo(
+          mapa.current,
         );
-      });
+        return;
+      }
 
-    return () => {
-      activo = false;
-    };
+      mapa.current.easeTo({ center: [longitud, latitud], zoom: 16 });
+      marcador.current?.setLngLat([longitud, latitud]);
+    } catch (err) {
+      const mensaje =
+        err instanceof Error ? err.message : 'No pudimos cargar el mapa.';
+      queueMicrotask(() => setError(mensaje));
+    }
   }, [latitud, longitud]);
+
+  useEffect(
+    () => () => {
+      marcador.current?.remove();
+      mapa.current?.remove();
+      marcador.current = null;
+      mapa.current = null;
+    },
+    [],
+  );
 
   if (error) {
     return (

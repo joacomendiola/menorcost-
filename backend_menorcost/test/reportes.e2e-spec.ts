@@ -6,6 +6,7 @@ import { App } from 'supertest/types.js';
 import {
   EstadoPedido,
   EstadoUsuario,
+  MotivoReporte,
   TipoDestinoReporte,
 } from '../src/generated/prisma/enums.js';
 import { AppModule } from '../src/app.module.js';
@@ -242,7 +243,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .set(auth(clienteToken))
           .send({
             idPedido: pedidoId,
-            motivo: 'El producto estaba en mal estado/era diferente',
+            motivoCodigo: MotivoReporte.PRODUCTO_MAL_ESTADO,
             tipo_destino: TipoDestinoReporte.COMERCIO,
           })
           .expect(201);
@@ -250,6 +251,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
         expect(res.body).toMatchObject({
           id_pedido: pedidoId,
           motivo: 'El producto estaba en mal estado/era diferente',
+          motivoCodigo: 'PRODUCTO_MAL_ESTADO',
           tipo_destino: 'COMERCIO',
           estado_reporte: 'PENDIENTE_REVISION',
           id_emisor: cliente.id,
@@ -325,7 +327,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .set(auth(clienteToken))
           .send({
             idPedido: pedidoRe.id_pedido,
-            motivo: 'El local estaba cerrado',
+            motivoCodigo: MotivoReporte.COMERCIO_CERRADO,
             tipo_destino: TipoDestinoReporte.COMERCIO,
           })
           .expect(201);
@@ -340,13 +342,13 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .set(auth(clienteToken))
           .send({
             idPedido: pedidoRe.id_pedido,
-            motivo: 'El local estaba cerrado',
+            motivoCodigo: MotivoReporte.COMERCIO_CERRADO,
             tipo_destino: TipoDestinoReporte.COMERCIO,
           })
           .expect(201);
       });
 
-      it('permite al cliente reportar un pedido cancelado', async () => {
+      it('rechaza al cliente reportar un pedido cancelado', async () => {
         const cancelado = await crearPedido(cliente.id, comercioId, 'CANCEL');
         await prisma.pedido.update({
           where: { id_pedido: cancelado.id_pedido },
@@ -358,10 +360,10 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .set(auth(clienteToken))
           .send({
             idPedido: cancelado.id_pedido,
-            motivo: 'El local estaba cerrado',
+            motivoCodigo: MotivoReporte.COMERCIO_CERRADO,
             tipo_destino: TipoDestinoReporte.COMERCIO,
           })
-          .expect(201);
+          .expect(400);
       });
 
       it('rechaza reportar un pedido pendiente de pago', async () => {

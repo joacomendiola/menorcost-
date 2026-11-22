@@ -1,12 +1,8 @@
 import { Loader, TextInput } from '@mantine/core';
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { ApiError } from '../api';
-import {
-  placesApi,
-  type PlacesDetalle,
-  type PlacesSugerencia,
-} from '../comercios/api';
+import type { PlacesDetalle, PlacesSugerencia } from '../comercios/api';
+import { buscarLugares, detalleLugar } from '../mapas/geocoding';
 
 export interface DireccionSugerida {
   displayName: string;
@@ -19,7 +15,7 @@ export interface DireccionSugerida {
 }
 
 interface BuscadorDireccionProps {
-  token: string | null;
+  token?: string | null;
   onSeleccion: (sugerencia: DireccionSugerida) => void;
 }
 
@@ -72,31 +68,19 @@ function normalizar(detalle: PlacesDetalle): DireccionSugerida {
   };
 }
 
-function mensajeDeError(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (error.status === 503) {
-      return 'Google Places no está configurado. Avisá al equipo para habilitar la búsqueda de direcciones.';
-    }
-    return error.message;
-  }
-  return 'No pudimos buscar direcciones. Intentá de nuevo.';
-}
-
 export function BuscadorDireccion({
-  token,
   onSeleccion,
 }: BuscadorDireccionProps) {
   const [texto, setTexto] = useState('');
   const [sugerencias, setSugerencias] = useState<PlacesSugerencia[]>([]);
   const [abierto, setAbierto] = useState(false);
   const [buscando, setBuscando] = useState(false);
-  const [seleccionando, setSeleccionando] = useState(false);
   const [error, setError] = useState('');
   const contenedorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const consulta = texto.trim();
-    if (!token || consulta.length < 3) return;
+    if (consulta.length < 3) return;
 
     const controlador = new AbortController();
 
@@ -105,11 +89,7 @@ export function BuscadorDireccion({
       setError('');
 
       try {
-        const resultados = await placesApi.autocompletar(
-          token,
-          consulta,
-          controlador.signal,
-        );
+        const resultados = await buscarLugares(consulta, controlador.signal);
         if (controlador.signal.aborted) return;
         setSugerencias(resultados);
         setAbierto(true);
@@ -117,11 +97,9 @@ export function BuscadorDireccion({
         if ((err as Error).name === 'AbortError') return;
         setSugerencias([]);
         setAbierto(true);
-        setError(mensajeDeError(err));
+        setError('No pudimos buscar direcciones. Intentá de nuevo.');
       } finally {
-        if (!controlador.signal.aborted) {
-          setBuscando(false);
-        }
+        if (!controlador.signal.aborted) setBuscando(false);
       }
     }, 300);
 
@@ -129,7 +107,7 @@ export function BuscadorDireccion({
       clearTimeout(temporizador);
       controlador.abort();
     };
-  }, [texto, token]);
+  }, [texto]);
 
   useEffect(() => {
     function alClicFuera(evento: MouseEvent) {
@@ -154,36 +132,29 @@ export function BuscadorDireccion({
     }
   }
 
-  async function seleccionar(sugerencia: PlacesSugerencia) {
-    if (!token) return;
-
-    setTexto(sugerencia.descripcion);
-    setAbierto(false);
-    setSeleccionando(true);
-    setError('');
-
-    try {
-      const detalle = await placesApi.detalle(token, sugerencia.placeId);
-      onSeleccion(normalizar(detalle));
-    } catch (err) {
-      setError(mensajeDeError(err));
-      setAbierto(true);
-    } finally {
-      setSeleccionando(false);
+  function seleccionar(sugerencia: PlacesSugerencia) {
+    const detalle = detalleLugar(sugerencia.placeId);
+    if (!detalle) {
+      setError('No pudimos cargar esa dirección. Buscala de nuevo.');
+      return;
     }
+
+    setTexto(detalle.direccion || detalle.nombre);
+    setAbierto(false);
+    setError('');
+    onSeleccion(normalizar(detalle));
   }
 
   const mostrarLista = abierto && texto.trim().length >= 3;
-  const cargando = buscando || seleccionando;
 
   return (
     <div className="buscador" ref={contenedorRef}>
       <TextInput
-        placeholder="Dirección o punto de referencia"
-        aria-label="Buscar dirección o punto de referencia"
+        placeholder="Dirección o punto de referencia (OpenStreetMap)"
+        aria-label="Buscar dirección o punto de referencia en OpenStreetMap"
         leftSection={<IconoLupa />}
         leftSectionPointerEvents="none"
-        rightSection={cargando ? <Loader size="xs" /> : undefined}
+        rightSection={buscando ? <Loader size="xs" /> : undefined}
         autoComplete="off"
         value={texto}
         onChange={cambiarTexto}
@@ -194,13 +165,17 @@ export function BuscadorDireccion({
           if (evento.key === 'Escape') setAbierto(false);
           if (evento.key === 'Enter' && sugerencias.length > 0) {
             evento.preventDefault();
-            void seleccionar(sugerencias[0]);
+            seleccionar(sugerencias[0]);
           }
         }}
       />
 
       {mostrarLista && (
-        <ul className="buscador__lista" role="listbox">
+        <ul
+          className="buscador__lista"
+          id="sugerencias-direcciones"
+          role="listbox"
+        >
           {buscando && <li className="buscador__estado">Buscando…</li>}
 
           {!buscando && error && (
@@ -224,12 +199,12 @@ export function BuscadorDireccion({
                   className="buscador__item"
                   role="option"
                   aria-selected={false}
-                  onClick={() => void seleccionar(sugerencia)}
+                  onClick={() => seleccionar(sugerencia)}
                 >
                   <span className="buscador__pin">
                     <IconoPin />
                   </span>
-                  <span className="buscador__texto">
+                    <span className="buscador__texto">
                     <span className="buscador__texto--principal">
                       {sugerencia.textoPrincipal || sugerencia.descripcion}
                     </span>

@@ -12,6 +12,11 @@ import { MailerService } from '../auth/mailer/mailer.service.js';
 import type { EnvioCorreo } from '../auth/mailer/mailer.interface.js';
 import type { CrearReporteDto } from './dto/crear-reporte.dto.js';
 import type { ListarMisReportesQueryDto } from './dto/listar-mis-reportes-query.dto.js';
+import {
+  esMotivoPermitido,
+  inferirMotivoCodigo,
+  MOTIVO_REPORTE_LABEL,
+} from './reporte-motivos.js';
 import type {
   EstadoPedido,
   TipoDestinoReporte,
@@ -63,7 +68,19 @@ export class ReportesService {
       throw new ForbiddenException('Solo clientes y comerciantes pueden crear reportes');
     }
 
-    const esOtroMotivo = dto.motivo.toLowerCase().includes('otro');
+    const motivoCodigo = dto.motivoCodigo ?? inferirMotivoCodigo(dto.motivo);
+    if (!motivoCodigo && !dto.motivo?.trim()) {
+      throw new BadRequestException('El motivo es obligatorio');
+    }
+    if (motivoCodigo && !esMotivoPermitido(rolUsuario, motivoCodigo)) {
+      throw new BadRequestException('El motivo no corresponde a tu rol');
+    }
+
+    const motivo = motivoCodigo
+      ? MOTIVO_REPORTE_LABEL[motivoCodigo]
+      : dto.motivo!.trim();
+    const esOtroMotivo =
+      motivoCodigo === 'OTRO' || motivo.toLowerCase().includes('otro');
     if (esOtroMotivo && (!dto.descripcion || dto.descripcion.trim() === '')) {
       throw new BadRequestException('Por favor, especifica brevemente el problema ocurrido');
     }
@@ -141,7 +158,8 @@ export class ReportesService {
           const reporte = await tx.reporte.create({
             data: {
               id_pedido: dto.idPedido,
-              motivo: dto.motivo,
+              motivo,
+              motivoCodigo: motivoCodigo ?? undefined,
               descripcion: dto.descripcion,
               estado_reporte: 'PENDIENTE_REVISION',
               tipo_destino: dto.tipo_destino,
