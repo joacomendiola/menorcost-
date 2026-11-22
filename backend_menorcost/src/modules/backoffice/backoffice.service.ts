@@ -6,10 +6,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Prisma } from '../../generated/prisma/client.js';
+import type { MotivoReporte } from '../../generated/prisma/enums.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { MailerService } from '../auth/mailer/mailer.service.js';
 import type { EnvioCorreo } from '../auth/mailer/mailer.interface.js';
 import { notificarPedido } from '../pedidos/pedido-notificaciones.js';
+import { esFaltaDeRetiro } from '../reportes/reporte-motivos.js';
 import type { AlcanceSancion } from './dto/sancionar-reporte.dto.js';
 
 const USUARIO_PUBLICO_SELECT = {
@@ -494,14 +496,11 @@ export class BackofficeService {
 
       // CU-Extra 02: si el comercio denunció que el cliente no retiró y el
       // admin resuelve a favor, el pedido se cierra por falta de retiro.
-      const pedidoCancelado =
-        estadoFinal === 'RESUELTO'
-          ? await this.cancelarPedidoPorFaltaDeRetiro(
-              tx,
-              reporte.id_pedido,
-              reporte.id_emisor,
-            )
-          : null;
+      const pedidoCancelado = await this.cancelarPedidoPorFaltaDeRetiro(
+        tx,
+        reporte,
+        estadoFinal,
+      );
 
       return { success: true, pedidoCancelado };
     });
@@ -564,11 +563,21 @@ export class BackofficeService {
    */
   private async cancelarPedidoPorFaltaDeRetiro(
     tx: Prisma.TransactionClient,
-    idPedido: string,
-    idEmisor: string,
+    reporte: {
+      id_pedido: string;
+      id_emisor: string;
+      tipo_destino: 'COMERCIO' | 'CLIENTE';
+      motivoCodigo: MotivoReporte | null;
+      motivo: string;
+    },
+    estadoFinal: 'RESUELTO' | 'DESESTIMADO',
   ) {
+    if (estadoFinal !== 'RESUELTO') return null;
+    if (reporte.tipo_destino !== 'CLIENTE') return null;
+    if (!esFaltaDeRetiro(reporte)) return null;
+
     const pedido = await tx.pedido.findUnique({
-      where: { id_pedido: idPedido },
+      where: { id_pedido: reporte.id_pedido },
       select: {
         id_pedido: true,
         usuarioId: true,
@@ -581,10 +590,10 @@ export class BackofficeService {
     if (!pedido) return null;
     if (pedido.estado !== 'PENDIENTE_DE_RETIRO') return null;
     // Solo aplica si el reporte lo emitió el comercio (no-show contra el cliente).
-    if (pedido.comercio?.userId !== idEmisor) return null;
+    if (pedido.comercio?.userId !== reporte.id_emisor) return null;
 
     const actualizados = await tx.pedido.updateMany({
-      where: { id_pedido: idPedido, estado: 'PENDIENTE_DE_RETIRO' },
+      where: { id_pedido: reporte.id_pedido, estado: 'PENDIENTE_DE_RETIRO' },
       data: { estado: 'CANCELADO_POR_FALTA_RETIRO' },
     });
 

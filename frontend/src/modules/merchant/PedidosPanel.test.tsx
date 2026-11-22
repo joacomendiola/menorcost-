@@ -93,6 +93,7 @@ beforeEach(() => {
   mocks.crear.mockResolvedValue({
     id_reporte: 10,
     motivo: 'El cliente no se presentó a retirar el producto',
+    motivoCodigo: 'CLIENTE_NO_RETIRO',
     descripcion: null,
     estado_reporte: 'PENDIENTE_REVISION',
     tipo_destino: 'CLIENTE',
@@ -158,7 +159,7 @@ describe('PedidosPanel', () => {
     await waitFor(() =>
       expect(mocks.crear).toHaveBeenCalledWith('token', {
         idPedido: 'p2',
-        motivo: 'El cliente no se presentó a retirar el producto',
+        motivoCodigo: 'CLIENTE_NO_RETIRO',
         descripcion: undefined,
         tipo_destino: 'CLIENTE',
       }),
@@ -196,6 +197,7 @@ describe('PedidosPanel', () => {
     mocks.crear.mockResolvedValue({
       id_reporte: 10,
       motivo: 'Cancelación indebida en mostrador',
+      motivoCodigo: 'CANCELACION_INDEBIDA',
       descripcion: null,
       estado_reporte: 'PENDIENTE_REVISION',
       tipo_destino: 'CLIENTE',

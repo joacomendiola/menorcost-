@@ -42,17 +42,22 @@ function pedidoBase(overrides: Record<string, unknown> = {}) {
 function dtoBase(overrides: Partial<CrearReporteDto> = {}): CrearReporteDto {
   return {
     idPedido: PEDIDO_ID,
-    motivo: 'El local estaba cerrado',
+    motivoCodigo: 'COMERCIO_CERRADO',
     tipo_destino: 'COMERCIO',
     ...overrides,
   };
+}
+
+function motivoParaRol(rol: 'CLIENTE' | 'COMERCIANTE') {
+  return rol === 'COMERCIANTE' ? 'CLIENTE_NO_RETIRO' : 'COMERCIO_CERRADO';
 }
 
 function reporteCreado(overrides: Record<string, unknown> = {}) {
   return {
     id_reporte: 1,
     id_pedido: PEDIDO_ID,
-    motivo: 'El local estaba cerrado',
+    motivo: 'El comercio estaba cerrado al ir a retirar',
+    motivoCodigo: 'COMERCIO_CERRADO',
     descripcion: null,
     estado_reporte: 'PENDIENTE_REVISION',
     tipo_destino: 'COMERCIO',
@@ -136,6 +141,7 @@ describe('ReportesService.crearReporte', () => {
     await expect(
       service.crearReporte(COMERCIANTE_ID, 'COMERCIANTE', dtoBase({
         tipo_destino: 'CLIENTE',
+        motivoCodigo: motivoParaRol('COMERCIANTE'),
       })),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
@@ -177,7 +183,10 @@ describe('ReportesService.crearReporte', () => {
       const resultado = await service.crearReporte(
         idUsuario,
         rol,
-        dtoBase({ tipo_destino: tipoDestino }),
+        dtoBase({
+          tipo_destino: tipoDestino,
+          motivoCodigo: motivoParaRol(rol),
+        }),
       );
 
       expect(prismaMock.reporte.create).toHaveBeenCalledWith(
@@ -216,7 +225,10 @@ describe('ReportesService.crearReporte', () => {
         service.crearReporte(
           idUsuario,
           rol,
-          dtoBase({ tipo_destino: tipoDestino }),
+          dtoBase({
+            tipo_destino: tipoDestino,
+            motivoCodigo: motivoParaRol(rol),
+          }),
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
 
@@ -247,7 +259,7 @@ describe('ReportesService.crearReporte', () => {
       service.crearReporte(
         CLIENTE_ID,
         'CLIENTE',
-        dtoBase({ motivo: 'Otro motivo' }),
+        dtoBase({ motivoCodigo: 'OTRO' }),
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
@@ -256,28 +268,74 @@ describe('ReportesService.crearReporte', () => {
     await service.crearReporte(
       CLIENTE_ID,
       'CLIENTE',
-      dtoBase({ motivo: 'Otro motivo', descripcion: 'Detalle del problema' }),
+      dtoBase({ motivoCodigo: 'OTRO', descripcion: 'Detalle del problema' }),
     );
 
     expect(prismaMock.reporte.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           motivo: 'Otro motivo',
+          motivoCodigo: 'OTRO',
           descripcion: 'Detalle del problema',
         }),
       }),
     );
   });
 
+  it('persiste la etiqueta canónica y el código del motivo', async () => {
+    await service.crearReporte(CLIENTE_ID, 'CLIENTE', dtoBase());
+
+    expect(prismaMock.reporte.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          motivo: 'El comercio estaba cerrado al ir a retirar',
+          motivoCodigo: 'COMERCIO_CERRADO',
+        }),
+      }),
+    );
+  });
+
+  it('infiere el código desde el texto legacy', async () => {
+    await service.crearReporte(
+      CLIENTE_ID,
+      'CLIENTE',
+      dtoBase({
+        motivoCodigo: undefined,
+        motivo: 'El comercio estaba cerrado al ir a retirar',
+      }),
+    );
+
+    expect(prismaMock.reporte.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          motivo: 'El comercio estaba cerrado al ir a retirar',
+          motivoCodigo: 'COMERCIO_CERRADO',
+        }),
+      }),
+    );
+  });
+
+  it('rechaza un motivo que no corresponde al rol', async () => {
+    await expect(
+      service.crearReporte(
+        CLIENTE_ID,
+        'CLIENTE',
+        dtoBase({ motivoCodigo: 'CLIENTE_NO_RETIRO' }),
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prismaMock.reporte.create).not.toHaveBeenCalled();
+  });
+
   it('notifica a los administradores activos al crear el reporte', async () => {
     prismaMock.reporte.create.mockResolvedValue(
-      reporteCreado({ motivo: '<motivo>' }),
+      reporteCreado({ motivo: '<motivo>', motivoCodigo: null }),
     );
 
     const resultado = await service.crearReporte(
       CLIENTE_ID,
       'CLIENTE',
-      dtoBase({ motivo: '<motivo>' }),
+      dtoBase({ motivo: '<motivo>', motivoCodigo: undefined }),
     );
 
     expect(prismaMock.usuario.findMany).toHaveBeenCalledWith({

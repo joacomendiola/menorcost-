@@ -4,6 +4,7 @@ import { notifications } from '@mantine/notifications';
 import { ApiError, pedidosApi, reportesApi } from '../../api';
 import type {
   EntregaValidada,
+  MotivoReporte,
   PedidoComercio,
   PedidoReportableComerciante,
 } from '../../api';
@@ -13,21 +14,20 @@ import { metaEstadoPago, metaEstadoPedido } from '../orders/estadosPedido';
 import { Card } from '../../components/ui/Card';
 import { EscanerQR } from './EscanerQR';
 
-const MOTIVO_OTRO = 'Otro motivo';
-const MOTIVOS = [
+const MOTIVOS: Array<{ value: MotivoReporte; label: string }> = [
   {
-    value: 'El cliente no se presentó a retirar el producto',
+    value: 'CLIENTE_NO_RETIRO',
     label: 'El cliente no se presentó a retirar el producto',
   },
   {
-    value: 'Cancelación indebida en mostrador',
+    value: 'CANCELACION_INDEBIDA',
     label: 'Cancelación indebida en mostrador',
   },
   {
-    value: 'Comportamiento inadecuado del cliente',
+    value: 'COMPORTAMIENTO_INADECUADO',
     label: 'Comportamiento inadecuado del cliente',
   },
-  { value: MOTIVO_OTRO, label: MOTIVO_OTRO },
+  { value: 'OTRO', label: 'Otro motivo' },
 ];
 
 const money = new Intl.NumberFormat('es-AR', {
@@ -51,7 +51,9 @@ export function PedidosPanel() {
   const [pedidos, setPedidos] = useState<PedidoReportableComerciante[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [motivos, setMotivos] = useState<Record<string, string | null>>({});
+  const [motivos, setMotivos] = useState<Record<string, MotivoReporte | null>>(
+    {},
+  );
   const [descripciones, setDescripciones] = useState<Record<string, string>>({});
   const [procesando, setProcesando] = useState<string | null>(null);
 
@@ -218,7 +220,7 @@ export function PedidosPanel() {
       });
       return;
     }
-    if (motivo === MOTIVO_OTRO && !descripcion) {
+    if (motivo === 'OTRO' && !descripcion) {
       notifications.show({
         color: 'yellow',
         title: 'Falta la descripción',
@@ -231,7 +233,7 @@ export function PedidosPanel() {
     try {
       const reporte = await reportesApi.crear(token, {
         idPedido: pedido.id_pedido,
-        motivo,
+        motivoCodigo: motivo,
         descripcion: descripcion || undefined,
         tipo_destino: 'CLIENTE',
       });
@@ -243,6 +245,7 @@ export function PedidosPanel() {
                 reporteAbierto: {
                   id_reporte: reporte.id_reporte,
                   motivo: reporte.motivo,
+                  motivoCodigo: reporte.motivoCodigo ?? motivo,
                   estado_reporte: reporte.estado_reporte,
                   fecha_reporte: reporte.fecha_reporte,
                 },
@@ -510,14 +513,14 @@ export function PedidosPanel() {
                         onChange={(valor) =>
                           setMotivos((actuales) => ({
                             ...actuales,
-                            [pedido.id_pedido]: valor,
+                            [pedido.id_pedido]: valor as MotivoReporte | null,
                           }))
                         }
                         required
                       />
                       <Textarea
                         label={
-                          motivos[pedido.id_pedido] === MOTIVO_OTRO
+                          motivos[pedido.id_pedido] === 'OTRO'
                             ? 'Descripción del problema'
                             : 'Descripción (opcional)'
                         }
@@ -533,7 +536,7 @@ export function PedidosPanel() {
                           }));
                         }}
                         maxLength={300}
-                        required={motivos[pedido.id_pedido] === MOTIVO_OTRO}
+                        required={motivos[pedido.id_pedido] === 'OTRO'}
                         autosize
                         minRows={2}
                         maxRows={5}
