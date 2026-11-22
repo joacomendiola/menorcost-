@@ -35,9 +35,19 @@ export type EstadoPedidoEnCheckout = EstadoPedidoVisible | 'PENDIENTE_PAGO';
 
 export interface CheckoutConfirmado {
   idPedido: string;
-  codigoAlfanumerico: string;
   estado: EstadoPedidoEnCheckout;
-  total: string;
+  /** Checkout de Mercado Pago al que hay que redirigir al comprador. */
+  urlRedireccion: string | null;
+}
+
+/** Respuesta de `GET /checkout/pedido/:idPedido/estado` (polling del pago). */
+export interface EstadoPedidoCheckout {
+  idPedido: string;
+  estado: EstadoPedidoEnCheckout;
+  pagoEstado: string | null;
+  codigoAlfanumerico: string;
+  /** Sigue disponible mientras el pedido espera el pago; si no, `null`. */
+  urlRedireccion: string | null;
 }
 
 export type EstadoPedidoVisible =
@@ -54,7 +64,7 @@ export interface PedidoResumenItem {
 export interface PedidoResumen {
   idPedido: string;
   codigoAlfanumerico: string;
-  estado: EstadoPedidoVisible;
+  estado: EstadoPedidoVisible | 'PENDIENTE_PAGO';
   fechaPedido: string;
   total: number;
   comercio: { idComercio: string; nombre: string } | null;

@@ -36,4 +36,20 @@ export class CheckoutController {
   ) {
     return this.checkoutService.pagar(usuario.id, dto);
   }
+
+  @Post(':idPedido/reintentar')
+  reintentar(
+    @CurrentUser() usuario: AuthenticatedUser,
+    @Param('idPedido', ParseUUIDPipe) idPedido: string,
+  ) {
+    return this.checkoutService.reintentar(usuario.id, idPedido);
+  }
+
+  @Get('pedido/:idPedido/estado')
+  obtenerEstado(
+    @CurrentUser() usuario: AuthenticatedUser,
+    @Param('idPedido', ParseUUIDPipe) idPedido: string,
+  ) {
+    return this.checkoutService.obtenerEstado(usuario.id, idPedido);
+  }
 }
