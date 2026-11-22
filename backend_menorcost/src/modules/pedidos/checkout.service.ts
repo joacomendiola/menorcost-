@@ -245,7 +245,7 @@ export class CheckoutService {
           idPago: pago.idPago,
           comercioId: dto.comercioId,
           accessToken: credencial.accessToken,
-          nombreComercio: detalle.comercio.nombreFantasia,
+          nombreComercio: detalle.comercio?.nombreFantasia ?? 'el comercio',
           emailComprador: usuario?.email ?? '',
           total: calculo.total,
           tarifaServicio: calculo.tarifaServicio,

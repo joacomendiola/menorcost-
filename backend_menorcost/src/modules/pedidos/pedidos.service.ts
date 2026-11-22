@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { liberarStockDePedido } from '../pago-pedido/reserva-stock.js';
 import { notificarPedido } from './pedido-notificaciones.js';
 import type {
   EntregaValidada,
@@ -372,25 +373,15 @@ export class PedidosService {
       );
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      const actualizados = await tx.pedido.updateMany({
-        where: { id_pedido: idPedido, estado: 'PENDIENTE_PAGO' },
-        data: { estado: 'CANCELADO' },
-      });
+    const cancelado = await this.prisma.$transaction((tx) =>
+      liberarStockDePedido(tx, idPedido, 'CANCELADO_POR_COMERCIO'),
+    );
 
-      if (actualizados.count === 0) {
-        throw new ConflictException(
-          'El pedido cambió de estado mientras se cancelaba.',
-        );
-      }
-
-      for (const item of pedido.items) {
-        await tx.producto.updateMany({
-          where: { idProducto: item.productoId },
-          data: { stock: { increment: item.cantidad } },
-        });
-      }
-    });
+    if (!cancelado) {
+      throw new ConflictException(
+        'El pedido cambió de estado mientras se cancelaba.',
+      );
+    }
 
     await notificarPedido(this.prisma, {
       usuarioId: pedido.usuarioId,
