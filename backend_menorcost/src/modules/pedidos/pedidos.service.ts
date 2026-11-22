@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { liberarStockDePedido } from '../pago-pedido/reserva-stock.js';
+import { liberarStockDePedido } from '../pagos-mercadopago/reserva-stock.js';
 import { notificarPedido } from './pedido-notificaciones.js';
 import type {
   EntregaValidada,

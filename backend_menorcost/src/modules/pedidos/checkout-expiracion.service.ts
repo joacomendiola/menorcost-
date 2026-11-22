@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { ConfiguracionPagoPedido } from '../pago-pedido/configuracion-pago-pedido.js';
-import { liberarStockDePedido } from '../pago-pedido/reserva-stock.js';
+import { ConfiguracionPagoPedido } from '../pagos-mercadopago/configuracion-pago-pedido.js';
+import { liberarStockDePedido } from '../pagos-mercadopago/reserva-stock.js';
 
 /** Cantidad máxima de pedidos que se procesan por corrida. */
 const LOTE = 50;

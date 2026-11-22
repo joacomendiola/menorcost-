@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { liberarStockDePedido } from '../pago-pedido/reserva-stock.js';
+import { liberarStockDePedido } from '../pagos-mercadopago/reserva-stock.js';
 import { CheckoutExpiracionService } from './checkout-expiracion.service.js';
 
-vi.mock('../pago-pedido/reserva-stock.js', () => ({
+vi.mock('../pagos-mercadopago/reserva-stock.js', () => ({
   liberarStockDePedido: vi.fn(),
 }));
 

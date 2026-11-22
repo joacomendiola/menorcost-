@@ -6,15 +6,15 @@ import {
 } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Prisma } from '../../generated/prisma/client.js';
-import { ErrorPagoMercadoPago } from '../pago-pedido/error-pago-mercadopago.js';
-import { urlCheckoutDeOrden } from '../pago-pedido/orden-mercadopago.js';
+import { ErrorPagoMercadoPago } from '../pagos-mercadopago/error-pago-mercadopago.js';
+import { urlCheckoutDeOrden } from '../pagos-mercadopago/orden-mercadopago.js';
 import {
   liberarStockDePedido,
   reservarStock,
-} from '../pago-pedido/reserva-stock.js';
+} from '../pagos-mercadopago/reserva-stock.js';
 import { CheckoutService } from './checkout.service.js';
 
-vi.mock('../pago-pedido/reserva-stock.js', () => ({
+vi.mock('../pagos-mercadopago/reserva-stock.js', () => ({
   reservarStock: vi.fn(),
   liberarStockDePedido: vi.fn(),
 }));

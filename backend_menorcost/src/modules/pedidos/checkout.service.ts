@@ -10,20 +10,20 @@ import { aMonto } from '../../common/utils/montos.util.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { CanastasService } from '../canastas/canastas.service.js';
-import { calcularPedido } from '../pago-pedido/calculo-pedido.js';
-import { ClienteMercadoPago } from '../pago-pedido/cliente-mercadopago.js';
-import { ConfiguracionPagoPedido } from '../pago-pedido/configuracion-pago-pedido.js';
-import { CredencialMercadoPagoService } from '../pago-pedido/credencial-mercadopago.service.js';
-import { ErrorPagoMercadoPago } from '../pago-pedido/error-pago-mercadopago.js';
+import { calcularPedido } from '../pagos-mercadopago/calculo-pedido.js';
+import { ClienteMercadoPago } from '../pagos-mercadopago/cliente-mercadopago.js';
+import { ConfiguracionPagoPedido } from '../pagos-mercadopago/configuracion-pago-pedido.js';
+import { CredencialMercadoPagoService } from '../pagos-mercadopago/credencial-mercadopago.service.js';
+import { ErrorPagoMercadoPago } from '../pagos-mercadopago/error-pago-mercadopago.js';
 import {
   construirOrdenMercadoPago,
   urlCheckoutDeOrden,
   type ItemOrdenMp,
-} from '../pago-pedido/orden-mercadopago.js';
+} from '../pagos-mercadopago/orden-mercadopago.js';
 import {
   liberarStockDePedido,
   reservarStock,
-} from '../pago-pedido/reserva-stock.js';
+} from '../pagos-mercadopago/reserva-stock.js';
 import {
   generarCodigoAlfanumerico,
   generarCodigoQR,

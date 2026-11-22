@@ -5,7 +5,7 @@ import { ConfiguracionPagoPedido } from './configuracion-pago-pedido.js';
 import { CredencialMercadoPagoService } from './credencial-mercadopago.service.js';
 
 /**
- * Módulo de pagos de un pedido.
+ * Módulo de pagos de un pedido con Mercado Pago.
  *
  * Reúne la configuración del flujo (expiración de la reserva, URLs de retorno
  * y secreto del webhook), el cliente HTTP de Mercado Pago y la credencial OAuth
@@ -24,4 +24,4 @@ import { CredencialMercadoPagoService } from './credencial-mercadopago.service.j
     CredencialMercadoPagoService,
   ],
 })
-export class PagoPedidoModule {}
+export class PagosMercadoPagoModule {}

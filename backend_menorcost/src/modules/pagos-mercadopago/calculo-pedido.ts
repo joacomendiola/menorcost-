@@ -7,7 +7,7 @@ import { Prisma } from '../../generated/prisma/client.js';
  * Cálculo de un pedido a partir de la canasta ya serializada por
  * `CanastasService.obtenerCanastaParaCheckout()`.
  *
- * Vive en `pago-pedido` porque lo usan tanto el resumen del checkout como la
+ * Vive en `pagos-mercadopago` porque lo usan tanto el resumen del checkout como la
  * reserva de stock: si estuviera en `pedidos`, el servicio de pago tendría que
  * importar un archivo de `pedidos` y el módulo quedaría acoplado.
  *
