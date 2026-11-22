@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Prisma } from '../../generated/prisma/client.js';
 import {
   construirOrdenMercadoPago,
+  duracionISO,
   urlCheckoutDeOrden,
 } from './orden-mercadopago.js';
 
@@ -20,8 +21,10 @@ const datos = {
     },
   ],
   urlsRetorno: {
-    exito: 'https://menorcost.test/checkout/resultado?estado=aprobado&idPedido=pedido-1',
-    fallo: 'https://menorcost.test/checkout/resultado?estado=rechazado&idPedido=pedido-1',
+    exito:
+      'https://menorcost.test/checkout/resultado?estado=aprobado&idPedido=pedido-1',
+    fallo:
+      'https://menorcost.test/checkout/resultado?estado=rechazado&idPedido=pedido-1',
     pendiente:
       'https://menorcost.test/checkout/resultado?estado=pendiente&idPedido=pedido-1',
   },
@@ -38,7 +41,9 @@ describe('construirOrdenMercadoPago', () => {
     expect(orden.external_reference).toBe('pedido-1');
     expect(orden.total_amount).toBe('9411.78');
     expect(orden.marketplace_fee).toBe('200.00');
-    expect(orden.expiration_time).toBe('PT60M');
+    expect(orden.expiration_time).toBe('PT1H');
+    // La moneda la infiere Mercado Pago del país del vendedor.
+    expect(orden).not.toHaveProperty('currency');
     expect(orden.payer).toEqual({ email: 'cliente@menorcost.test' });
     expect(orden.description).toContain('MC-20261122-ABC123');
     expect(orden.description).toContain('Almacén del Centro');
@@ -77,5 +82,14 @@ describe('urlCheckoutDeOrden', () => {
     expect(urlCheckoutDeOrden('ORDTST01KS5AJ6')).toBe(
       'https://www.mercadopago.com.ar/checkout/v1/redirect?order_id=ORDTST01KS5AJ6',
     );
+  });
+});
+
+describe('duracionISO', () => {
+  it('normaliza minutos a horas y minutos en ISO 8601', () => {
+    expect(duracionISO(60)).toBe('PT1H');
+    expect(duracionISO(90)).toBe('PT1H30M');
+    expect(duracionISO(45)).toBe('PT45M');
+    expect(duracionISO(0)).toBe('PT0M');
   });
 });

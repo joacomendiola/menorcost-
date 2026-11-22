@@ -50,8 +50,8 @@ export function construirOrdenMercadoPago(datos: DatosOrdenMp): CuerpoOrdenMp {
     ),
     total_amount: aMonto(datos.total),
     marketplace_fee: aMonto(datos.tarifaServicio),
-    currency: 'ARS',
-    expiration_time: `PT${datos.minutosExpiracion}M`,
+    // La moneda no se envía: la define el país de la cuenta del vendedor.
+    expiration_time: duracionISO(datos.minutosExpiracion),
     payer: { email: datos.emailComprador },
     items: datos.items.map((item) => ({
       title: item.titulo,
@@ -68,6 +68,18 @@ export function construirOrdenMercadoPago(datos: DatosOrdenMp): CuerpoOrdenMp {
       },
     },
   };
+}
+
+/**
+ * Duración en ISO 8601 con horas y minutos normalizados (`PT1H`, `PT1H30M`),
+ * como los ejemplos de la documentación (`P1D`). Evita formas ambiguas tipo
+ * `PT90M` aunque muchos parsers las acepten.
+ */
+export function duracionISO(minutos: number): string {
+  const horas = Math.floor(minutos / 60);
+  const resto = minutos % 60;
+
+  return `PT${horas > 0 ? `${horas}H` : ''}${resto > 0 ? `${resto}M` : ''}${horas === 0 && resto === 0 ? '0M' : ''}`;
 }
 
 /**
