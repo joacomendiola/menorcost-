@@ -16,6 +16,9 @@ describe('PedidosService', () => {
       findUnique: vi.fn(),
       updateMany: vi.fn(),
     },
+    pedidoItem: {
+      findMany: vi.fn(),
+    },
     producto: {
       updateMany: vi.fn(),
     },
@@ -78,12 +81,13 @@ describe('PedidosService', () => {
     vi.clearAllMocks();
     prisma.pedido.findUnique.mockResolvedValue(null);
     prisma.pedido.updateMany.mockResolvedValue({ count: 1 });
+    prisma.pedidoItem.findMany.mockResolvedValue([]);
     prisma.producto.updateMany.mockResolvedValue({ count: 1 });
     prisma.notificacion.create.mockResolvedValue({ id: 1 });
   });
 
   describe('listar', () => {
-    it('excluye los pagos rechazados y ordena por fecha descendente', async () => {
+    it('incluye los pendientes de pago (para reintentar) y ordena por fecha descendente', async () => {
       prisma.pedido.findMany.mockResolvedValue([
         {
           id_pedido: pedidoId,
@@ -104,10 +108,7 @@ describe('PedidosService', () => {
 
       expect(prisma.pedido.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: {
-            usuarioId,
-            estado: { not: 'PENDIENTE_PAGO' },
-          },
+          where: { usuarioId },
           orderBy: { fecha_pedido: 'desc' },
         }),
       );
@@ -350,6 +351,7 @@ describe('PedidosService', () => {
 
     it('cancela el pedido y restaura el stock reservado', async () => {
       prisma.pedido.findUnique.mockResolvedValue(pedidoPendiente);
+      prisma.pedidoItem.findMany.mockResolvedValue(pedidoPendiente.items);
 
       const resultado = await service.cancelarPendientePago(
         usuarioId,
@@ -362,8 +364,15 @@ describe('PedidosService', () => {
         stockRestaurado: true,
       });
       expect(prisma.pedido.updateMany).toHaveBeenCalledWith({
-        where: { id_pedido: pedidoId, estado: 'PENDIENTE_PAGO' },
-        data: { estado: 'CANCELADO' },
+        where: {
+          id_pedido: pedidoId,
+          estado: 'PENDIENTE_PAGO',
+          stockLiberadoEn: null,
+        },
+        data: expect.objectContaining({
+          estado: 'CANCELADO',
+          motivoCancelacion: 'CANCELADO_POR_COMERCIO',
+        }),
       });
       expect(prisma.producto.updateMany).toHaveBeenCalledWith({
         where: { idProducto: pedidoPendiente.items[0].productoId },

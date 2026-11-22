@@ -359,7 +359,6 @@ export class PedidosService {
         estado: true,
         codigoAlfanumerico: true,
         comercio: { select: { userId: true } },
-        items: { select: { productoId: true, cantidad: true } },
       },
     });
 
