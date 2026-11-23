@@ -10,7 +10,7 @@ const SECRETO = 'secreto-del-panel-de-webhooks';
 function encabezados(
   dataId: string,
   requestId: string,
-  ts = Math.floor(Date.now() / 1000),
+  ts = Date.now(),
 ) {
   const manifiesto = `id:${dataId};request-id:${requestId};ts:${ts};`;
   const v1 = createHmac('sha256', SECRETO).update(manifiesto).digest('hex');
@@ -22,6 +22,14 @@ describe('validarFirmaWebhook', () => {
   it('acepta una firma válida de Mercado Pago', () => {
     expect(() =>
       validarFirmaWebhook(encabezados('ORD-1', 'req-1'), 'ORD-1', SECRETO),
+    ).not.toThrow();
+  });
+
+  it('también tolera un timestamp expresado en segundos', () => {
+    const ts = Math.floor(Date.now() / 1000);
+
+    expect(() =>
+      validarFirmaWebhook(encabezados('ORD-1', 'req-1', ts), 'ORD-1', SECRETO),
     ).not.toThrow();
   });
 
@@ -46,7 +54,7 @@ describe('validarFirmaWebhook', () => {
   });
 
   it('rechaza una firma vieja (replay fuera de tolerancia)', () => {
-    const ts = Math.floor(Date.now() / 1000) - 10 * 60;
+    const ts = Date.now() - 10 * 60 * 1000;
 
     expect(() =>
       validarFirmaWebhook(encabezados('ORD-1', 'req-1', ts), 'ORD-1', SECRETO),

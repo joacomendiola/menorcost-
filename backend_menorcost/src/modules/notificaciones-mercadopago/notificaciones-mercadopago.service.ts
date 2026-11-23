@@ -91,7 +91,7 @@ export class NotificacionesMercadoPagoService {
   ): Promise<RecepcionNotificacion> {
     // MP firma el `data.id` de la query. No se usa el body para autenticar ni
     // para decidir qué recurso consultar.
-    const orderId = query['data.id'];
+    const orderId = query.dataId;
     const topico = query.type ?? 'order';
 
     validarFirmaWebhook(encabezados, orderId, this.config.secretoWebhook());

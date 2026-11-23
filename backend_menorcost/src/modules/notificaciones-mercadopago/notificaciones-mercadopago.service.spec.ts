@@ -48,7 +48,7 @@ function encabezadosValidos() {
   return { xSignature: `ts=${ts},v1=${v1}`, xRequestId: 'req-1' };
 }
 
-const query = { 'data.id': ORDER_ID, type: 'order' };
+const query = { dataId: ORDER_ID, type: 'order' };
 const cuerpo = {
   id: 'evento-1',
   action: 'order.processed',

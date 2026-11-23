@@ -7,9 +7,12 @@ import {
   Query,
   UnauthorizedException,
 } from '@nestjs/common';
-import type {
-  CuerpoNotificacionMercadoPago,
+// El DTO de `@Query()` va como import de valor: con `import type` el decorador
+// emite `Function` en `design:paramtypes` y `ValidationPipe` no transforma la
+// query (`data.id` nunca llega a `dataId`).
+import {
   NotificacionMercadoPagoQueryDto,
+  type CuerpoNotificacionMercadoPago,
 } from './dto/notificacion-mercadopago.dto.js';
 import { InvalidWebhookSignatureError } from './firma-webhook-mercadopago.js';
 import { NotificacionesMercadoPagoService } from './notificaciones-mercadopago.service.js';

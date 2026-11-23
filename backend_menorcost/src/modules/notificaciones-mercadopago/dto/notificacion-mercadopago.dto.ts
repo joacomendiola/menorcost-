@@ -1,10 +1,13 @@
+import { Expose } from 'class-transformer';
 import { IsOptional, IsString } from 'class-validator';
 
 /** Query params que Mercado Pago adjunta al POST del webhook. */
 export class NotificacionMercadoPagoQueryDto {
+  // Sin este mapeo, class-transformer no copia el parámetro con punto al DTO.
+  @Expose({ name: 'data.id' })
   @IsOptional()
   @IsString()
-  'data.id'?: string;
+  dataId?: string;
 
   @IsOptional()
   @IsString()
