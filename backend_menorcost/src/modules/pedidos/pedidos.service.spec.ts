@@ -141,7 +141,6 @@ describe('PedidosService', () => {
         expect.objectContaining({
           where: {
             usuarioId,
-            estado: { not: 'PENDIENTE_PAGO' },
             OR: [
               { codigoAlfanumerico: { in: ['hrwwlbwy', 'HRWWLBWY'] } },
               { codigoQR: { in: ['hrwwlbwy', 'HRWWLBWY'] } },
@@ -154,9 +153,9 @@ describe('PedidosService', () => {
         codigoAlfanumerico: 'HRWWLBWY',
         codigoQR: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
         estado: 'PENDIENTE_DE_RETIRO',
-        total: 5600,
-        subtotal: 5600,
-        tarifaServicio: 600,
+        total: '5600.00',
+        subtotal: '5600.00',
+        tarifaServicio: '600.00',
         localAbierto: true,
         comercio: { idComercio: comercioId, nombre: 'Mercado del Barrio' },
         franjaHorario: { inicio: '09:00', fin: '10:00' },
@@ -166,8 +165,8 @@ describe('PedidosService', () => {
             titulo: 'Yogur entero',
             imagen: '/uploads/yogur.jpg',
             cantidad: 2,
-            precioUnitario: 2800,
-            subtotal: 5600,
+            precioUnitario: '2800.00',
+            subtotal: '5600.00',
           },
         ],
         calificacion: null,
@@ -210,6 +209,27 @@ describe('PedidosService', () => {
           fecha: '2026-11-19T11:00:00.000Z',
         },
       ]);
+    });
+
+    it('devuelve el ticket de un pedido PENDIENTE_PAGO para reintentar', async () => {
+      prisma.pedido.findFirst.mockResolvedValue({
+        ...pedidoBase,
+        estado: 'PENDIENTE_PAGO',
+        pagos: [{ estado: 'RECHAZADO' }],
+      });
+
+      const resultado = await service.obtenerPorCodigo(usuarioId, 'HRWWLBWY');
+
+      expect(resultado).toMatchObject({
+        idPedido: pedidoId,
+        estado: 'PENDIENTE_PAGO',
+        pagoEstado: 'RECHAZADO',
+      });
+      expect(prisma.pedido.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { usuarioId, OR: expect.any(Array) },
+        }),
+      );
     });
 
     it('lanza 404 si el pedido no existe o es de otro usuario', async () => {
