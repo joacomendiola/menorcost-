@@ -7,7 +7,9 @@ import { useAuth } from '../../auth/contexto';
 import { ApiError, pedidosApi, reportesApi, reputacionApi } from '../../api';
 import type { PedidoTicket } from '../../api';
 import { Badge } from '../../components/ui/Badge';
+import { checkoutApi } from './checkoutApi';
 import { metaEstadoPago, metaEstadoPedido } from './estadosPedido';
+import { redirigirFueraDeLaApp } from './redireccion';
 
 const MOTIVO_OTRO = 'Otro';
 
@@ -61,6 +63,9 @@ export function Ticket() {
   const [motivo, setMotivo] = useState<string | null>(null);
   const [descripcion, setDescripcion] = useState('');
   const [enviandoReporte, setEnviandoReporte] = useState(false);
+  const [reintentandoPago, setReintentandoPago] = useState(false);
+
+  const pagoPagado = pedido?.pagoEstado === 'PAGADO';
 
   useEffect(() => {
     if (!token || !codigo) return;
@@ -97,7 +102,8 @@ export function Ticket() {
   }
 
   useEffect(() => {
-    const codigoQR = pedido?.codigoQR;
+    // El QR solo se muestra cuando el pago está aprobado.
+    const codigoQR = pagoPagado ? pedido?.codigoQR : undefined;
     if (!codigoQR) return;
 
     let activo = true;
@@ -117,7 +123,34 @@ export function Ticket() {
     return () => {
       activo = false;
     };
-  }, [pedido?.codigoQR]);
+  }, [pedido?.codigoQR, pagoPagado]);
+
+  async function reintentarPago() {
+    if (!token || !pedido) return;
+
+    setReintentandoPago(true);
+
+    try {
+      const checkout = await checkoutApi.reintentar(token, pedido.idPedido);
+
+      if (checkout.urlRedireccion) {
+        redirigirFueraDeLaApp(checkout.urlRedireccion);
+        return;
+      }
+
+      navigate(
+        `/checkout/resultado?idPedido=${encodeURIComponent(checkout.idPedido)}`,
+      );
+    } catch (err) {
+      notifications.show({
+        color: 'red',
+        title: 'No se pudo reintentar el pago',
+        message: mensajeDeError(err),
+      });
+    } finally {
+      setReintentandoPago(false);
+    }
+  }
 
   async function enviarCalificacion(evento: FormEvent) {
     evento.preventDefault();
@@ -336,30 +369,57 @@ export function Ticket() {
         <div className="ticket-card__top">
           <Badge tone={estado.tone}>{estado.label}</Badge>
 
-          {qrDataUrl ? (
-            <img
-              className="ticket-qr"
-              src={qrDataUrl}
-              width={170}
-              height={170}
-              alt={`Código QR del pedido ${pedido.codigoAlfanumerico}`}
-            />
+          {pagoPagado ? (
+            qrDataUrl ? (
+              <img
+                className="ticket-qr"
+                src={qrDataUrl}
+                width={170}
+                height={170}
+                alt={`Código QR del pedido ${pedido.codigoAlfanumerico}`}
+              />
+            ) : (
+              <div
+                className="ticket-qr ticket-qr--empty"
+                role="status"
+                aria-label="Código QR no disponible"
+              >
+                {qr?.codigo === pedido.codigoQR
+                  ? 'No se pudo generar el QR'
+                  : 'Generando código QR…'}
+              </div>
+            )
           ) : (
             <div
               className="ticket-qr ticket-qr--empty"
               role="status"
               aria-label="Código QR no disponible"
             >
-              {qr?.codigo === pedido.codigoQR
-                ? 'No se pudo generar el QR'
-                : 'Generando código QR…'}
+              {pedido.estado === 'PENDIENTE_PAGO'
+                ? 'Pago pendiente'
+                : 'QR no disponible'}
             </div>
           )}
 
           <h1 className="ticket-code">{pedido.codigoAlfanumerico}</h1>
           <p className="ticket-note">
-            Mostrá este QR en el local para retirar tu pedido.
+            {pagoPagado
+              ? 'Mostrá este QR en el local para retirar tu pedido.'
+              : pedido.estado === 'PENDIENTE_PAGO'
+                ? 'El QR se habilita cuando Mercado Pago confirme el pago.'
+                : 'El QR no está disponible porque el pago no figura como aprobado.'}
           </p>
+
+          {pedido.estado === 'PENDIENTE_PAGO' && (
+            <Button
+              color="brand"
+              mt="sm"
+              loading={reintentandoPago}
+              onClick={() => void reintentarPago()}
+            >
+              Reintentar pago
+            </Button>
+          )}
         </div>
 
         <dl className="ticket-rows">
@@ -381,7 +441,7 @@ export function Ticket() {
             <dt>Pago</dt>
             <dd>
               <Badge tone={pagoMeta.tone}>{pagoMeta.label}</Badge> ·{' '}
-              {money.format(pedido.total)}
+              {money.format(Number(pedido.total))}
             </dd>
           </div>
 
@@ -402,14 +462,14 @@ export function Ticket() {
               <dt>
                 {item.titulo} ×{item.cantidad}
               </dt>
-              <dd>{money.format(item.subtotal)}</dd>
+              <dd>{money.format(Number(item.subtotal))}</dd>
             </div>
           ))}
         </dl>
 
         <div className="ticket-total">
           <span>Total</span>
-          <strong>{money.format(pedido.total)}</strong>
+          <strong>{money.format(Number(pedido.total))}</strong>
         </div>
 
         {pedido.estado === 'ENTREGADO' && (

@@ -304,20 +304,20 @@ export interface PedidoTicketItem {
   titulo: string;
   imagen: string | null;
   cantidad: number;
-  precioUnitario: number;
-  subtotal: number;
+  precioUnitario: string;
+  subtotal: string;
 }
 
 export interface PedidoTicket {
   idPedido: string;
   codigoAlfanumerico: string;
   codigoQR: string;
-  estado: EstadoPedido;
+  estado: EstadoPedido | 'PENDIENTE_PAGO';
   fechaPedido: string;
   fechaEntrega: string | null;
-  subtotal: number;
-  tarifaServicio: number;
-  total: number;
+  subtotal: string;
+  tarifaServicio: string;
+  total: string;
   comercio: { idComercio: string; nombre: string } | null;
   franjaHorario: { inicio: string; fin: string } | null;
   localAbierto: boolean | null;
@@ -356,9 +356,9 @@ export interface PedidoReportableComerciante {
 export interface PedidoResumen {
   idPedido: string;
   codigoAlfanumerico: string;
-  estado: EstadoPedido;
+  estado: EstadoPedido | 'PENDIENTE_PAGO';
   fechaPedido: string;
-  total: number;
+  total: string;
   comercio: { idComercio: string; nombre: string } | null;
   franjaHorario: { inicio: string; fin: string } | null;
   itemsCantidad: number;
@@ -400,7 +400,7 @@ export interface PedidoComercio {
   estado: EstadoPedido | 'PENDIENTE_PAGO';
   fechaPedido: string;
   fechaEntrega: string | null;
-  total: number;
+  total: string;
   cliente: { nombre: string; apellido: string } | null;
   pagoEstado: string | null;
   items: Array<{ titulo: string; cantidad: number }>;
