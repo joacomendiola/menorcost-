@@ -17,6 +17,7 @@ import { BajasTab } from './modules/admin/BajasTab';
 import { DenunciasTab } from './modules/admin/DenunciasTab';
 import { Reviews } from './modules/merchant/Reviews';
 import { Checkout } from './modules/orders/Checkout';
+import { ResultadoPagoPage } from './modules/orders/ResultadoPagoPage';
 import { Ticket } from './modules/orders/Ticket';
 import { MisPedidosPage } from './modules/orders/MisPedidosPage';
 import { ComercioEstadoPage } from './pages/ComercioEstadoPage';
@@ -93,6 +94,7 @@ export default function App() {
           />
 
           <Route path="/pedido/:codigo" element={<Ticket />} />
+          <Route path="/checkout/resultado" element={<ResultadoPagoPage />} />
           <Route path="/checkout/:comercioId" element={<Checkout />} />
           <Route
             path="/mis-pedidos"

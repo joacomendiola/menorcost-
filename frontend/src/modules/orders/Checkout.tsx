@@ -97,7 +97,17 @@ export function Checkout() {
         idempotencyKey,
       });
 
-      navigate(`/pedido/${pedido.codigoAlfanumerico}`);
+      // El POST ya no devuelve el código del ticket: si hay checkout de
+      // Mercado Pago se sale del SPA; si no, la pantalla de resultado consulta
+      // el estado real del pedido.
+      if (pedido.urlRedireccion) {
+        window.location.assign(pedido.urlRedireccion);
+        return;
+      }
+
+      navigate(
+        `/checkout/resultado?idPedido=${encodeURIComponent(pedido.idPedido)}`,
+      );
     } catch (err) {
       const mensaje = mensajeError(err);
 
@@ -241,7 +251,7 @@ export function Checkout() {
         <Button
           fullWidth
           size="lg"
-          disabled={!franjaId}
+          disabled={!franjaId || pagando}
           loading={pagando}
           onClick={() => void pagar()}
         >

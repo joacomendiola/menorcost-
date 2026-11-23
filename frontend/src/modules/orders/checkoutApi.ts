@@ -38,12 +38,23 @@ export type EstadoCheckoutConfirmado =
   | 'CANCELADO'
   | 'CANCELADO_POR_FALTA_RETIRO';
 
+/** Respuesta de `POST /checkout` y `POST /checkout/:idPedido/reintentar`. */
 export interface CheckoutConfirmado {
   idPedido: string;
-  codigoAlfanumerico: string;
   /** Puede no ser PENDIENTE_DE_RETIRO si el reintento devuelve un pedido previo. */
   estado: EstadoCheckoutConfirmado;
-  total: string;
+  /** Checkout de Mercado Pago; `null` si no hay un cobro abierto. */
+  urlRedireccion: string | null;
+}
+
+/** Respuesta de `GET /checkout/pedido/:idPedido/estado` (polling del pago). */
+export interface EstadoPedidoCheckout {
+  idPedido: string;
+  estado: EstadoCheckoutConfirmado;
+  pagoEstado: string | null;
+  codigoAlfanumerico: string;
+  /** Sigue disponible mientras el pedido espera el pago; si no, `null`. */
+  urlRedireccion: string | null;
 }
 
 export interface CrearPedidoPayload {
@@ -66,4 +77,16 @@ export const checkoutApi = {
       body: payload,
       token,
     }),
+
+  obtenerEstado: (token: string, idPedido: string) =>
+    api<EstadoPedidoCheckout>(
+      `/checkout/pedido/${encodeURIComponent(idPedido)}/estado`,
+      { token },
+    ),
+
+  reintentar: (token: string, idPedido: string) =>
+    api<CheckoutConfirmado>(
+      `/checkout/${encodeURIComponent(idPedido)}/reintentar`,
+      { method: 'POST', token },
+    ),
 };
