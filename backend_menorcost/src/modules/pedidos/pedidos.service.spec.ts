@@ -118,7 +118,7 @@ describe('PedidosService', () => {
           codigoAlfanumerico: 'HRWWLBWY',
           estado: 'PENDIENTE_DE_RETIRO',
           fechaPedido: '2026-11-17T04:33:49.000Z',
-          total: 5600,
+          total: '5600.00',
           comercio: {
             idComercio: comercioId,
             nombre: 'Mercado del Barrio',

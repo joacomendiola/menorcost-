@@ -5,11 +5,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import type { Prisma } from '../../generated/prisma/client.js';
+import { aMonto } from '../../common/utils/montos.util.js';
 import { liberarStockDePedido } from '../pagos-mercadopago/reserva-stock.js';
 import { notificarPedido } from './pedido-notificaciones.js';
 import type {
   EntregaValidada,
-  EstadoPedidoVisible,
   PedidoComercio,
   PedidoResumen,
   PedidoTicket,
@@ -63,7 +64,7 @@ export class PedidosService {
       codigoAlfanumerico: pedido.codigoAlfanumerico,
       estado: pedido.estado,
       fechaPedido: pedido.fecha_pedido.toISOString(),
-      total: pedido.total.toNumber(),
+      total: aMonto(pedido.total),
       comercio: pedido.comercio
         ? {
             idComercio: pedido.comercio.idComercio,
@@ -99,9 +100,6 @@ export class PedidosService {
     const pedido = await this.prisma.pedido.findFirst({
       where: {
         usuarioId,
-        // Los pagos rechazados ya no generan pedido, pero los `PENDIENTE_PAGO`
-        // históricos no deben exponerse como ticket válido.
-        estado: { not: 'PENDIENTE_PAGO' },
         OR: [
           { codigoAlfanumerico: { in: posibles } },
           { codigoQR: { in: posibles } },
@@ -172,12 +170,12 @@ export class PedidosService {
       idPedido: pedido.id_pedido,
       codigoAlfanumerico: pedido.codigoAlfanumerico,
       codigoQR: pedido.codigoQR,
-      estado: pedido.estado as EstadoPedidoVisible,
+      estado: pedido.estado as PedidoTicket['estado'],
       fechaPedido: pedido.fecha_pedido.toISOString(),
       fechaEntrega: pedido.fecha_entrega?.toISOString() ?? null,
-      subtotal: pedido.subtotal.toNumber(),
-      tarifaServicio: pedido.tarifa_servicio.toNumber(),
-      total: pedido.total.toNumber(),
+      subtotal: aMonto(pedido.subtotal),
+      tarifaServicio: aMonto(pedido.tarifa_servicio),
+      total: aMonto(pedido.total),
       comercio: pedido.comercio
         ? {
             idComercio: pedido.comercio.idComercio,
@@ -197,8 +195,8 @@ export class PedidosService {
         titulo: item.nombreHistorico,
         imagen: item.producto?.imagen ?? null,
         cantidad: item.cantidad,
-        precioUnitario: item.precio_unitario.toNumber(),
-        subtotal: item.subtotal.toNumber(),
+        precioUnitario: aMonto(item.precio_unitario),
+        subtotal: aMonto(item.subtotal),
       })),
       calificacion: pedido.calificacion
         ? {
@@ -455,7 +453,7 @@ interface PedidoComercioRow {
   estado: string;
   fecha_pedido: Date;
   fecha_entrega: Date | null;
-  total: { toNumber(): number };
+  total: Prisma.Decimal;
   usuario: { nombre: string; apellido: string } | null;
   pagos: Array<{ estado: string }>;
   items: Array<{ cantidad: number; nombreHistorico: string }>;
@@ -468,7 +466,7 @@ function aPedidoComercio(pedido: PedidoComercioRow): PedidoComercio {
     estado: pedido.estado as PedidoComercio['estado'],
     fechaPedido: pedido.fecha_pedido.toISOString(),
     fechaEntrega: pedido.fecha_entrega?.toISOString() ?? null,
-    total: pedido.total.toNumber(),
+    total: aMonto(pedido.total),
     cliente: pedido.usuario
       ? { nombre: pedido.usuario.nombre, apellido: pedido.usuario.apellido }
       : null,

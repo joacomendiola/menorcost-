@@ -66,7 +66,8 @@ export interface PedidoResumen {
   codigoAlfanumerico: string;
   estado: EstadoPedidoVisible | 'PENDIENTE_PAGO';
   fechaPedido: string;
-  total: number;
+  /** Monto como string con 2 decimales (nunca `number`). */
+  total: string;
   comercio: { idComercio: string; nombre: string } | null;
   franjaHorario: { inicio: string; fin: string } | null;
   itemsCantidad: number;
@@ -78,24 +79,28 @@ export interface PedidoTicketItem {
   titulo: string;
   imagen: string | null;
   cantidad: number;
-  precioUnitario: number;
-  subtotal: number;
+  /** Monto como string con 2 decimales (nunca `number`). */
+  precioUnitario: string;
+  subtotal: string;
 }
 
 /**
  * Contrato exacto que consume `Ticket.tsx` (Pantalla 22). Los montos viajan
- * como número porque la UI los formatea directo con `Intl.NumberFormat`.
+ * como string con 2 decimales; la UI los convierte recién al formatear.
+ *
+ * Incluye `PENDIENTE_PAGO`: el ticket se muestra sin QR para poder reintentar
+ * el pago desde la pantalla.
  */
 export interface PedidoTicket {
   idPedido: string;
   codigoAlfanumerico: string;
   codigoQR: string;
-  estado: EstadoPedidoVisible;
+  estado: EstadoPedidoVisible | 'PENDIENTE_PAGO';
   fechaPedido: string;
   fechaEntrega: string | null;
-  subtotal: number;
-  tarifaServicio: number;
-  total: number;
+  subtotal: string;
+  tarifaServicio: string;
+  total: string;
   comercio: { idComercio: string; nombre: string } | null;
   franjaHorario: { inicio: string; fin: string } | null;
   localAbierto: boolean | null;
@@ -127,7 +132,8 @@ export interface PedidoComercio {
   estado: EstadoPedidoVisible | 'PENDIENTE_PAGO';
   fechaPedido: string;
   fechaEntrega: string | null;
-  total: number;
+  /** Monto como string con 2 decimales (nunca `number`). */
+  total: string;
   cliente: { nombre: string; apellido: string } | null;
   pagoEstado: string | null;
   items: PedidoComercioItem[];
