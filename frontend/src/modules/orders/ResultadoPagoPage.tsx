@@ -17,6 +17,7 @@ import {
   type EstadoCheckoutConfirmado,
   type EstadoPedidoCheckout,
 } from './checkoutApi';
+import { redirigirFueraDeLaApp } from './redireccion';
 
 /** Cada cuánto se consulta el estado real del pedido. */
 const INTERVALO_POLLING_MS = 3_000;
@@ -143,7 +144,7 @@ export function ResultadoPagoPage() {
       const pedido = await checkoutApi.reintentar(token, idPedido);
 
       if (pedido.urlRedireccion) {
-        window.location.assign(pedido.urlRedireccion);
+        redirigirFueraDeLaApp(pedido.urlRedireccion);
         return;
       }
 
@@ -258,7 +259,7 @@ export function ResultadoPagoPage() {
             {puedeVolverAlCheckout && !agotado && (
               <Button
                 onClick={() =>
-                  window.location.assign(estado.urlRedireccion as string)
+                  redirigirFueraDeLaApp(estado.urlRedireccion as string)
                 }
               >
                 Volver a Mercado Pago

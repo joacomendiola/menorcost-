@@ -18,6 +18,7 @@ import { notifications } from '@mantine/notifications';
 import { ApiError } from '../../api';
 import { useAuth } from '../../auth/contexto';
 import { checkoutApi, type CheckoutResumen } from './checkoutApi';
+import { redirigirFueraDeLaApp } from './redireccion';
 
 const moneda = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -101,7 +102,7 @@ export function Checkout() {
       // Mercado Pago se sale del SPA; si no, la pantalla de resultado consulta
       // el estado real del pedido.
       if (pedido.urlRedireccion) {
-        window.location.assign(pedido.urlRedireccion);
+        redirigirFueraDeLaApp(pedido.urlRedireccion);
         return;
       }
 
