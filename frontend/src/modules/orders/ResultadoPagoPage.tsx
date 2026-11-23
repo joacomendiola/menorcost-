@@ -12,11 +12,7 @@ import {
 } from '@mantine/core';
 import { ApiError } from '../../api';
 import { useAuth } from '../../auth/contexto';
-import {
-  checkoutApi,
-  type EstadoCheckoutConfirmado,
-  type EstadoPedidoCheckout,
-} from './checkoutApi';
+import { checkoutApi, type EstadoPedidoCheckout } from './checkoutApi';
 import { redirigirFueraDeLaApp } from './redireccion';
 
 /** Cada cuánto se consulta el estado real del pedido. */
@@ -30,18 +26,6 @@ function mensajeError(error: unknown): string {
   }
 
   return 'No pudimos reintentar el pago.';
-}
-
-function tituloEstado(estado: EstadoCheckoutConfirmado): string {
-  switch (estado) {
-    case 'PENDIENTE_DE_RETIRO':
-    case 'ENTREGADO':
-      return 'Pago acreditado';
-    case 'PENDIENTE_PAGO':
-      return 'Esperando confirmación';
-    default:
-      return 'Pedido cancelado';
-  }
 }
 
 /**
@@ -64,10 +48,7 @@ export function ResultadoPagoPage() {
   const [errorReintento, setErrorReintento] = useState('');
 
   useEffect(() => {
-    if (!token || !idPedido) {
-      setCargando(false);
-      return;
-    }
+    if (!token || !idPedido) return;
 
     let activo = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -143,15 +124,14 @@ export function ResultadoPagoPage() {
     try {
       const pedido = await checkoutApi.reintentar(token, idPedido);
 
-      if (pedido.urlRedireccion) {
-        redirigirFueraDeLaApp(pedido.urlRedireccion);
+      if (!pedido.urlRedireccion) {
+        setErrorReintento(
+          'Mercado Pago no devolvió un checkout para reintentar el pago.',
+        );
         return;
       }
 
-      // Sin checkout nuevo se vuelve a consultar el estado del pedido.
-      navigate(
-        `/checkout/resultado?idPedido=${encodeURIComponent(pedido.idPedido)}`,
-      );
+      redirigirFueraDeLaApp(pedido.urlRedireccion);
     } catch (err) {
       setErrorReintento(mensajeError(err));
     } finally {
@@ -175,6 +155,16 @@ export function ResultadoPagoPage() {
             Ir a mis pedidos
           </Button>
         </Stack>
+      </main>
+    );
+  }
+
+  if (!token) {
+    return (
+      <main className="comercio-page canastas-page">
+        <Alert color="red">
+          Necesitás una sesión activa para ver el resultado del pago.
+        </Alert>
       </main>
     );
   }
@@ -291,7 +281,7 @@ export function ResultadoPagoPage() {
     return (
       <main className="comercio-page canastas-page">
         <Stack gap="lg" mt="md">
-          <Title order={1}>{tituloEstado(estado.estado)}</Title>
+          <Title order={1}>Pago acreditado</Title>
 
           <Paper withBorder p="lg" radius="lg">
             <Text>

@@ -15,6 +15,7 @@ import type { CheckoutResumen } from './checkoutApi';
 const mocks = vi.hoisted(() => ({
   obtenerResumen: vi.fn(),
   pagar: vi.fn(),
+  redirigir: vi.fn(),
   show: vi.fn(),
 }));
 
@@ -23,6 +24,10 @@ vi.mock('./checkoutApi', () => ({
     obtenerResumen: mocks.obtenerResumen,
     pagar: mocks.pagar,
   },
+}));
+
+vi.mock('./redireccion', () => ({
+  redirigirFueraDeLaApp: mocks.redirigir,
 }));
 
 vi.mock('../../auth/contexto', () => ({
@@ -72,6 +77,10 @@ function renderizar() {
       <MemoryRouter initialEntries={[`/checkout/${comercioId}`]}>
         <Routes>
           <Route path="/checkout/:comercioId" element={<Checkout />} />
+          <Route
+            path="/checkout/resultado"
+            element={<div>Resultado del pago</div>}
+          />
           <Route path="/comercios/:comercioId" element={<div>Tienda</div>} />
           <Route path="/canastas/:comercioId" element={<div>Canasta</div>} />
           <Route path="/pedido/:codigo" element={<div>Ticket QR</div>} />
@@ -113,12 +122,11 @@ describe('Checkout', () => {
     });
   });
 
-  it('al pagar navega al ticket con QR', async () => {
+  it('al pagar redirige al checkout de Mercado Pago', async () => {
     mocks.pagar.mockResolvedValue({
       idPedido: 'pedido-1',
-      codigoAlfanumerico: 'ABCD2345',
-      estado: 'PENDIENTE_DE_RETIRO',
-      total: '9411.78',
+      estado: 'PENDIENTE_PAGO',
+      urlRedireccion: 'https://mp.test/ORD-1',
     });
 
     renderizar();
@@ -127,11 +135,50 @@ describe('Checkout', () => {
     fireEvent.click(screen.getByText('Mar 24/11 · 10:00 a 11:00'));
     fireEvent.click(screen.getByRole('button', { name: 'PAGAR' }));
 
-    expect(await screen.findByText('Ticket QR')).toBeTruthy();
+    await waitFor(() => {
+      expect(mocks.redirigir).toHaveBeenCalledWith('https://mp.test/ORD-1');
+    });
+
+    expect(screen.queryByText('Resultado del pago')).toBeNull();
     expect(mocks.pagar).toHaveBeenCalledWith('token', {
       comercioId,
       franjaHorarioId: 'f1',
       idempotencyKey: expect.any(String),
+    });
+  });
+
+  it('sin urlRedireccion navega a la pantalla de resultado', async () => {
+    mocks.pagar.mockResolvedValue({
+      idPedido: 'pedido-1',
+      estado: 'PENDIENTE_PAGO',
+      urlRedireccion: null,
+    });
+
+    renderizar();
+
+    await screen.findByText('Yogur entero');
+    fireEvent.click(screen.getByText('Mar 24/11 · 10:00 a 11:00'));
+    fireEvent.click(screen.getByRole('button', { name: 'PAGAR' }));
+
+    expect(await screen.findByText('Resultado del pago')).toBeTruthy();
+    expect(mocks.redirigir).not.toHaveBeenCalled();
+  });
+
+  it('deshabilita el botón mientras el POST está en curso', async () => {
+    mocks.pagar.mockReturnValue(new Promise(() => undefined));
+
+    renderizar();
+
+    await screen.findByText('Yogur entero');
+    fireEvent.click(screen.getByText('Mar 24/11 · 10:00 a 11:00'));
+
+    const pagar = screen.getByRole('button', {
+      name: 'PAGAR',
+    }) as HTMLButtonElement;
+    fireEvent.click(pagar);
+
+    await waitFor(() => {
+      expect(pagar.disabled).toBe(true);
     });
   });
 
@@ -150,6 +197,7 @@ describe('Checkout', () => {
       expect(mocks.show).toHaveBeenCalled();
     });
 
-    expect(screen.queryByText('Ticket QR')).toBeNull();
+    expect(screen.queryByText('Resultado del pago')).toBeNull();
+    expect(mocks.redirigir).not.toHaveBeenCalled();
   });
 });
