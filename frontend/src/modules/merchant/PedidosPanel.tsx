@@ -348,7 +348,7 @@ export function PedidosPanel() {
             >
               <Text fw={700}>
                 Pedido {validacion.pedido.codigoAlfanumerico} ·{' '}
-                {money.format(validacion.pedido.total)}
+                {money.format(Number(validacion.pedido.total))}
               </Text>
               <Text size="sm">
                 Cliente:{' '}
@@ -417,7 +417,7 @@ export function PedidosPanel() {
                     <Text fw={600}>{pedido.codigoAlfanumerico}</Text>
                     <Text size="sm" c="dimmed">
                       {fecha.format(new Date(pedido.fechaPedido))} ·{' '}
-                      {money.format(pedido.total)}
+                      {money.format(Number(pedido.total))}
                       {pedido.cliente
                         ? ` · ${pedido.cliente.nombre} ${pedido.cliente.apellido}`
                         : ''}

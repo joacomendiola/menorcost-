@@ -10,7 +10,9 @@ import {
 } from '../../api';
 import { useAuth } from '../../auth/contexto';
 import { Badge } from '../../components/ui/Badge';
+import { checkoutApi } from './checkoutApi';
 import { metaEstadoPedido } from './estadosPedido';
+import { redirigirFueraDeLaApp } from './redireccion';
 
 const moneda = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -41,6 +43,7 @@ export function MisPedidosPage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [avisos, setAvisos] = useState<Notificacion[]>([]);
+  const [reintentando, setReintentando] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     if (!token) return;
@@ -100,6 +103,29 @@ export function MisPedidosPage() {
 
     // Se revalida en vez de confiar solo en el estado optimista.
     await Promise.all([cargar(), cargarAvisos()]);
+  }
+
+  async function reintentarPago(pedido: PedidoResumen) {
+    if (!token) return;
+
+    setReintentando(pedido.idPedido);
+
+    try {
+      const checkout = await checkoutApi.reintentar(token, pedido.idPedido);
+
+      if (checkout.urlRedireccion) {
+        redirigirFueraDeLaApp(checkout.urlRedireccion);
+        return;
+      }
+
+      navigate(
+        `/checkout/resultado?idPedido=${encodeURIComponent(checkout.idPedido)}`,
+      );
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setReintentando(null);
+    }
   }
 
   if (!cargandoSesion && !token) {
@@ -198,7 +224,7 @@ export function MisPedidosPage() {
                     </p>
 
                     <p className="mis-pedido__detalle">
-                      {franja} · {moneda.format(pedido.total)}
+                      {franja} · {moneda.format(Number(pedido.total))}
                       {pedido.items.length > 0
                         ? ` · ${detalleItems(pedido)}`
                         : ''}
@@ -208,15 +234,28 @@ export function MisPedidosPage() {
                   <Badge tone={estado.tone}>{estado.label}</Badge>
                 </div>
 
-                <button
-                  type="button"
-                  className="mis-pedido__accion"
-                  onClick={() =>
-                    navigate(`/pedido/${pedido.codigoAlfanumerico}`)
-                  }
-                >
-                  {esPendiente ? 'Ver ticket QR' : 'Ver detalle'}
-                </button>
+                {pedido.estado === 'PENDIENTE_PAGO' ? (
+                  <button
+                    type="button"
+                    className="mis-pedido__accion"
+                    disabled={reintentando === pedido.idPedido}
+                    onClick={() => void reintentarPago(pedido)}
+                  >
+                    {reintentando === pedido.idPedido
+                      ? 'Reintentando…'
+                      : 'Reintentar pago'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="mis-pedido__accion"
+                    onClick={() =>
+                      navigate(`/pedido/${pedido.codigoAlfanumerico}`)
+                    }
+                  >
+                    {esPendiente ? 'Ver ticket QR' : 'Ver detalle'}
+                  </button>
+                )}
               </article>
             );
           })}

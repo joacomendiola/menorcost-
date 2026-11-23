@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   listar: vi.fn(),
   listarNotificaciones: vi.fn(),
   marcarLeida: vi.fn(),
+  reintentar: vi.fn(),
+  redirigir: vi.fn(),
 }));
 
 vi.mock('../../api', () => ({
@@ -25,6 +27,14 @@ vi.mock('../../api', () => ({
     listar: mocks.listarNotificaciones,
     marcarLeida: mocks.marcarLeida,
   },
+}));
+
+vi.mock('./checkoutApi', () => ({
+  checkoutApi: { reintentar: mocks.reintentar },
+}));
+
+vi.mock('./redireccion', () => ({
+  redirigirFueraDeLaApp: mocks.redirigir,
 }));
 
 vi.mock('../../auth/contexto', () => ({
@@ -37,7 +47,7 @@ const pedidos: PedidoResumen[] = [
     codigoAlfanumerico: 'HRWWLBWY',
     estado: 'PENDIENTE_DE_RETIRO',
     fechaPedido: '2026-11-17T04:33:49.000Z',
-    total: 5600,
+    total: '5600.00',
     comercio: { idComercio: 'c1', nombre: 'Mercado del Barrio' },
     franjaHorario: { inicio: '09:00', fin: '10:00' },
     itemsCantidad: 2,
@@ -51,11 +61,22 @@ const pedidos: PedidoResumen[] = [
     codigoAlfanumerico: 'P8A288MB',
     estado: 'ENTREGADO',
     fechaPedido: '2026-11-16T04:30:00.000Z',
-    total: 2500,
+    total: '2500.00',
     comercio: { idComercio: 'c2', nombre: 'Almacén del Centro' },
     franjaHorario: { inicio: '10:00', fin: '11:00' },
     itemsCantidad: 1,
     items: [{ titulo: 'Leche', cantidad: 1 }],
+  },
+  {
+    idPedido: 'p3',
+    codigoAlfanumerico: 'PAGO1234',
+    estado: 'PENDIENTE_PAGO',
+    fechaPedido: '2026-11-15T04:30:00.000Z',
+    total: '1200.00',
+    comercio: { idComercio: 'c3', nombre: 'Verdulería Norte' },
+    franjaHorario: null,
+    itemsCantidad: 1,
+    items: [{ titulo: 'Tomates', cantidad: 1 }],
   },
 ];
 
@@ -66,6 +87,7 @@ function renderizar() {
         <Routes>
           <Route path="/mis-pedidos" element={<MisPedidosPage />} />
           <Route path="/pedido/:codigo" element={<div>Ticket QR</div>} />
+          <Route path="/checkout/resultado" element={<div>Resultado pago</div>} />
         </Routes>
       </MemoryRouter>
     </MantineProvider>,
@@ -113,6 +135,42 @@ describe('MisPedidosPage', () => {
     );
 
     expect(await screen.findByText('Ticket QR')).toBeTruthy();
+  });
+
+  it('muestra "Reintentar pago" para los pendientes de pago y redirige a MP', async () => {
+    mocks.reintentar.mockResolvedValue({
+      idPedido: 'p3',
+      estado: 'PENDIENTE_PAGO',
+      urlRedireccion: 'https://mp.test/ORD-3',
+    });
+
+    renderizar();
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Reintentar pago' }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.reintentar).toHaveBeenCalledWith('token', 'p3');
+      expect(mocks.redirigir).toHaveBeenCalledWith('https://mp.test/ORD-3');
+    });
+  });
+
+  it('sin urlRedireccion al reintentar va a la pantalla de resultado', async () => {
+    mocks.reintentar.mockResolvedValue({
+      idPedido: 'p3',
+      estado: 'PENDIENTE_PAGO',
+      urlRedireccion: null,
+    });
+
+    renderizar();
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Reintentar pago' }),
+    );
+
+    expect(await screen.findByText('Resultado pago')).toBeTruthy();
+    expect(mocks.redirigir).not.toHaveBeenCalled();
   });
 
   it('muestra el estado vacío cuando no hay pedidos', async () => {

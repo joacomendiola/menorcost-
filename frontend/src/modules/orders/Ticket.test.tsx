@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   obtenerPorCodigo: vi.fn(),
   calificar: vi.fn(),
   crearReporte: vi.fn(),
+  reintentar: vi.fn(),
+  redirigir: vi.fn(),
   show: vi.fn(),
 }));
 
@@ -31,6 +33,14 @@ vi.mock('../../auth/contexto', () => ({
   useAuth: () => ({ token: 'token', cargando: false }),
 }));
 
+vi.mock('./checkoutApi', () => ({
+  checkoutApi: { reintentar: mocks.reintentar },
+}));
+
+vi.mock('./redireccion', () => ({
+  redirigirFueraDeLaApp: mocks.redirigir,
+}));
+
 vi.mock('@mantine/notifications', () => ({
   notifications: { show: mocks.show },
 }));
@@ -48,9 +58,9 @@ const pedidoBase: PedidoTicket = {
   estado: 'ENTREGADO',
   fechaPedido: '2026-01-01T00:00:00.000Z',
   fechaEntrega: '2026-01-02T12:00:00.000Z',
-  subtotal: 1000,
-  tarifaServicio: 0,
-  total: 1000,
+  subtotal: '1000.00',
+  tarifaServicio: '0.00',
+  total: '1000.00',
   comercio: { idComercio: 'c1', nombre: 'Local' },
   franjaHorario: null,
   localAbierto: true,
@@ -61,8 +71,8 @@ const pedidoBase: PedidoTicket = {
       titulo: 'Producto',
       imagen: null,
       cantidad: 1,
-      precioUnitario: 1000,
-      subtotal: 1000,
+      precioUnitario: '1000.00',
+      subtotal: '1000.00',
     },
   ],
   calificacion: null,
@@ -79,6 +89,7 @@ function renderTicket() {
       <MemoryRouter initialEntries={['/pedido/MC-1']}>
         <Routes>
           <Route path="/pedido/:codigo" element={<Ticket />} />
+          <Route path="/checkout/resultado" element={<div>Resultado pago</div>} />
         </Routes>
       </MemoryRouter>
     </MantineProvider>,
@@ -214,6 +225,62 @@ describe('Ticket · calificación', () => {
         }),
       ),
     );
+  });
+});
+
+describe('Ticket · pago', () => {
+  it('muestra el QR solo cuando el pago está aprobado', async () => {
+    renderTicket();
+
+    expect(
+      await screen.findByRole('img', {
+        name: 'Código QR del pedido MC-1',
+      }),
+    ).toBeTruthy();
+  });
+
+  it('no muestra el QR si el pago no está aprobado', async () => {
+    mocks.obtenerPorCodigo.mockResolvedValue(
+      pedido({ estado: 'PENDIENTE_DE_RETIRO', pagoEstado: 'PENDIENTE' }),
+    );
+    renderTicket();
+
+    await screen.findByText('MC-1');
+
+    expect(
+      screen.queryByRole('img', { name: 'Código QR del pedido MC-1' }),
+    ).toBeNull();
+    expect(screen.getByText('QR no disponible')).toBeTruthy();
+  });
+
+  it('en un pedido pendiente de pago no muestra QR y permite reintentar', async () => {
+    mocks.obtenerPorCodigo.mockResolvedValue(
+      pedido({ estado: 'PENDIENTE_PAGO', pagoEstado: 'RECHAZADO' }),
+    );
+    mocks.reintentar.mockResolvedValue({
+      idPedido: 'p1',
+      estado: 'PENDIENTE_PAGO',
+      urlRedireccion: 'https://mp.test/ORD-2',
+    });
+
+    renderTicket();
+
+    await screen.findByText('MC-1');
+
+    expect(
+      screen.queryByRole('img', { name: 'Código QR del pedido MC-1' }),
+    ).toBeNull();
+    expect(screen.getByText('Pago pendiente')).toBeTruthy();
+    expect(
+      screen.getByText(/El QR se habilita cuando Mercado Pago confirme/),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar pago' }));
+
+    await waitFor(() => {
+      expect(mocks.reintentar).toHaveBeenCalledWith('token', 'p1');
+      expect(mocks.redirigir).toHaveBeenCalledWith('https://mp.test/ORD-2');
+    });
   });
 });
 
