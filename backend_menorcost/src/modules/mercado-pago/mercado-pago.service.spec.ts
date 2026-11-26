@@ -43,7 +43,7 @@ describe('MercadoPagoService', () => {
   const config = {
     pkceHabilitado: vi.fn(() => false),
     clientId: vi.fn(() => '123456'),
-    redirectUri: vi.fn(() => 'http://localhost:3000/mercadopago/oauth/callback'),
+    redirectUri: vi.fn(() => 'https://menorcostserver.tail67d69c.ts.net/api/mercadopago/oauth/callback'),
   };
   const crypto = {
     cifrar: vi.fn((texto: string) => `cifrado:${texto}`),
@@ -65,7 +65,7 @@ describe('MercadoPagoService', () => {
     config.pkceHabilitado.mockReturnValue(false);
     config.clientId.mockReturnValue('123456');
     config.redirectUri.mockReturnValue(
-      'http://localhost:3000/mercadopago/oauth/callback',
+      'https://menorcostserver.tail67d69c.ts.net/api/mercadopago/oauth/callback',
     );
     crypto.cifrar.mockImplementation((texto: string) => `cifrado:${texto}`);
     state.crear.mockResolvedValue('state-firmado');
@@ -90,7 +90,7 @@ describe('MercadoPagoService', () => {
       expect(parametros.get('platform_id')).toBe('mp');
       expect(parametros.get('state')).toBe('state-firmado');
       expect(parametros.get('redirect_uri')).toBe(
-        'http://localhost:3000/mercadopago/oauth/callback',
+        'https://menorcostserver.tail67d69c.ts.net/api/mercadopago/oauth/callback',
       );
       expect(parametros.get('scope')).toBe('offline_access');
       expect(parametros.get('code_challenge')).toBeNull();
