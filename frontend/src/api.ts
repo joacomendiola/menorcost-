@@ -332,6 +332,7 @@ export interface PedidoTicket {
   misReportes: Array<{
     id: number;
     motivo: string;
+    motivoCodigo?: MotivoReporte | null;
     estado: string;
     fecha: string;
   }>;
@@ -348,6 +349,7 @@ export interface PedidoReportableComerciante {
   reporteAbierto: {
     id_reporte: number;
     motivo: string;
+    motivoCodigo?: MotivoReporte | null;
     estado_reporte: string;
     fecha_reporte: string;
   } | null;
@@ -471,9 +473,19 @@ export const reputacionApi = {
 
 /* ---------- Reportes (Pantalla 22 y 23) ---------- */
 
+export type MotivoReporte =
+  | 'PRODUCTO_MAL_ESTADO'
+  | 'COMERCIO_CERRADO'
+  | 'PRECIO_NO_RESPETADO'
+  | 'CLIENTE_NO_RETIRO'
+  | 'CANCELACION_INDEBIDA'
+  | 'COMPORTAMIENTO_INADECUADO'
+  | 'OTRO';
+
 export interface ReporteCreado {
   id_reporte: number;
   motivo: string;
+  motivoCodigo?: MotivoReporte | null;
   descripcion: string | null;
   estado_reporte: string;
   tipo_destino: 'COMERCIO' | 'CLIENTE';
@@ -488,6 +500,7 @@ export interface ReporteCreado {
 export interface ReporteMio {
   id_reporte: number;
   motivo: string;
+  motivoCodigo?: MotivoReporte | null;
   descripcion: string | null;
   estado_reporte: string;
   tipo_destino: string;
@@ -529,7 +542,7 @@ export const reportesApi = {
     token: string,
     data: {
       idPedido: string;
-      motivo: string;
+      motivoCodigo: MotivoReporte;
       descripcion?: string;
       tipo_destino: 'COMERCIO' | 'CLIENTE';
     },
@@ -646,6 +659,7 @@ export type EstadoDenuncia =
 export interface AdminDenuncia {
   id_reporte: number;
   motivo: string;
+  motivoCodigo?: MotivoReporte | null;
   descripcion: string | null;
   estado_reporte: EstadoDenuncia;
   tipo_destino: 'COMERCIO' | 'CLIENTE';

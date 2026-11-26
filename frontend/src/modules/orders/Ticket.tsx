@@ -5,28 +5,26 @@ import { notifications } from '@mantine/notifications';
 import QRCode from 'qrcode';
 import { useAuth } from '../../auth/contexto';
 import { ApiError, pedidosApi, reportesApi, reputacionApi } from '../../api';
-import type { PedidoTicket } from '../../api';
+import type { MotivoReporte, PedidoTicket } from '../../api';
 import { Badge } from '../../components/ui/Badge';
 import { checkoutApi } from './checkoutApi';
 import { metaEstadoPago, metaEstadoPedido } from './estadosPedido';
 import { redirigirFueraDeLaApp } from './redireccion';
 
-const MOTIVO_OTRO = 'Otro';
-
-const MOTIVOS = [
+const MOTIVOS: Array<{ value: MotivoReporte; label: string }> = [
   {
-    value: 'El producto estaba en mal estado/era diferente',
+    value: 'PRODUCTO_MAL_ESTADO',
     label: 'El producto estaba en mal estado/era diferente',
   },
   {
-    value: 'El comercio estaba cerrado al ir a retirar',
+    value: 'COMERCIO_CERRADO',
     label: 'El comercio estaba cerrado al ir a retirar',
   },
   {
-    value: 'El comercio no respetó el precio',
+    value: 'PRECIO_NO_RESPETADO',
     label: 'El comercio no respetó el precio',
   },
-  { value: MOTIVO_OTRO, label: 'Otro motivo' },
+  { value: 'OTRO', label: 'Otro motivo' },
 ];
 
 const money = new Intl.NumberFormat('es-AR', {
@@ -60,7 +58,7 @@ export function Ticket() {
   const [comentario, setComentario] = useState('');
   const [enviandoCalificacion, setEnviandoCalificacion] = useState(false);
 
-  const [motivo, setMotivo] = useState<string | null>(null);
+  const [motivo, setMotivo] = useState<MotivoReporte | null>(null);
   const [descripcion, setDescripcion] = useState('');
   const [enviandoReporte, setEnviandoReporte] = useState(false);
   const [reintentandoPago, setReintentandoPago] = useState(false);
@@ -216,7 +214,7 @@ export function Ticket() {
       return;
     }
 
-    if (motivo === MOTIVO_OTRO && !descripcion.trim()) {
+    if (motivo === 'OTRO' && !descripcion.trim()) {
       notifications.show({
         color: 'yellow',
         title: 'Falta la descripción',
@@ -229,7 +227,7 @@ export function Ticket() {
     try {
       const reporte = await reportesApi.crear(token, {
         idPedido: pedido.idPedido,
-        motivo,
+        motivoCodigo: motivo,
         descripcion: descripcion.trim() ? descripcion.trim() : undefined,
         tipo_destino: 'COMERCIO',
       });
@@ -242,6 +240,7 @@ export function Ticket() {
                 {
                   id: reporte.id_reporte,
                   motivo: reporte.motivo,
+                  motivoCodigo: reporte.motivoCodigo ?? motivo,
                   estado: reporte.estado_reporte,
                   fecha: reporte.fecha_reporte,
                 },
@@ -563,14 +562,16 @@ export function Ticket() {
                   placeholder="Elegí un motivo"
                   data={MOTIVOS}
                   value={motivo}
-                  onChange={setMotivo}
+                  onChange={(valor) =>
+                    setMotivo(valor as MotivoReporte | null)
+                  }
                   withAsterisk
                 />
 
                 <div>
                   <Textarea
                     label={
-                      motivo === MOTIVO_OTRO
+                      motivo === 'OTRO'
                         ? 'Descripción del problema'
                         : 'Descripción (opcional)'
                     }
@@ -583,7 +584,7 @@ export function Ticket() {
                     autosize
                     minRows={3}
                     maxRows={6}
-                    required={motivo === MOTIVO_OTRO}
+                    required={motivo === 'OTRO'}
                   />
                   <p className="ticket-counter">{descripcion.length}/300</p>
                 </div>

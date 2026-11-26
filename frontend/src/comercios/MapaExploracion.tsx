@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { cargarGoogleMaps } from './googleMaps';
+import * as maplibregl from 'maplibre-gl';
+import type { Map, Marker, Popup } from 'maplibre-gl';
+import { crearMapa, crearMarcador } from '../mapas/maplibre';
 import { agruparOfertasPorComercio, type OfertaMapa } from './mapaCatalogo';
 
 interface Props {
@@ -30,112 +32,100 @@ export function MapaExploracion({
   longitudOrigen,
 }: Props) {
   const contenedor = useRef<HTMLDivElement>(null);
-  const mapa = useRef<google.maps.Map | null>(null);
-  const marcadores = useRef<google.maps.Marker[]>([]);
-  const ventana = useRef<google.maps.InfoWindow | null>(null);
+  const mapa = useRef<Map | null>(null);
+  const marcadores = useRef<Marker[]>([]);
+  const ventana = useRef<Popup | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    let activo = true;
+    if (!contenedor.current) return;
 
-    cargarGoogleMaps()
-      .then((sdk) => {
-        if (!activo || !contenedor.current) return;
-
-        if (!mapa.current) {
-          mapa.current = new sdk.maps.Map(contenedor.current, {
-            center: { lat: latitudOrigen, lng: longitudOrigen },
-            zoom: 12,
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: false,
-            clickableIcons: false,
-          });
-          ventana.current = new sdk.maps.InfoWindow();
-        }
-
-        const instancia = mapa.current;
-        ventana.current?.close();
-
-        for (const marcador of marcadores.current) {
-          marcador.setMap(null);
-        }
-        marcadores.current = [];
-
-        const comercios = agruparOfertasPorComercio(ofertas).filter(
-          (comercio) =>
-            Number.isFinite(comercio.latitud) &&
-            Number.isFinite(comercio.longitud),
+    try {
+      if (!mapa.current) {
+        mapa.current = crearMapa(
+          contenedor.current,
+          latitudOrigen,
+          longitudOrigen,
+          12,
         );
+      }
 
+      const instancia = mapa.current;
+      ventana.current?.remove();
+      for (const marcador of marcadores.current) marcador.remove();
+      marcadores.current = [];
+
+      const comercios = agruparOfertasPorComercio(ofertas).filter(
+        (comercio) =>
+          Number.isFinite(comercio.latitud) &&
+          Number.isFinite(comercio.longitud),
+      );
+
+      for (const comercio of comercios) {
+        const lista = comercio.ofertas
+          .map(
+            (oferta) =>
+              `<li><a href="/comercios/${encodeURIComponent(comercio.id)}/productos/${encodeURIComponent(oferta.id)}">${escaparHtml(oferta.titulo)} · ${moneda.format(Number(oferta.precioPublico))}</a></li>`,
+          )
+          .join('');
+        const popup = `<strong>${escaparHtml(comercio.nombreFantasia)}</strong><p>${comercio.abierto ? 'Abierto ahora' : 'Cerrado'} · ${comercio.ofertas.length} ${comercio.ofertas.length === 1 ? 'oferta' : 'ofertas'}</p><ul>${lista}</ul>`;
+
+        const marcador = crearMarcador({
+          latitud: comercio.latitud,
+          longitud: comercio.longitud,
+          etiqueta: String(comercio.ofertas.length),
+          titulo: comercio.nombreFantasia,
+        }).addTo(instancia);
+
+        marcador.getElement().addEventListener('click', (evento) => {
+          evento.stopPropagation();
+          ventana.current?.remove();
+          ventana.current = new maplibregl.Popup({
+            offset: 18,
+            maxWidth: '280px',
+          })
+            .setLngLat([comercio.longitud, comercio.latitud])
+            .setHTML(popup)
+            .addTo(instancia);
+        });
+
+        marcadores.current.push(marcador);
+      }
+
+      if (comercios.length === 1) {
+        instancia.easeTo({
+          center: [comercios[0].longitud, comercios[0].latitud],
+          zoom: 13,
+        });
+      } else if (comercios.length > 1) {
+        const limites = new maplibregl.LngLatBounds();
         for (const comercio of comercios) {
-          const lista = comercio.ofertas
-            .map(
-              (oferta) =>
-                `<li><a href="/comercios/${encodeURIComponent(comercio.id)}/productos/${encodeURIComponent(oferta.id)}">${escaparHtml(oferta.titulo)} · ${moneda.format(Number(oferta.precioPublico))}</a></li>`,
-            )
-            .join('');
-          const popup = `<strong>${escaparHtml(comercio.nombreFantasia)}</strong><p>${comercio.abierto ? 'Abierto ahora' : 'Cerrado'} · ${comercio.ofertas.length} ${comercio.ofertas.length === 1 ? 'oferta' : 'ofertas'}</p><ul>${lista}</ul>`;
-
-          const marcador = new sdk.maps.Marker({
-            map: instancia,
-            position: {
-              lat: comercio.latitud,
-              lng: comercio.longitud,
-            },
-            title: comercio.nombreFantasia,
-            label: {
-              text: String(comercio.ofertas.length),
-              color: '#ffffff',
-              fontSize: '12px',
-              fontWeight: '700',
-            },
-          });
-
-          marcador.addListener('click', () => {
-            ventana.current?.setContent(popup);
-            ventana.current?.open({ anchor: marcador, map: instancia });
-          });
-
-          marcadores.current.push(marcador);
+          limites.extend([comercio.longitud, comercio.latitud]);
         }
-
-        if (comercios.length === 1) {
-          instancia.setCenter({
-            lat: comercios[0].latitud,
-            lng: comercios[0].longitud,
-          });
-          instancia.setZoom(13);
-        } else if (comercios.length > 1) {
-          const limites = new sdk.maps.LatLngBounds();
-          for (const comercio of comercios) {
-            limites.extend({
-              lat: comercio.latitud,
-              lng: comercio.longitud,
-            });
-          }
-          instancia.fitBounds(limites, 28);
-          if ((instancia.getZoom() ?? 0) > 14) {
-            instancia.setZoom(14);
-          }
-        } else {
-          instancia.setCenter({ lat: latitudOrigen, lng: longitudOrigen });
-          instancia.setZoom(12);
-        }
-      })
-      .catch((err: unknown) => {
-        if (!activo) return;
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'No pudimos cargar el mapa de Google.',
-        );
-      });
-
-    return () => {
-      activo = false;
-    };
+        instancia.fitBounds(limites, { padding: 28, maxZoom: 14 });
+      } else {
+        instancia.easeTo({
+          center: [longitudOrigen, latitudOrigen],
+          zoom: 12,
+        });
+      }
+    } catch (err) {
+      const mensaje =
+        err instanceof Error ? err.message : 'No pudimos cargar el mapa.';
+      queueMicrotask(() => setError(mensaje));
+    }
   }, [ofertas, latitudOrigen, longitudOrigen]);
+
+  useEffect(
+    () => () => {
+      ventana.current?.remove();
+      for (const marcador of marcadores.current) marcador.remove();
+      marcadores.current = [];
+      mapa.current?.remove();
+      mapa.current = null;
+    },
+    [],
+  );
 
   if (error) {
     return (

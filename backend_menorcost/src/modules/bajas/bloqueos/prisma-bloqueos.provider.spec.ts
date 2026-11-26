@@ -3,6 +3,7 @@ import { PrismaBajaBloqueosProvider } from './prisma-bloqueos.provider.js';
 
 const prismaMock = {
   pedido: { count: vi.fn(), groupBy: vi.fn() },
+  splitPago: { findMany: vi.fn() },
   reporte: { count: vi.fn() },
   comercio: { findUnique: vi.fn(), findMany: vi.fn() },
   producto: { updateMany: vi.fn() },
@@ -15,6 +16,7 @@ describe('PrismaBajaBloqueosProvider', () => {
     vi.clearAllMocks();
     prismaMock.pedido.count.mockResolvedValue(0);
     prismaMock.pedido.groupBy.mockResolvedValue([]);
+    prismaMock.splitPago.findMany.mockResolvedValue([]);
     prismaMock.reporte.count.mockResolvedValue(0);
     prismaMock.comercio.findUnique.mockResolvedValue(null);
     prismaMock.comercio.findMany.mockResolvedValue([]);
@@ -87,6 +89,51 @@ describe('PrismaBajaBloqueosProvider', () => {
       expect(resumen.get('u1')).toEqual({
         pedidosCompletados: 3,
         saldoTarifas: 0,
+      });
+    });
+
+    it('calcula el saldo real de tarifas descontando los splits marketplace pagados', async () => {
+      prismaMock.comercio.findMany.mockResolvedValue([
+        { userId: 'u1', idComercio: 'c1' },
+      ]);
+      prismaMock.pedido.groupBy
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ comercioId: 'c1', _count: { _all: 2 } }])
+        .mockResolvedValueOnce([
+          {
+            comercioId: 'c1',
+            _sum: { tarifa_servicio: { toNumber: () => 1000 } },
+          },
+        ]);
+      prismaMock.splitPago.findMany.mockResolvedValueOnce([
+        {
+          monto: { toNumber: () => 300 },
+          pago: { pedido: { comercioId: 'c1' } },
+        },
+        {
+          monto: { toNumber: () => 200 },
+          pago: { pedido: { comercioId: 'c1' } },
+        },
+      ]);
+
+      const resumen = await provider.obtenerResumenesCuentas(['u1']);
+
+      expect(resumen.get('u1')).toEqual({
+        pedidosCompletados: 2,
+        saldoTarifas: 500,
+      });
+      expect(prismaMock.splitPago.findMany).toHaveBeenCalledWith({
+        where: {
+          recipientType: 'MARKETPLACE',
+          pago: {
+            estado: 'PAGADO',
+            pedido: { estado: 'ENTREGADO', comercioId: { in: ['c1'] } },
+          },
+        },
+        select: {
+          monto: true,
+          pago: { select: { pedido: { select: { comercioId: true } } } },
+        },
       });
     });
   });

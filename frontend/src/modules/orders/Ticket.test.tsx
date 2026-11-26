@@ -116,6 +116,7 @@ beforeEach(() => {
   mocks.crearReporte.mockResolvedValue({
     id_reporte: 9,
     motivo: 'El producto estaba en mal estado/era diferente',
+    motivoCodigo: 'PRODUCTO_MAL_ESTADO',
     descripcion: null,
     estado_reporte: 'PENDIENTE_REVISION',
     tipo_destino: 'COMERCIO',
@@ -314,7 +315,7 @@ describe('Ticket · reportes', () => {
     await waitFor(() =>
       expect(mocks.crearReporte).toHaveBeenCalledWith('token', {
         idPedido: 'p1',
-        motivo: 'El producto estaba en mal estado/era diferente',
+        motivoCodigo: 'PRODUCTO_MAL_ESTADO',
         descripcion: undefined,
         tipo_destino: 'COMERCIO',
       }),
@@ -349,6 +350,7 @@ describe('Ticket · reportes', () => {
     mocks.crearReporte.mockResolvedValue({
       id_reporte: 9,
       motivo: 'El comercio estaba cerrado al ir a retirar',
+      motivoCodigo: 'COMERCIO_CERRADO',
       descripcion: null,
       estado_reporte: 'PENDIENTE_REVISION',
       tipo_destino: 'COMERCIO',

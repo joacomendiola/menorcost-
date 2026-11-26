@@ -1,89 +1,112 @@
 import { useEffect, useRef, useState } from 'react';
-import { cargarGoogleMaps } from '../comercios/googleMaps';
+import type { Map, Marker } from 'maplibre-gl';
+import { detallePorCoordenadas } from '../mapas/geocoding';
+import { crearMapa, crearMarcador } from '../mapas/maplibre';
+import type { PlacesDetalle } from '../comercios/api';
 
 interface MapaUbicacionProps {
   latitud: number;
   longitud: number;
   onChange: (latitud: number, longitud: number) => void;
+  onDireccion?: (detalle: PlacesDetalle) => void;
 }
 
 export function MapaUbicacion({
   latitud,
   longitud,
   onChange,
+  onDireccion,
 }: MapaUbicacionProps) {
   const contenedor = useRef<HTMLDivElement>(null);
-  const mapa = useRef<google.maps.Map | null>(null);
-  const marcador = useRef<google.maps.Marker | null>(null);
+  const mapa = useRef<Map | null>(null);
+  const marcador = useRef<Marker | null>(null);
   const onChangeRef = useRef(onChange);
+  const onDireccionRef = useRef(onDireccion);
+  const controlador = useRef<AbortController | null>(null);
   const [error, setError] = useState('');
+  const [buscandoDireccion, setBuscandoDireccion] = useState(false);
+  const [errorDireccion, setErrorDireccion] = useState('');
 
   useEffect(() => {
     onChangeRef.current = onChange;
-  }, [onChange]);
+    onDireccionRef.current = onDireccion;
+  }, [onChange, onDireccion]);
 
   useEffect(() => {
-    let activo = true;
+    if (!contenedor.current) return;
 
-    cargarGoogleMaps()
-      .then((sdk) => {
-        if (!activo || !contenedor.current) return;
+    try {
+      if (!mapa.current) {
+        const instancia = crearMapa(contenedor.current, latitud, longitud, 15);
+        const pin = crearMarcador({
+          latitud,
+          longitud,
+          arrastrable: true,
+        }).addTo(instancia);
 
-        if (!mapa.current) {
-          const nuevoMapa = new sdk.maps.Map(contenedor.current, {
-            center: { lat: latitud, lng: longitud },
-            zoom: 15,
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: false,
-            clickableIcons: false,
-          });
+        const actualizar = (lat: number, lng: number) => {
+          onChangeRef.current(lat, lng);
+          if (!onDireccionRef.current) return;
 
-          const nuevoMarcador = new sdk.maps.Marker({
-            map: nuevoMapa,
-            position: { lat: latitud, lng: longitud },
-            draggable: true,
-          });
+          controlador.current?.abort();
+          const peticion = new AbortController();
+          controlador.current = peticion;
+          setBuscandoDireccion(true);
+          setErrorDireccion('');
 
-          nuevoMapa.addListener('click', (event: google.maps.MapMouseEvent) => {
-            if (!event.latLng) return;
-            const nuevaLatitud = event.latLng.lat();
-            const nuevaLongitud = event.latLng.lng();
-            nuevoMarcador.setPosition({
-              lat: nuevaLatitud,
-              lng: nuevaLongitud,
+          detallePorCoordenadas(lat, lng, peticion.signal)
+            .then((detalle) => {
+              if (peticion.signal.aborted || !detalle) return;
+              onDireccionRef.current?.(detalle);
+            })
+            .catch((err: unknown) => {
+              if ((err as Error).name === 'AbortError') return;
+              setErrorDireccion(
+                'No pudimos completar la dirección automáticamente.',
+              );
+            })
+            .finally(() => {
+              if (controlador.current === peticion) {
+                setBuscandoDireccion(false);
+              }
             });
-            onChangeRef.current(nuevaLatitud, nuevaLongitud);
-          });
+        };
 
-          nuevoMarcador.addListener('dragend', () => {
-            const posicion = nuevoMarcador.getPosition();
-            if (!posicion) return;
-            onChangeRef.current(posicion.lat(), posicion.lng());
-          });
+        instancia.on('click', (evento) => {
+          const { lat, lng } = evento.lngLat;
+          pin.setLngLat([lng, lat]);
+          actualizar(lat, lng);
+        });
 
-          mapa.current = nuevoMapa;
-          marcador.current = nuevoMarcador;
-          return;
-        }
+        pin.on('dragend', () => {
+          const posicion = pin.getLngLat();
+          actualizar(posicion.lat, posicion.lng);
+        });
 
-        const posicion = { lat: latitud, lng: longitud };
-        mapa.current.panTo(posicion);
-        marcador.current?.setPosition(posicion);
-      })
-      .catch((err: unknown) => {
-        if (!activo) return;
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'No pudimos cargar el mapa de Google.',
-        );
-      });
+        mapa.current = instancia;
+        marcador.current = pin;
+        return;
+      }
 
-    return () => {
-      activo = false;
-    };
+      mapa.current.easeTo({ center: [longitud, latitud] });
+      marcador.current?.setLngLat([longitud, latitud]);
+    } catch (err) {
+      const mensaje =
+        err instanceof Error ? err.message : 'No pudimos cargar el mapa.';
+      queueMicrotask(() => setError(mensaje));
+    }
   }, [latitud, longitud]);
+
+  useEffect(
+    () => () => {
+      controlador.current?.abort();
+      marcador.current?.remove();
+      mapa.current?.remove();
+      marcador.current = null;
+      mapa.current = null;
+    },
+    [],
+  );
 
   if (error) {
     return (
@@ -119,6 +142,27 @@ export function MapaUbicacion({
         style={{ height: 240, width: '100%', borderRadius: 12 }}
         aria-label="Mapa de la dirección"
       />
+
+      {(buscandoDireccion || errorDireccion) && (
+        <div
+          className="help"
+          role={errorDireccion ? 'alert' : undefined}
+          style={{
+            position: 'absolute',
+            left: 10,
+            bottom: 10,
+            margin: 0,
+            padding: '4px 8px',
+            borderRadius: 8,
+            background: 'rgba(255, 255, 255, 0.9)',
+            pointerEvents: 'none',
+          }}
+        >
+          {buscandoDireccion
+            ? 'Completando dirección…'
+            : errorDireccion}
+        </div>
+      )}
     </div>
   );
 }

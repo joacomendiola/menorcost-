@@ -20,10 +20,10 @@ MENORCOST es una plataforma web orientada al comercio minorista de cercanía (ki
 
 ## 🛠️ Stack Tecnológico
 
-- **Frontend:** React + Vite, TypeScript, Mantine UI, OpenStreetMap (CartoDB Tiles).
+- **Frontend:** React + Vite, TypeScript, Mantine UI, MapLibre GL JS.
 * **Backend:** Node.js, NestJS (Modular Monolith, Arquitectura en capas), TypeScript, JWT.
 * **Persistencia y ORM:** PostgreSQL (vía Docker) y Prisma ORM.
-* **Integraciones Externas:** Mercado Pago Checkout & Split Payment API (OAuth), Google Places API (validación geográfica), Nodemailer / Gmail API.
+* **Integraciones Externas:** Mercado Pago Checkout & Split Payment API (OAuth), OpenStreetMap / Photon (mapas y geocodificación), Nodemailer / Gmail API.
 * **Infraestructura Local:** Docker & Docker Compose.
 
 ---
@@ -86,14 +86,13 @@ Crea otro archivo llamado .env y pega lo siguiente (esto conecta Prisma con la b
 DATABASE_URL="postgresql://postgres:menorcostpassword@localhost:5433/menorcost?schema=public"
 
 C. En la carpeta del frontend (/frontend):
-Crea un archivo `frontend/.env.local` para conectar React con NestJS y configurar los mapas:
+Crea un archivo `frontend/.env.local` para conectar React con NestJS:
 
 ```env
 VITE_API_URL=http://localhost:3000
-VITE_GOOGLE_MAPS_API_KEY=tu_clave_de_google_maps
 ```
 
-La clave de Google Maps se solicita en [Google Maps Platform](https://developers.google.com/maps/get-started). Se usa para cargar los mapas de inicio, exploración, ubicación y comercios. Vite expone las variables `VITE_*` al navegador; restringí la clave a los dominios de la aplicación desde Google Cloud y no la publiques en el repositorio. `frontend/.env.local` está excluido de Git.
+Los mapas usan MapLibre GL JS con tiles de OpenFreeMap y geocodificación de Photon (OpenStreetMap), por lo que no requieren API key. Vite expone las variables `VITE_*` al navegador; no publiques secretos en el repositorio. `frontend/.env.local` está excluido de Git.
 
 Después de crear o modificar este archivo, reiniciá el frontend (`npm run dev` dentro de `/frontend`) para que Vite vuelva a cargar las variables.
 
@@ -187,17 +186,16 @@ La notificación puede consultarse desde la campana del panel del comerciante.
 
 ### Datos de prueba del backoffice
 
-Además de la seed general, el backend incluye una seed específica para probar el panel de administración: altas de comercios, solicitudes de baja y denuncias.
+La seed unificada (`npm run seed`) también crea los datos para probar el panel de administración: altas de comercios, solicitudes de baja y denuncias.
 
 Desde la carpeta del backend:
 
 ```powershell
 cd backend_menorcost
 npm run seed
-npm run seed:backoffice
 ```
 
-La seed de backoffice es idempotente: vuelve a crear únicamente sus datos de prueba y no modifica el resto de la base. Requiere que `npm run seed` se haya ejecutado antes. Para restaurar los datos a su estado inicial, volvé a ejecutar `npm run seed:backoffice`.
+La seed es idempotente: sincroniza categorías/datos demo y recrea los datos de prueba de backoffice en cada ejecución. Para restaurar los datos a su estado inicial, volvé a ejecutar `npm run seed`.
 
 Datos que genera:
 
@@ -213,7 +211,7 @@ Administrador: admin@test.com / Password123
 Usuarios de backoffice: bo.*@test.com / Password123
 ```
 
-Los usuarios de backoffice usan correos ficticios `@test.com`; no son cuentas de Gmail. El detalle de cada usuario y sus datos asociados está en `backend_menorcost/prisma/seed-backoffice.ts`.
+Los usuarios de backoffice usan correos ficticios `@test.com`; no son cuentas de Gmail. El detalle de cada usuario y sus datos asociados está en `backend_menorcost/prisma/seed.ts`.
 
 CU-1.02 no almacena documentación: el comerciante la envía a `menorcost@gmail.com` y la revisión es externa. El Backoffice registra únicamente la resolución del alta: administrador, fecha y motivo de rechazo (CU-5.03).
 

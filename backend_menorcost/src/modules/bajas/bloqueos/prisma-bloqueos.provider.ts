@@ -7,6 +7,14 @@ import type {
   ResumenCuentaBaja,
 } from './baja-bloqueos.port.js';
 
+function aNumero(
+  valor: { toNumber: () => number } | number | null | undefined,
+): number {
+  if (valor == null) return 0;
+  if (typeof valor === 'number') return valor;
+  return valor.toNumber();
+}
+
 /**
  * Implementación real del puerto para CU-1.07: consulta `Pedido` (D4),
  * `Reporte` (D5) y `Producto` (D3) usando el schema existente.
@@ -80,17 +88,55 @@ export class PrismaBajaBloqueosProvider implements BajaBloqueosPort {
     );
 
     const idsComercio = [...comercioPorUsuario.values()];
-    const comoComercio =
+    const [comoComercio, tarifas, splitsLiquidados] = await Promise.all([
       idsComercio.length > 0
-        ? await this.prisma.pedido.groupBy({
+        ? this.prisma.pedido.groupBy({
             by: ['comercioId'],
             where: { comercioId: { in: idsComercio }, estado: 'ENTREGADO' },
             _count: { _all: true },
           })
-        : [];
+        : Promise.resolve([]),
+      idsComercio.length > 0
+        ? this.prisma.pedido.groupBy({
+            by: ['comercioId'],
+            where: { comercioId: { in: idsComercio }, estado: 'ENTREGADO' },
+            _sum: { tarifa_servicio: true },
+          })
+        : Promise.resolve([]),
+      idsComercio.length > 0
+        ? this.prisma.splitPago.findMany({
+            where: {
+              recipientType: 'MARKETPLACE',
+              pago: {
+                estado: 'PAGADO',
+                pedido: {
+                  estado: 'ENTREGADO',
+                  comercioId: { in: idsComercio },
+                },
+              },
+            },
+            select: {
+              monto: true,
+              pago: { select: { pedido: { select: { comercioId: true } } } },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
     const completadosComoComercio = new Map(
       comoComercio.map((g) => [g.comercioId, g._count._all]),
     );
+    const tarifasPorComercio = new Map(
+      tarifas.map((g) => [g.comercioId, aNumero(g._sum.tarifa_servicio)]),
+    );
+    const splitsPorComercio = new Map<string, number>();
+    for (const split of splitsLiquidados) {
+      const comercioId = split.pago.pedido.comercioId;
+      splitsPorComercio.set(
+        comercioId,
+        (splitsPorComercio.get(comercioId) ?? 0) + aNumero(split.monto),
+      );
+    }
 
     for (const id of usuarioIds) {
       const idComercio = comercioPorUsuario.get(id);
@@ -98,7 +144,13 @@ export class PrismaBajaBloqueosProvider implements BajaBloqueosPort {
         pedidosCompletados: idComercio
           ? (completadosComoComercio.get(idComercio) ?? 0)
           : (completadosComoCliente.get(id) ?? 0),
-        saldoTarifas: 0,
+        saldoTarifas: idComercio
+          ? Math.max(
+              0,
+              (tarifasPorComercio.get(idComercio) ?? 0) -
+                (splitsPorComercio.get(idComercio) ?? 0),
+            )
+          : 0,
       });
     }
 

@@ -1,15 +1,22 @@
 import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
-import { TipoDestinoReporte } from '../../../generated/prisma/enums.js';
+import {
+  MotivoReporte,
+  TipoDestinoReporte,
+} from '../../../generated/prisma/enums.js';
 
 export class CrearReporteDto {
   @IsNotEmpty()
   @IsUUID()
   idPedido: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   @MaxLength(120)
-  motivo: string; // Categoría seleccionada en el select
+  motivo?: string; // Texto legacy; el frontend nuevo envía motivoCodigo.
+
+  @IsOptional()
+  @IsEnum(MotivoReporte)
+  motivoCodigo?: MotivoReporte;
 
   @IsOptional()
   @IsString()

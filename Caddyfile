@@ -1,0 +1,22 @@
+# Reverse proxy para demo en un solo origen (Tailscale Funnel -> 127.0.0.1:8081)
+# /api/* se reenvia al backend recortando el prefijo /api
+# /uploads/* se reenvia al backend conservando la ruta
+
+:80 {
+	encode gzip zstd
+
+	@api path /api /api/*
+	handle @api {
+		uri strip_prefix /api
+		reverse_proxy backend:3000
+	}
+
+	@uploads path /uploads /uploads/*
+	handle @uploads {
+		reverse_proxy backend:3000
+	}
+
+	handle {
+		reverse_proxy frontend:80
+	}
+}

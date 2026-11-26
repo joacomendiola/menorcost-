@@ -1,0 +1,13 @@
+-- CreateEnum
+CREATE TYPE "MotivoReporte" AS ENUM (
+  'PRODUCTO_MAL_ESTADO',
+  'COMERCIO_CERRADO',
+  'PRECIO_NO_RESPETADO',
+  'CLIENTE_NO_RETIRO',
+  'CANCELACION_INDEBIDA',
+  'COMPORTAMIENTO_INADECUADO',
+  'OTRO'
+);
+
+-- AlterTable
+ALTER TABLE "reporte" ADD COLUMN "motivo_codigo" "MotivoReporte";
