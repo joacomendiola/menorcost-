@@ -4,6 +4,11 @@ const API_URL =
   (import.meta.env.VITE_API_URL as string | undefined) ??
   'http://localhost:3000';
 
+function obtenerOrigenApi(url: string): string {
+  const base = new URL(url, window.location.origin);
+  return base.origin;
+}
+
 export function resolverImagen(url: string | null | undefined): string | null {
   if (!url) return null;
 
@@ -15,7 +20,10 @@ export function resolverImagen(url: string | null | undefined): string | null {
     return url;
   }
 
-  return `${API_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+  // La API se publica bajo /api, pero los archivos estáticos se exponen en
+  // /uploads desde el origen. Evitamos generar la ruta inexistente /api/uploads.
+  const base = url.startsWith('/uploads/') ? obtenerOrigenApi(API_URL) : API_URL;
+  return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
 }
 
 export type EstadoComercio =

@@ -7,8 +7,21 @@ maplibregl.setWorkerUrl(workerUrl);
 
 export const ESTILO_MAPA = 'https://tiles.openfreemap.org/styles/liberty';
 
+export const ESTILO_MAPA_RESPALDO: maplibregl.StyleSpecification = {
+  version: 8,
+  sources: {
+    carto: {
+      type: 'raster',
+      tiles: ['https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '© OpenStreetMap © CARTO',
+    },
+  },
+  layers: [{ id: 'carto', type: 'raster', source: 'carto' }],
+};
+
 const ATRIBUCION =
-  '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a> · <a href="https://tiles.openfreemap.org" target="_blank" rel="noopener noreferrer">OpenFreeMap</a>';
+  '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a> · <a href="https://tiles.openfreemap.org" target="_blank" rel="noopener noreferrer">OpenFreeMap</a> / <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>';
 
 interface OpcionesPin {
   latitud: number;
@@ -23,6 +36,7 @@ export function crearMapa(
   latitud: number,
   longitud: number,
   zoom: number,
+  onError?: (error: Error) => void,
 ): Map {
   const mapa = new maplibregl.Map({
     container: contenedor,
@@ -43,6 +57,26 @@ export function crearMapa(
     new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }),
     'top-right',
   );
+
+  // Los errores de red del estilo/tiles no lanzan excepciones: MapLibre los
+  // notifica mediante el evento 'error'. Si OpenFreeMap falla, usamos un
+  // estilo raster alternativo para no dejar el mapa sin calles.
+  let usaRespaldo = false;
+  mapa.on('error', (evento) => {
+    if (usaRespaldo) return;
+    usaRespaldo = true;
+    const error =
+      evento.error instanceof Error
+        ? evento.error
+        : new Error(String(evento.error ?? 'Error al cargar el mapa'));
+    try {
+      mapa.setStyle(ESTILO_MAPA_RESPALDO);
+    } catch (errorAplicarRespaldo) {
+      console.error('No se pudo aplicar el estilo de respaldo.', errorAplicarRespaldo);
+    }
+    console.warn('No se pudo cargar OpenFreeMap; se usa el mapa de respaldo.', error);
+    onError?.(error);
+  });
 
   return mapa;
 }

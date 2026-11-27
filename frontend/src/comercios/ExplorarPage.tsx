@@ -74,6 +74,13 @@ function formatearDistancia(distanciaKm: number | null): string | null {
   return `${distanciaKm.toFixed(1)} km`;
 }
 
+function formatearFechaVencimiento(fecha: string): string {
+  const valor = new Date(fecha);
+  return Number.isNaN(valor.getTime())
+    ? 'Fecha de vencimiento no disponible'
+    : valor.toLocaleDateString('es-AR');
+}
+
 export function ExplorarPage() {
   const { token } = useAuth();
   const [params, setParams] = useSearchParams();
@@ -363,9 +370,7 @@ export function ExplorarPage() {
                           </div>
                           <small>
                             Vence{' '}
-                            {new Date(
-                              `${producto.fechaVencimiento}T00:00:00`,
-                            ).toLocaleDateString('es-AR')}
+                            {formatearFechaVencimiento(producto.fechaVencimiento)}
                             {distancia ? ` · ${distancia}` : ''}
                           </small>
                         </div>

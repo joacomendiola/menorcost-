@@ -22,7 +22,9 @@ function numero(valor: string | number): number {
 }
 
 function fechaExacta(fecha: string): string {
-  return new Date(`${fecha}T00:00:00`).toLocaleDateString('es-AR', {
+  const valor = new Date(fecha);
+  if (Number.isNaN(valor.getTime())) return 'Fecha no disponible';
+  return valor.toLocaleDateString('es-AR', {
     day: '2-digit',
     month: 'long',
     year: 'numeric',

@@ -27,7 +27,7 @@ type CategoriaSeed = {
 
 const categorias: CategoriaSeed[] = [
   {
-    nombre: 'Almac├®n',
+    nombre: 'Almacén',
     slug: 'almacen',
     orden: 1,
     subcategorias: [
@@ -38,7 +38,7 @@ const categorias: CategoriaSeed[] = [
     ],
   },
   {
-    nombre: 'L├ícteos',
+    nombre: 'Lácteos',
     slug: 'lacteos',
     orden: 2,
     subcategorias: [
@@ -49,7 +49,7 @@ const categorias: CategoriaSeed[] = [
     ],
   },
   {
-    nombre: 'Fiambrer├¡a',
+    nombre: 'Fiambrería',
     slug: 'fiambreria',
     orden: 3,
     subcategorias: [
@@ -80,7 +80,7 @@ const categorias: CategoriaSeed[] = [
     ],
   },
   {
-    nombre: 'Panader├¡a',
+    nombre: 'Panadería',
     slug: 'panaderia',
     orden: 6,
     subcategorias: [
@@ -100,7 +100,7 @@ const categorias: CategoriaSeed[] = [
     subcategorias: [
       { nombre: 'Detergentes', slug: 'detergentes', orden: 1 },
       { nombre: 'Limpiadores', slug: 'limpiadores', orden: 2 },
-      { nombre: 'Papel higi├®nico', slug: 'papel-higienico', orden: 3 },
+      { nombre: 'Papel higiénico', slug: 'papel-higienico', orden: 3 },
     ],
   },
 ];
@@ -178,7 +178,7 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
     });
   }
 
-  console.log(`Categor├¡as sincronizadas: ${totalCategorias}`);
+  console.log(`Categorías sincronizadas: ${totalCategorias}`);
   console.table(rubros);
 
   const passwordDemoHash = await hash(PASSWORD_DEMO, 10);
@@ -222,10 +222,10 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
     update: {
       usuarioId: clienteDemo.id,
       etiqueta: 'Casa',
-      calle: 'Avenida San Mart├â┬¡n',
+      calle: 'Avenida San Martín',
       numero: '1200',
       localidad: 'Ushuaia',
-      descripcion: 'Direcci├│n de prueba para explorar por cercan├¡a',
+      descripcion: 'Dirección de prueba para explorar por cercanía',
         latitud: '-54.808912',
         longitud: '-68.314511',
       esPredeterminada: true,
@@ -235,10 +235,10 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
       id: '00000000-0000-4000-8000-000000000121',
       usuarioId: clienteDemo.id,
       etiqueta: 'Casa',
-      calle: 'Avenida San Mart├â┬¡n',
+      calle: 'Avenida San Martín',
       numero: '1200',
       localidad: 'Ushuaia',
-      descripcion: 'Direcci├│n de prueba para explorar por cercan├¡a',
+      descripcion: 'Dirección de prueba para explorar por cercanía',
         latitud: '-54.808912',
         longitud: '-68.314511',
       esPredeterminada: true,
@@ -254,7 +254,7 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
   );
   const obtenerCategoria = (slug: string): string => {
     const id = categoriasPorSlug.get(slug);
-    if (!id) throw new Error(`Falta la subcategor├¡a activa ${slug}`);
+    if (!id) throw new Error(`Falta la subcategoría activa ${slug}`);
     return id;
   };
 
@@ -266,8 +266,8 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
       email: 'comercio.centro@test.com',
       nombre: 'Comercio Centro',
       apellido: 'Demo',
-      nombreFantasia: 'Almac├®n del Centro',
-      razonSocial: 'Almac├®n del Centro S.R.L.',
+      nombreFantasia: 'Almacén del Centro',
+      razonSocial: 'Almacén del Centro S.R.L.',
       cuit: '30-12345678-1',
       googlePlaceId: 'menorcost-demo-centro',
       numero: '1250',
@@ -345,7 +345,7 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
         idComercio: id,
         userId,
         ...datosComercio,
-        descripcion: 'Comercio demo para probar b├║squeda y exploraci├│n.',
+        descripcion: 'Comercio demo para probar búsqueda y exploración.',
         logoUrl: '/uploads/logo-test.png',
         mercadoPagoVinculado: true,
         estado: 'HABILITADO',
@@ -360,7 +360,7 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
       comercio: 'comercio.centro@test.com',
       categoria: 'aceites-y-conservas',
       titulo: 'Aceite de girasol 900 ml',
-      descripcion: 'Oferta de almac├®n v├ílida hasta hoy inclusive.',
+      descripcion: 'Oferta de almacén válida hasta hoy inclusive.',
       precioLista: '5000.00',
       precioBaseNeto: '2800.00',
       precioPublico: '3500.00',
@@ -371,7 +371,7 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
       comercio: 'comercio.centro@test.com',
       categoria: 'leches',
       titulo: 'Leche entera 1 litro',
-      descripcion: 'Oferta de l├ícteos para b├║squeda por producto.',
+      descripcion: 'Oferta de lácteos para búsqueda por producto.',
       precioLista: '3200.00',
       precioBaseNeto: '2000.00',
       precioPublico: '2500.00',
@@ -475,6 +475,9 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
   const comercioVencido = await prisma.comercio.upsert({
     where: { userId: comercianteVencido.id },
     update: {
+      nombreFantasia: 'Comercio CU-2.07',
+      razonSocial: 'Comercio CU-2.07 S.R.L.',
+      descripcion: 'Comercio usado para probar el vencimiento automático.',
       estado: 'HABILITADO',
       mercadoPagoVinculado: true,
       abierto: true,
@@ -494,8 +497,8 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
       razonSocial: 'Comercio CU-2.07 S.R.L.',
         cuit: '30-12345677-3',
       telefono: '+54 2901 555557',
-      descripcion: 'Comercio usado para probar el vencimiento autom├ítico.',
-      calle: 'San Mart├¡n',
+      descripcion: 'Comercio usado para probar el vencimiento automático.',
+      calle: 'San Martín',
       numero: '123',
       localidad: 'Ushuaia',
       provincia: 'Tierra del Fuego',
@@ -521,7 +524,7 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
       comercioId: comercioVencido.idComercio,
       categoriaId: categoriaVencida.idCategoria,
       titulo: 'Oferta vencida CU-2.07',
-      descripcion: 'Oferta creada para probar la depuraci├│n autom├ítica.',
+      descripcion: 'Oferta creada para probar la depuración automática.',
       fechaVencimiento: fechaVencimiento(-2),
       stock: 5,
       precioLista: '100.00',
@@ -537,7 +540,7 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
       comercioId: comercioVencido.idComercio,
       categoriaId: categoriaVencida.idCategoria,
       titulo: 'Oferta vencida CU-2.07',
-      descripcion: 'Oferta creada para probar la depuraci├│n autom├ítica.',
+      descripcion: 'Oferta creada para probar la depuración automática.',
       fechaVencimiento: fechaVencimiento(-2),
       stock: 5,
       precioLista: '100.00',
@@ -551,7 +554,7 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
   });
 
   console.log(
-    'Datos demo para cat├ílogo, cercan├¡a, filtros y b├║squeda sincronizados.',
+    'Datos demo para catálogo, cercanía, filtros y búsqueda sincronizados.',
   );
   console.log(`Cliente: ${clienteDemo.email} / ${PASSWORD_DEMO}`);
   console.log(
@@ -588,7 +591,7 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
 
   console.log(`Administrador demo sincronizado: ${admin.email}`);
 
-  // Garantiza una ├║nica configuraci├│n activa y carga la tasa inicial (10 %).
+  // Garantiza una única configuración activa y carga la tasa inicial (10 %).
   await prisma.configComision.updateMany({
     where: {
       activa: true,
@@ -611,7 +614,7 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
   });
 
   console.log(
-    `Comisi├│n Menorcost activa: ${configComision.comisionMenorcost.toString()}`,
+    `Comisión Menorcost activa: ${configComision.comisionMenorcost.toString()}`,
   );
 
   return admin.id;
@@ -980,7 +983,7 @@ const usuarios: UsuarioSeed[] = [
     id: IDS.USER.denunciadoBajo,
     dni: '32000004',
     nombre: 'Denunciado',
-    apellido: 'Bajo Investigaci├│n',
+    apellido: 'Bajo Investigación',
     email: 'bo.denuncia.denunciado.bajo@test.com',
     telefono: '+54 2901 620004',
     fechaNacimiento: new Date('1993-02-14T00:00:00.000Z'),
@@ -1021,12 +1024,12 @@ const comercios: ComercioSeed[] = [
   {
     idComercio: IDS.COMERCIO.altaPendiente1,
     userId: IDS.USER.altaPendiente1,
-    nombreFantasia: 'Almac├®n Pendiente Uno',
+    nombreFantasia: 'Almacén Pendiente Uno',
     razonSocial: 'Alta Pendiente Uno S.R.L.',
     cuit: '30-90000001-0',
     telefono: '+54 2901 600001',
-    descripcion: 'Comercio pendiente para probar la aprobaci├│n de altas.',
-    calle: 'San Mart├¡n',
+    descripcion: 'Comercio pendiente para probar la aprobación de altas.',
+    calle: 'San Martín',
     numero: '1001',
     localidad: 'Ushuaia',
     provincia: 'Tierra del Fuego',
@@ -1071,7 +1074,7 @@ const comercios: ComercioSeed[] = [
     razonSocial: 'Alta Rechazada S.R.L.',
     cuit: '30-90000003-7',
     telefono: '+54 2901 600003',
-    descripcion: 'Comercio con documentaci├│n rechazada para probar filtros.',
+    descripcion: 'Comercio con documentación rechazada para probar filtros.',
     calle: 'Gobernador Paz',
     numero: '1003',
     localidad: 'Ushuaia',
@@ -1085,7 +1088,7 @@ const comercios: ComercioSeed[] = [
     estado: 'DOCUMENTACION_RECHAZADA',
     resueltoEn: fecha(-7),
     motivoRechazo:
-      'La constancia de CUIT no coincide con la raz├│n social declarada.',
+      'La constancia de CUIT no coincide con la razón social declarada.',
     mercadoPagoVinculado: false,
     reputacionPromedio: 0,
     totalCalificaciones: 0,
@@ -1097,7 +1100,7 @@ const comercios: ComercioSeed[] = [
     razonSocial: 'Alta Aprobada Reciente S.R.L.',
     cuit: '30-90000004-5',
     telefono: '+54 2901 600004',
-    descripcion: 'Comercio habilitado dentro de la ventana de 30 d├¡as.',
+    descripcion: 'Comercio habilitado dentro de la ventana de 30 días.',
     calle: 'Malvinas Argentinas',
     numero: '1004',
     localidad: 'Ushuaia',
@@ -1122,7 +1125,7 @@ const comercios: ComercioSeed[] = [
     razonSocial: 'Alta Aprobada Vieja S.R.L.',
     cuit: '30-90000005-3',
     telefono: '+54 2901 600005',
-    descripcion: 'Comercio habilitado fuera de la ventana de 30 d├¡as.',
+    descripcion: 'Comercio habilitado fuera de la ventana de 30 días.',
     calle: 'Ruta 3',
     numero: '1005',
     localidad: 'Ushuaia',
@@ -1171,7 +1174,7 @@ const comercios: ComercioSeed[] = [
     cuit: '30-90000020-7',
     telefono: '+54 2901 620002',
     descripcion: 'Comercio que denuncia a un cliente.',
-    calle: 'San Mart├¡n',
+    calle: 'San Martín',
     numero: '1020',
     localidad: 'Ushuaia',
     provincia: 'Tierra del Fuego',
@@ -1212,11 +1215,11 @@ const comercios: ComercioSeed[] = [
   {
     idComercio: IDS.COMERCIO.denunciadoBajo,
     userId: IDS.USER.denunciadoBajo,
-    nombreFantasia: 'Comercio Bajo Investigaci├│n',
-    razonSocial: 'Denunciado Bajo Investigaci├│n S.R.L.',
+    nombreFantasia: 'Comercio Bajo Investigación',
+    razonSocial: 'Denunciado Bajo Investigación S.R.L.',
     cuit: '30-90000022-3',
     telefono: '+54 2901 620004',
-    descripcion: 'Comercio bajo investigaci├│n con un ├║nico reporte abierto.',
+    descripcion: 'Comercio bajo investigación con un único reporte abierto.',
     calle: 'Gobernador Paz',
     numero: '1022',
     localidad: 'Ushuaia',
@@ -1239,7 +1242,7 @@ const comercios: ComercioSeed[] = [
     razonSocial: 'Denunciado Sancionable S.R.L.',
     cuit: '30-90000023-1',
     telefono: '+54 2901 620005',
-    descripcion: 'Comercio con dos reportes abiertos para probar la sanci├│n.',
+    descripcion: 'Comercio con dos reportes abiertos para probar la sanción.',
     calle: 'Malvinas Argentinas',
     numero: '1023',
     localidad: 'Ushuaia',
@@ -1290,7 +1293,7 @@ const productos: ProductoSeed[] = [
     idProducto: IDS.PRODUCTO.denunciadoBajo,
     comercioId: IDS.COMERCIO.denunciadoBajo,
     categoriaSlug: 'gaseosas',
-    titulo: 'Gaseosa del comercio bajo investigaci├│n',
+    titulo: 'Gaseosa del comercio bajo investigación',
     descripcion: 'Producto usado en un pedido con reporte abierto.',
     fechaVencimiento: fecha(15),
     stock: 10,
@@ -1399,7 +1402,7 @@ const pedidos: PedidoSeed[] = [
     usuarioId: IDS.USER.emisorCliente,
     comercioId: IDS.COMERCIO.denunciadoBajo,
     productoId: IDS.PRODUCTO.denunciadoBajo,
-    tituloProducto: 'Gaseosa del comercio bajo investigaci├│n',
+    tituloProducto: 'Gaseosa del comercio bajo investigación',
     fechaVencimientoProducto: fecha(15),
     estado: 'ENTREGADO',
     fechaPedido: fecha(-4),
@@ -1564,7 +1567,7 @@ const bajas: BajaSeed[] = [
     motivo: 'Quiero darme de baja',
     estado: 'RECHAZADA',
     estadoPrevioUsuario: 'HABILITADO',
-    observaciones: 'Ten├®s un pedido pendiente de retiro.',
+    observaciones: 'Tenés un pedido pendiente de retiro.',
     resueltoPorId: null,
     resueltoEn: fecha(-2),
     createdAt: fecha(-4),
@@ -1825,7 +1828,7 @@ async function crearProductos(
     const categoriaId = categorias.get(producto.categoriaSlug);
     if (!categoriaId) {
       throw new Error(
-        `Falta la categor├¡a ${producto.categoriaSlug}. Ejecut├í npm run seed primero.`,
+        `Falta la categoría ${producto.categoriaSlug}. Ejecutá npm run seed primero.`,
       );
     }
 
@@ -1993,7 +1996,7 @@ async function seedBackoffice(prisma: PrismaClient, adminId: string): Promise<vo
   for (const slug of categoriasRequeridas) {
     if (!categorias.has(slug)) {
       throw new Error(
-        `Falta la categor├¡a ${slug}. Ejecut├í npm run seed antes del seed de backoffice.`,
+        `Falta la categoría ${slug}. Ejecutá npm run seed antes del seed de backoffice.`,
       );
     }
   }
@@ -2010,7 +2013,7 @@ async function seedBackoffice(prisma: PrismaClient, adminId: string): Promise<vo
 
   if (!productoDemo) {
     throw new Error(
-      'Falta el producto demo del seed principal. Ejecut├í npm run seed antes del seed de backoffice.',
+      'Falta el producto demo del seed principal. Ejecutá npm run seed antes del seed de backoffice.',
     );
   }
 
@@ -2059,11 +2062,11 @@ async function seedBackoffice(prisma: PrismaClient, adminId: string): Promise<vo
 
   console.log('Seed de backoffice aplicado.');
   console.log(`Altas pendientes: ${altasPendientes}`);
-  console.log(`Altas aprobadas (30 d├¡as): ${altasAprobadas30Dias}`);
+  console.log(`Altas aprobadas (30 días): ${altasAprobadas30Dias}`);
   console.log(`Bajas solicitadas: ${bajasSolicitadas}`);
   console.log(`Denuncias abiertas: ${denunciasAbiertas}`);
   console.log(`Usuarios sembrados: ${usuarios.length}`);
-  console.log(`Contrase├▒a de todos los usuarios: ${PASSWORD_DEMO}`);
+  console.log(`Contraseña de todos los usuarios: ${PASSWORD_DEMO}`);
   console.log('Altas pendientes:');
   console.log('  bo.alta.pendiente1@test.com');
   console.log('  bo.alta.pendiente2@test.com');

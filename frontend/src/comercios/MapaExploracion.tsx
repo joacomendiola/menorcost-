@@ -36,6 +36,7 @@ export function MapaExploracion({
   const marcadores = useRef<Marker[]>([]);
   const ventana = useRef<Popup | null>(null);
   const [error, setError] = useState('');
+  const [avisoMapa, setAvisoMapa] = useState('');
 
   useEffect(() => {
     if (!contenedor.current) return;
@@ -47,6 +48,10 @@ export function MapaExploracion({
           latitudOrigen,
           longitudOrigen,
           12,
+          () =>
+            setAvisoMapa(
+              'No se pudo cargar el mapa base; se muestra una alternativa.',
+            ),
         );
       }
 
@@ -140,11 +145,22 @@ export function MapaExploracion({
   }
 
   return (
-    <div
-      className="explorar__map"
-      ref={contenedor}
-      role="region"
-      aria-label="Mapa de comercios y ofertas"
-    />
+    <>
+      {avisoMapa && (
+        <div
+          className="explorar__map-aviso"
+          role="status"
+          style={{ padding: '8px 12px', background: '#fff4e6' }}
+        >
+          {avisoMapa}
+        </div>
+      )}
+      <div
+        className="explorar__map"
+        ref={contenedor}
+        role="region"
+        aria-label="Mapa de comercios y ofertas"
+      />
+    </>
   );
 }
