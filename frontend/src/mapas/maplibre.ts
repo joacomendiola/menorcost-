@@ -23,6 +23,42 @@ export const ESTILO_MAPA_RESPALDO: maplibregl.StyleSpecification = {
 const ATRIBUCION =
   '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a> · <a href="https://tiles.openfreemap.org" target="_blank" rel="noopener noreferrer">OpenFreeMap</a> / <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>';
 
+interface ErrorConDetalles extends Error {
+  status?: number;
+  url?: string;
+}
+
+function normalizarError(valor: unknown): ErrorConDetalles {
+  if (valor instanceof Error) return valor as ErrorConDetalles;
+
+  const error = new Error(
+    valor && typeof valor === 'object' && 'message' in valor
+      ? String((valor as { message: unknown }).message)
+      : String(valor ?? 'Error al cargar el mapa'),
+  ) as ErrorConDetalles;
+
+  if (valor && typeof valor === 'object') {
+    error.status = (valor as { status?: number }).status;
+    error.url = (valor as { url?: string }).url;
+  }
+
+  return error;
+}
+
+function esFalloDelMapaBase(error: ErrorConDetalles): boolean {
+  const url = error.url ?? '';
+  const esRecursoBase =
+    url.includes('tiles.openfreemap.org') &&
+    (url.includes('/styles/') ||
+      url.includes('/backup_planet') ||
+      /\.pbf(?:$|\?)/.test(url));
+  const falloRed =
+    (typeof error.status === 'number' && error.status >= 400) ||
+    /failed to fetch|networkerror|load failed/i.test(error.message);
+
+  return falloRed && esRecursoBase;
+}
+
 interface OpcionesPin {
   latitud: number;
   longitud: number;
@@ -59,16 +95,29 @@ export function crearMapa(
   );
 
   // Los errores de red del estilo/tiles no lanzan excepciones: MapLibre los
-  // notifica mediante el evento 'error'. Si OpenFreeMap falla, usamos un
-  // estilo raster alternativo para no dejar el mapa sin calles.
+  // notifica mediante el evento 'error'. Si OpenFreeMap falla antes de cargar
+  // el estilo, o deja de servir teselas vectoriales, usamos un estilo raster
+  // alternativo. Un error aislado de glifos/sprites no descarta el mapa principal.
   let usaRespaldo = false;
+  let estiloPrincipalCargado = false;
+
+  mapa.on('style.load', () => {
+    if (!usaRespaldo) estiloPrincipalCargado = true;
+  });
+
   mapa.on('error', (evento) => {
     if (usaRespaldo) return;
+
+    const error = normalizarError(evento.error);
+    if (estiloPrincipalCargado && !esFalloDelMapaBase(error)) {
+      console.warn(
+        'Error no crítico del mapa; se mantiene el estilo principal.',
+        error,
+      );
+      return;
+    }
+
     usaRespaldo = true;
-    const error =
-      evento.error instanceof Error
-        ? evento.error
-        : new Error(String(evento.error ?? 'Error al cargar el mapa'));
     try {
       mapa.setStyle(ESTILO_MAPA_RESPALDO);
     } catch (errorAplicarRespaldo) {
