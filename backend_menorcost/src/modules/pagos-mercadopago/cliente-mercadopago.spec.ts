@@ -16,6 +16,7 @@ describe('ClienteMercadoPago (adaptador del SDK)', () => {
     timeoutMs: vi.fn(() => 1000),
     clientId: vi.fn(() => 'app-id'),
     clientSecret: vi.fn(() => 'app-secret'),
+    testToken: vi.fn(() => false),
   };
   const cliente = new ClienteMercadoPago(
     config as unknown as MercadoPagoConfigService,
@@ -27,6 +28,7 @@ describe('ClienteMercadoPago (adaptador del SDK)', () => {
     config.timeoutMs.mockReturnValue(1000);
     config.clientId.mockReturnValue('app-id');
     config.clientSecret.mockReturnValue('app-secret');
+    config.testToken.mockReturnValue(false);
     vi.stubGlobal('fetch', fetchMock);
   });
 
@@ -104,7 +106,8 @@ describe('ClienteMercadoPago (adaptador del SDK)', () => {
     ).rejects.toMatchObject({ codigo: 'mp_no_disponible' });
   });
 
-  it('renueva el token con grant_type=refresh_token', async () => {
+  it('renueva el token con grant_type=refresh_token y pide token sandbox', async () => {
+    config.testToken.mockReturnValue(true);
     fetchMock.mockResolvedValue(
       respuesta(200, {
         access_token: 'nuevo-access',
@@ -128,7 +131,24 @@ describe('ClienteMercadoPago (adaptador del SDK)', () => {
       client_secret: 'app-secret',
       refresh_token: 'refresh-viejo',
       grant_type: 'refresh_token',
+      test_token: true,
     });
+  });
+
+  it('no pide token sandbox cuando MP_TEST_TOKEN está desactivado', async () => {
+    fetchMock.mockResolvedValue(
+      respuesta(200, {
+        access_token: 'nuevo-access',
+        refresh_token: 'nuevo-refresh',
+        expires_in: 15_552_000,
+      }),
+    );
+
+    await cliente.refrescarToken('access-viejo', 'refresh-viejo');
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).not.toHaveProperty(
+      'test_token',
+    );
   });
 
   it('un refresh rechazado es credencial_invalida', async () => {

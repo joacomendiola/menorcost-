@@ -45,6 +45,15 @@ export class MercadoPagoConfigService {
     return this.config.get<string>('MP_PKCE_ENABLED') === 'true';
   }
 
+  /**
+   * Pide a MP un token sandbox en `/oauth/token`. Necesario cuando el Client ID
+   * y el Client Secret se toman del entorno de producción (OAuth los exige)
+   * pero los cobros se prueban con cuentas y saldo de prueba.
+   */
+  testToken(): boolean {
+    return this.config.get<string>('MP_TEST_TOKEN') === 'true';
+  }
+
   /** Clave de 32 bytes para AES-256-GCM, en hex (64) o base64. */
   claveCifrado(): Buffer {
     const valor = this.requerida('MP_TOKENS_ENCRYPTION_KEY');

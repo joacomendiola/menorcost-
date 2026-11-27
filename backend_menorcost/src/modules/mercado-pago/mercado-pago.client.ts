@@ -46,6 +46,10 @@ export class MercadoPagoClient {
       cuerpo.code_verifier = codeVerifier;
     }
 
+    if (this.config.testToken()) {
+      cuerpo.test_token = 'true';
+    }
+
     const datos = await this.postToken(cuerpo);
 
     if (

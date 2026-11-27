@@ -27,6 +27,11 @@ export interface TokenRenovadoMp {
   expires_in: number;
 }
 
+/** El SDK no tipa `test_token`; Mercado Pago lo acepta en `/oauth/token`. */
+type CuerpoRefreshMp = Parameters<OAuth['refresh']>[0]['body'] & {
+  test_token?: boolean;
+};
+
 /**
  * Adaptador del SDK oficial de Mercado Pago (Orders API + OAuth).
  *
@@ -97,15 +102,21 @@ export class ClienteMercadoPago {
     refreshToken: string,
   ): Promise<TokenRenovadoMp> {
     const oauth = new OAuth(new MercadoPagoConfig({ accessToken }));
+    const cuerpo: CuerpoRefreshMp = {
+      client_id: this.config.clientId(),
+      client_secret: this.config.clientSecret(),
+      refresh_token: refreshToken,
+    };
+
+    if (this.config.testToken()) {
+      cuerpo.test_token = true;
+    }
+
     let renovado: Awaited<ReturnType<OAuth['refresh']>>;
 
     try {
       renovado = await oauth.refresh({
-        body: {
-          client_id: this.config.clientId(),
-          client_secret: this.config.clientSecret(),
-          refresh_token: refreshToken,
-        },
+        body: cuerpo,
         requestOptions: {
           timeout: this.config.timeoutMs(),
           maxRetries: 0,

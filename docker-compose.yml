@@ -48,7 +48,8 @@ services:
       MP_REDIRECT_URI: ${MP_REDIRECT_URI:-}
       MP_OAUTH_STATE_SECRET: ${MP_OAUTH_STATE_SECRET:-}
       MP_TOKENS_ENCRYPTION_KEY: ${MP_TOKENS_ENCRYPTION_KEY:-}
-      MP_PKCE_ENABLED: ${MP_PKCE_ENABLED:-false}
+      MP_PKCE_ENABLED: ${MP_PKCE_ENABLED:-true}
+      MP_TEST_TOKEN: ${MP_TEST_TOKEN:-false}
       MP_TIMEOUT_MS: ${MP_TIMEOUT_MS:-10000}
       MP_URL_PUBLICA: ${MP_URL_PUBLICA:-}
       MP_WEBHOOK_SECRET: ${MP_WEBHOOK_SECRET:-}
@@ -65,8 +66,6 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL}
-        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
-        VITE_CARTO_BASEMAP_API_KEY: ${VITE_CARTO_BASEMAP_API_KEY:-}
     container_name: menorcost_frontend
     restart: unless-stopped
 
