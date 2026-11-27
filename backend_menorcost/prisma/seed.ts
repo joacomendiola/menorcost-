@@ -108,6 +108,9 @@ const categorias: CategoriaSeed[] = [
 const CONFIG_COMISION_INICIAL_ID = '00000000-0000-4000-8000-000000000001';
 const COMISION_MENORCOST_INICIAL = '0.1000'; // 10 %
 const PASSWORD_DEMO = 'Password123';
+const DESCRIPCION_COMERCIO_DEMO =
+  'Comercio demo para probar búsqueda y exploración.';
+const LOGO_COMERCIO_DEMO = '/uploads/logo-test.png';
 
 function fechaVencimiento(diasDesdeHoy: number): Date {
   const hoy = new Intl.DateTimeFormat('sv-SE', {
@@ -271,7 +274,7 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
       cuit: '30-12345678-1',
       googlePlaceId: 'menorcost-demo-centro',
       numero: '1250',
-      calle: 'Avenida San Martin',
+      calle: 'Avenida San Martín',
       localidad: 'Ushuaia',
       provincia: 'Tierra del Fuego',
       codigoPostal: '9410',
@@ -338,6 +341,8 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
       where: { userId },
       update: {
         ...datosComercio,
+        descripcion: DESCRIPCION_COMERCIO_DEMO,
+        logoUrl: LOGO_COMERCIO_DEMO,
         estado: 'HABILITADO',
         mercadoPagoVinculado: true,
       },
@@ -345,8 +350,8 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
         idComercio: id,
         userId,
         ...datosComercio,
-        descripcion: 'Comercio demo para probar búsqueda y exploración.',
-        logoUrl: '/uploads/logo-test.png',
+        descripcion: DESCRIPCION_COMERCIO_DEMO,
+        logoUrl: LOGO_COMERCIO_DEMO,
         mercadoPagoVinculado: true,
         estado: 'HABILITADO',
       },
@@ -472,43 +477,33 @@ async function seedBase(prisma: PrismaClient): Promise<string> {
       estado: 'HABILITADO',
     },
   });
+  const datosComercioVencido = {
+    nombreFantasia: 'Comercio CU-2.07',
+    razonSocial: 'Comercio CU-2.07 S.R.L.',
+    cuit: '30-12345677-3',
+    telefono: '+54 2901 555557',
+    descripcion: 'Comercio usado para probar el vencimiento automático.',
+    calle: 'San Martín',
+    numero: '123',
+    localidad: 'Ushuaia',
+    provincia: 'Tierra del Fuego',
+    codigoPostal: '9410',
+    latitud: '-54.805139',
+    longitud: '-68.300124',
+    googlePlaceId: 'cu-207-test-place',
+    logoUrl: LOGO_COMERCIO_DEMO,
+    abierto: true,
+    estado: 'HABILITADO' as const,
+    mercadoPagoVinculado: true,
+  };
+
   const comercioVencido = await prisma.comercio.upsert({
     where: { userId: comercianteVencido.id },
-    update: {
-      nombreFantasia: 'Comercio CU-2.07',
-      razonSocial: 'Comercio CU-2.07 S.R.L.',
-      descripcion: 'Comercio usado para probar el vencimiento automático.',
-      estado: 'HABILITADO',
-      mercadoPagoVinculado: true,
-      abierto: true,
-      calle: 'San Martin',
-      numero: '123',
-      localidad: 'Ushuaia',
-      provincia: 'Tierra del Fuego',
-      codigoPostal: '9410',
-        latitud: '-54.805139',
-        longitud: '-68.300124',
-    },
+    update: datosComercioVencido,
     create: {
       idComercio: '00000000-0000-4000-8000-000000000202',
       userId: comercianteVencido.id,
-      mercadoPagoVinculado: true,
-      nombreFantasia: 'Comercio CU-2.07',
-      razonSocial: 'Comercio CU-2.07 S.R.L.',
-        cuit: '30-12345677-3',
-      telefono: '+54 2901 555557',
-      descripcion: 'Comercio usado para probar el vencimiento automático.',
-      calle: 'San Martín',
-      numero: '123',
-      localidad: 'Ushuaia',
-      provincia: 'Tierra del Fuego',
-      codigoPostal: '9410',
-        latitud: '-54.805139',
-        longitud: '-68.300124',
-      googlePlaceId: 'cu-207-test-place',
-      logoUrl: '/uploads/logo-test.png',
-      abierto: true,
-      estado: 'HABILITADO',
+      ...datosComercioVencido,
     },
   });
   const vencidaId = '00000000-0000-4000-8000-000000000203';
