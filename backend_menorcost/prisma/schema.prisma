@@ -576,6 +576,9 @@ model Pago {
   // Orden de Mercado Pago (Orders API) asociada a este intento de pago.
   // Único porque una orden de MP pertenece a un solo intento.
   mpOrderId        String?    @unique @map("mp_order_id") @db.VarChar(64)
+  // URL de checkout devuelta por MP. Se guarda porque reconstruirla desde el
+  // order id pierde el pref_id y puede llevar a una orden vieja/inutilizable.
+  mpCheckoutUrl    String?    @map("mp_checkout_url") @db.Text
   // Estado crudo informado por Mercado Pago (`created`, `processed`, `action_required`, ...).
   mpStatus         String?    @map("mp_status") @db.VarChar(40)
   mpStatusDetail   String?    @map("mp_status_detail") @db.VarChar(80)

@@ -289,9 +289,9 @@ export class CheckoutService {
   }
 
   /**
-   * Reintento de pago: reutiliza la order vigente si todavía sirve y, si el
-   * intento anterior quedó rechazado, abre un `Pago` nuevo (la order anterior
-   * no se toca: queda como auditoría).
+   * Reintento de pago: reutiliza la order anterior sólo si Mercado Pago
+   * confirma que sigue pagable; si no, abre un `Pago` nuevo con una order
+   * nueva en vez de devolver una URL vencida.
    */
   async reintentar(
     usuarioId: string,
@@ -335,15 +335,8 @@ export class CheckoutService {
       );
     }
 
-    const ultimo = pedido.pagos[0];
-    if (ultimo?.estado === 'PENDIENTE' && ultimo.mpOrderId) {
-      return {
-        idPedido,
-        estado: pedido.estado,
-        urlRedireccion: urlCheckoutDeOrden(ultimo.mpOrderId),
-      };
-    }
-
+    // Antes de reutilizar cualquier order: si la reserva venció, se libera el
+    // stock y se avisa. Antes estaba después del `return` de reutilización.
     if (
       pedido.fechaExpiracionPago &&
       pedido.fechaExpiracionPago.getTime() < Date.now()
@@ -362,6 +355,29 @@ export class CheckoutService {
       .catch((error: unknown) => {
         throw this.aExcepcionHttp(error);
       });
+
+    const ultimo = pedido.pagos[0];
+    if (ultimo?.estado === 'PENDIENTE' && ultimo.mpOrderId) {
+      const checkoutVigente = await this.checkoutDeOrdenVigente(
+        credencial.accessToken,
+        ultimo.mpOrderId,
+      );
+
+      if (checkoutVigente) {
+        return {
+          idPedido,
+          estado: pedido.estado,
+          urlRedireccion: checkoutVigente,
+        };
+      }
+
+      // La order anterior ya no sirve: se cierra el intento para que los
+      // reintentos siguientes no vuelvan a mandar al cliente a una URL muerta.
+      await this.prisma.pago.update({
+        where: { idPago: ultimo.idPago },
+        data: { estado: 'RECHAZADO' },
+      });
+    }
 
     const pago = await this.prisma.pago.create({
       data: {
@@ -404,6 +420,36 @@ export class CheckoutService {
     }
   }
 
+  /**
+   * Una order se reutiliza sólo si MP la devuelve como `created` con su
+   * `checkout_url`. Cualquier otro estado, vencimiento o error implica crear
+   * una orden nueva en lugar de reconstruir una URL que puede estar muerta.
+   */
+  private async checkoutDeOrdenVigente(
+    accessToken: string,
+    mpOrderId: string,
+  ): Promise<string | null> {
+    try {
+      const orden = await this.mercadoPago.obtenerOrden(
+        accessToken,
+        mpOrderId,
+      );
+
+      if (orden.status !== 'created' || !orden.checkout_url) return null;
+
+      if (orden.expiration_time) {
+        const expira = new Date(orden.expiration_time);
+        if (!Number.isNaN(expira.getTime()) && expira.getTime() <= Date.now()) {
+          return null;
+        }
+      }
+
+      return orden.checkout_url;
+    } catch {
+      return null;
+    }
+  }
+
   /** Estado real del pedido para la pantalla de resultado (polling). */
   async obtenerEstado(
     usuarioId: string,
@@ -416,10 +462,11 @@ export class CheckoutService {
         usuarioId: true,
         estado: true,
         codigoAlfanumerico: true,
+        fechaExpiracionPago: true,
         pagos: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          select: { estado: true, mpOrderId: true },
+          select: { estado: true, mpOrderId: true, mpCheckoutUrl: true },
         },
       },
     });
@@ -432,7 +479,9 @@ export class CheckoutService {
     const pendienteDeCobro =
       pedido.estado === 'PENDIENTE_PAGO' &&
       pago?.estado === 'PENDIENTE' &&
-      pago.mpOrderId;
+      pago.mpOrderId &&
+      (!pedido.fechaExpiracionPago ||
+        pedido.fechaExpiracionPago.getTime() >= Date.now());
 
     return {
       idPedido,
@@ -440,7 +489,8 @@ export class CheckoutService {
       pagoEstado: pago?.estado ?? null,
       codigoAlfanumerico: pedido.codigoAlfanumerico,
       urlRedireccion: pendienteDeCobro
-        ? urlCheckoutDeOrden(pago.mpOrderId as string)
+        ? (pago?.mpCheckoutUrl ??
+          urlCheckoutDeOrden(pago.mpOrderId as string))
         : null,
     };
   }
@@ -479,6 +529,7 @@ export class CheckoutService {
       where: { idPago: intento.idPago },
       data: {
         mpOrderId: orden.id,
+        mpCheckoutUrl: orden.checkout_url ?? null,
         mpStatus: orden.status ?? null,
         mpStatusDetail: orden.status_detail ?? null,
       },
@@ -512,15 +563,17 @@ export class CheckoutService {
     const pago = await this.prisma.pago.findFirst({
       where: { pedidoId: pedido.id_pedido, estado: 'PENDIENTE' },
       orderBy: { createdAt: 'desc' },
-      select: { mpOrderId: true },
+      select: { mpOrderId: true, mpCheckoutUrl: true },
     });
 
     return {
       idPedido: pedido.id_pedido,
       estado: pedido.estado,
-      urlRedireccion: pago?.mpOrderId
-        ? urlCheckoutDeOrden(pago.mpOrderId)
-        : null,
+      urlRedireccion: pago?.mpCheckoutUrl
+        ? pago.mpCheckoutUrl
+        : pago?.mpOrderId
+          ? urlCheckoutDeOrden(pago.mpOrderId)
+          : null,
     };
   }
 

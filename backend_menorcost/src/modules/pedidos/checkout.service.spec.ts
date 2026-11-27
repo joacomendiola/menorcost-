@@ -99,7 +99,7 @@ describe('CheckoutService', () => {
   const canastas = { obtenerCanastaParaCheckout: vi.fn() };
   const franjas = { listarParaCheckout: vi.fn(), validarParaCheckout: vi.fn() };
   const credenciales = { obtenerCredencialActiva: vi.fn() };
-  const mercadoPago = { crearOrden: vi.fn() };
+  const mercadoPago = { crearOrden: vi.fn(), obtenerOrden: vi.fn() };
   const config = {
     minutosExpiracion: vi.fn(() => 60),
     urlsRetorno: vi.fn((id: string) => ({
@@ -149,6 +149,11 @@ describe('CheckoutService', () => {
       id: 'ORD-1',
       status: 'created',
       status_detail: 'created',
+      checkout_url: 'https://mp.test/ORD-1',
+    });
+    mercadoPago.obtenerOrden.mockResolvedValue({
+      id: 'ORD-1',
+      status: 'created',
       checkout_url: 'https://mp.test/ORD-1',
     });
     tx.pedido.create.mockResolvedValue({
@@ -242,6 +247,7 @@ describe('CheckoutService', () => {
         where: { idPago: pagoId },
         data: {
           mpOrderId: 'ORD-1',
+          mpCheckoutUrl: 'https://mp.test/ORD-1',
           mpStatus: 'created',
           mpStatusDetail: 'created',
         },
@@ -310,7 +316,7 @@ describe('CheckoutService', () => {
   });
 
   describe('reintentar', () => {
-    it('reutiliza la order vigente sin crear otra', async () => {
+    it('reutiliza la order vigente con el checkout_url que devuelve MP', async () => {
       prisma.pedido.findUnique.mockResolvedValue(
         pedidoPendiente({
           pagos: [{ idPago: pagoId, estado: 'PENDIENTE', mpOrderId: 'ORD-1' }],
@@ -319,9 +325,55 @@ describe('CheckoutService', () => {
 
       const resultado = await service.reintentar(usuarioId, pedidoId);
 
-      expect(resultado.urlRedireccion).toBe(urlCheckoutDeOrden('ORD-1'));
+      expect(mercadoPago.obtenerOrden).toHaveBeenCalledWith(
+        'token-vendedor',
+        'ORD-1',
+      );
+      expect(resultado.urlRedireccion).toBe('https://mp.test/ORD-1');
       expect(prisma.pago.create).not.toHaveBeenCalled();
       expect(mercadoPago.crearOrden).not.toHaveBeenCalled();
+    });
+
+    it('crea una order nueva si la anterior ya no está pagable', async () => {
+      prisma.pedido.findUnique.mockResolvedValue(
+        pedidoPendiente({
+          pagos: [{ idPago: pagoId, estado: 'PENDIENTE', mpOrderId: 'ORD-1' }],
+        }),
+      );
+      mercadoPago.obtenerOrden.mockResolvedValue({
+        id: 'ORD-1',
+        status: 'expired',
+        checkout_url: 'https://mp.test/ORD-1',
+      });
+
+      const resultado = await service.reintentar(usuarioId, pedidoId);
+
+      expect(prisma.pago.update).toHaveBeenCalledWith({
+        where: { idPago: pagoId },
+        data: { estado: 'RECHAZADO' },
+      });
+      expect(prisma.pago.create).toHaveBeenCalledOnce();
+      expect(mercadoPago.crearOrden).toHaveBeenCalledOnce();
+      expect(resultado.urlRedireccion).toBe('https://mp.test/ORD-1');
+    });
+
+    it('crea una order nueva si MP no puede consultar la anterior', async () => {
+      prisma.pedido.findUnique.mockResolvedValue(
+        pedidoPendiente({
+          pagos: [{ idPago: pagoId, estado: 'PENDIENTE', mpOrderId: 'ORD-1' }],
+        }),
+      );
+      mercadoPago.obtenerOrden.mockRejectedValue(new Error('MP caído'));
+
+      const resultado = await service.reintentar(usuarioId, pedidoId);
+
+      expect(prisma.pago.update).toHaveBeenCalledWith({
+        where: { idPago: pagoId },
+        data: { estado: 'RECHAZADO' },
+      });
+      expect(prisma.pago.create).toHaveBeenCalledOnce();
+      expect(mercadoPago.crearOrden).toHaveBeenCalledOnce();
+      expect(resultado.urlRedireccion).toBe('https://mp.test/ORD-1');
     });
 
     it('abre un intento nuevo cuando el anterior quedó rechazado', async () => {
@@ -408,6 +460,39 @@ describe('CheckoutService', () => {
         codigoAlfanumerico: 'ABC123XY',
         urlRedireccion: urlCheckoutDeOrden('ORD-1'),
       });
+    });
+
+    it('usa el checkout_url guardado en vez de reconstruirlo', async () => {
+      prisma.pedido.findUnique.mockResolvedValue(
+        pedidoPendiente({
+          pagos: [
+            {
+              estado: 'PENDIENTE',
+              mpOrderId: 'ORD-1',
+              mpCheckoutUrl: 'https://mp.test/checkout?order_id=ORD-1&pref_id=P-1',
+            },
+          ],
+        }),
+      );
+
+      const estado = await service.obtenerEstado(usuarioId, pedidoId);
+
+      expect(estado.urlRedireccion).toBe(
+        'https://mp.test/checkout?order_id=ORD-1&pref_id=P-1',
+      );
+    });
+
+    it('no expone el checkout después del vencimiento de la reserva', async () => {
+      prisma.pedido.findUnique.mockResolvedValue(
+        pedidoPendiente({
+          fechaExpiracionPago: new Date(Date.now() - 1000),
+          pagos: [{ estado: 'PENDIENTE', mpOrderId: 'ORD-1' }],
+        }),
+      );
+
+      const estado = await service.obtenerEstado(usuarioId, pedidoId);
+
+      expect(estado.urlRedireccion).toBeNull();
     });
 
     it('una vez pagado no expone más el checkout', async () => {
