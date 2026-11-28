@@ -983,9 +983,11 @@ describe('Backoffice Admin CU-5.03 (e2e)', () => {
         });
         reporteSancionarId = r.id_reporte;
 
+        const pedidoExtra = await crearPedido(cliente.id, comercioHabilitadoId);
+
         const extra = await prisma.reporte.create({
           data: {
-            id_pedido: pedidoId,
+            id_pedido: pedidoExtra.id_pedido,
             motivo: 'Otra denuncia abierta del mismo usuario',
             tipo_destino: 'COMERCIO',
             estado_reporte: 'BAJO_INVESTIGACION',
