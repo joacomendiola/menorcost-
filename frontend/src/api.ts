@@ -543,7 +543,7 @@ export const reportesApi = {
     data: {
       idPedido: string;
       motivoCodigo: MotivoReporte;
-      descripcion?: string;
+      descripcion: string;
       tipo_destino: 'COMERCIO' | 'CLIENTE';
     },
   ) =>

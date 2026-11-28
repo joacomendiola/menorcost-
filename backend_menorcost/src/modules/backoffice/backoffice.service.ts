@@ -531,7 +531,7 @@ export class BackofficeService {
     estadoFinal: 'RESUELTO' | 'DESESTIMADO',
   ) {
     const resultado =
-      estadoFinal === 'DESESTIMADO' ? 'desestimado' : 'resuelto';
+      estadoFinal === 'DESESTIMADO' ? 'desestimado' : 'resuelto sin sanción';
     const subject = `Resolución del reporte #${idReporte}`;
 
     const [notificacionEmisor, notificacionDenunciado] = await Promise.all([

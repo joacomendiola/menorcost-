@@ -4,10 +4,12 @@ import { hash } from 'bcryptjs';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
 import {
+  EstadoPago,
   EstadoPedido,
   EstadoUsuario,
   MotivoReporte,
   TipoDestinoReporte,
+  TipoSplit,
 } from '../src/generated/prisma/enums.js';
 import { AppModule } from '../src/app.module.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
@@ -137,6 +139,17 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
       await prisma.pedidoItem.deleteMany({
         where: { pedidoId: { in: pedidoIds } },
       });
+      const pagos = await prisma.pago.findMany({
+        where: { pedidoId: { in: pedidoIds } },
+        select: { idPago: true },
+      });
+      if (pagos.length > 0) {
+        const pagoIds = pagos.map((pago) => pago.idPago);
+        await prisma.splitPago.deleteMany({
+          where: { pagoId: { in: pagoIds } },
+        });
+        await prisma.pago.deleteMany({ where: { idPago: { in: pagoIds } } });
+      }
       await prisma.pedido.deleteMany({
         where: { id_pedido: { in: pedidoIds } },
       });
@@ -155,6 +168,9 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
       });
     }
     if (usuarioIds.length > 0) {
+      await prisma.solicitudBaja.deleteMany({
+        where: { usuarioId: { in: usuarioIds } },
+      });
       await prisma.usuario.deleteMany({ where: { id: { in: usuarioIds } } });
     }
     await app.close();
@@ -242,6 +258,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .post('/reports')
           .set(auth(clienteToken))
           .send({
+            descripcion: 'Descripción de prueba',
             idPedido: pedidoId,
             motivoCodigo: MotivoReporte.PRODUCTO_MAL_ESTADO,
             tipo_destino: TipoDestinoReporte.COMERCIO,
@@ -266,15 +283,16 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .post('/reports')
           .set(auth(comercianteToken))
           .send({
+            descripcion: 'Descripción de prueba',
             idPedido: pedidoId,
-            motivo: 'El cliente no se presentó a retirar el producto',
+            motivo: 'Comportamiento inadecuado del cliente',
             tipo_destino: TipoDestinoReporte.CLIENTE,
           })
           .expect(201);
 
         expect(res.body).toMatchObject({
           id_pedido: pedidoId,
-          motivo: 'El cliente no se presentó a retirar el producto',
+          motivo: 'Comportamiento inadecuado del cliente',
           tipo_destino: 'CLIENTE',
           estado_reporte: 'PENDIENTE_REVISION',
           id_emisor: comerciante.id,
@@ -287,6 +305,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .post('/reports')
           .set(auth(clienteToken))
           .send({
+            descripcion: 'Descripción de prueba',
             idPedido: pedidoId,
             motivo: 'Test',
             tipo_destino: TipoDestinoReporte.CLIENTE,
@@ -299,6 +318,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .post('/reports')
           .set(auth(comercianteToken))
           .send({
+            descripcion: 'Descripción de prueba',
             idPedido: pedidoId,
             motivo: 'Test',
             tipo_destino: TipoDestinoReporte.COMERCIO,
@@ -312,6 +332,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .post('/reports')
           .set(auth(clienteToken))
           .send({
+            descripcion: 'Descripción de prueba',
             idPedido: pedidoId,
             motivo: 'El producto estaba en mal estado/era diferente',
             tipo_destino: TipoDestinoReporte.COMERCIO,
@@ -326,8 +347,9 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .post('/reports')
           .set(auth(clienteToken))
           .send({
+            descripcion: 'Descripción de prueba',
             idPedido: pedidoRe.id_pedido,
-            motivoCodigo: MotivoReporte.COMERCIO_CERRADO,
+            motivoCodigo: MotivoReporte.PRODUCTO_MAL_ESTADO,
             tipo_destino: TipoDestinoReporte.COMERCIO,
           })
           .expect(201);
@@ -341,14 +363,15 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .post('/reports')
           .set(auth(clienteToken))
           .send({
+            descripcion: 'Descripción de prueba',
             idPedido: pedidoRe.id_pedido,
-            motivoCodigo: MotivoReporte.COMERCIO_CERRADO,
+            motivoCodigo: MotivoReporte.PRODUCTO_MAL_ESTADO,
             tipo_destino: TipoDestinoReporte.COMERCIO,
           })
           .expect(201);
       });
 
-      it('rechaza al cliente reportar un pedido cancelado', async () => {
+      it('permite al cliente reportar un pedido cancelado', async () => {
         const cancelado = await crearPedido(cliente.id, comercioId, 'CANCEL');
         await prisma.pedido.update({
           where: { id_pedido: cancelado.id_pedido },
@@ -359,8 +382,59 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .post('/reports')
           .set(auth(clienteToken))
           .send({
+            descripcion: 'Descripción de prueba',
             idPedido: cancelado.id_pedido,
             motivoCodigo: MotivoReporte.COMERCIO_CERRADO,
+            tipo_destino: TipoDestinoReporte.COMERCIO,
+          })
+          .expect(201);
+      });
+
+      it('permite al cliente reportar un pedido pendiente de retiro', async () => {
+        const pendiente = await crearPedido(cliente.id, comercioId, 'PENDIENTE');
+        await prisma.pedido.update({
+          where: { id_pedido: pendiente.id_pedido },
+          data: { estado: EstadoPedido.PENDIENTE_DE_RETIRO },
+        });
+
+        await request(server())
+          .post('/reports')
+          .set(auth(clienteToken))
+          .send({
+            descripcion: 'Descripción de prueba',
+            idPedido: pendiente.id_pedido,
+            motivoCodigo: MotivoReporte.COMERCIO_CERRADO,
+            tipo_destino: TipoDestinoReporte.COMERCIO,
+          })
+          .expect(201);
+      });
+
+      it('rechaza un motivo incompatible con el estado del pedido', async () => {
+        await request(server())
+          .post('/reports')
+          .set(auth(clienteToken))
+          .send({
+            descripcion: 'Descripción de prueba',
+            idPedido: pedidoId,
+            motivoCodigo: MotivoReporte.COMERCIO_CERRADO,
+            tipo_destino: TipoDestinoReporte.COMERCIO,
+          })
+          .expect(400);
+      });
+
+      it('rechaza reportes sin justificación', async () => {
+        const nuevoPedido = await crearPedido(
+          cliente.id,
+          comercioId,
+          'SIN-DESCRIPCION',
+        );
+
+        await request(server())
+          .post('/reports')
+          .set(auth(clienteToken))
+          .send({
+            idPedido: nuevoPedido.id_pedido,
+            motivoCodigo: MotivoReporte.PRODUCTO_MAL_ESTADO,
             tipo_destino: TipoDestinoReporte.COMERCIO,
           })
           .expect(400);
@@ -381,6 +455,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .post('/reports')
           .set(auth(clienteToken))
           .send({
+            descripcion: 'Descripción de prueba',
             idPedido: pendiente.id_pedido,
             motivo: 'El local estaba cerrado',
             tipo_destino: TipoDestinoReporte.COMERCIO,
@@ -403,6 +478,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .post('/reports')
           .set(auth(comercianteToken))
           .send({
+            descripcion: 'Descripción de prueba',
             idPedido: pedido.id_pedido,
             motivo: 'El cliente no se presentó a retirar el producto',
             tipo_destino: TipoDestinoReporte.CLIENTE,
@@ -410,7 +486,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .expect(201);
       });
 
-      it('rechaza al cliente reportar un pedido cancelado por falta de retiro', async () => {
+      it('permite al cliente reportar un pedido cancelado por falta de retiro', async () => {
         const pedido = await crearPedido(
           cliente.id,
           comercioId,
@@ -425,11 +501,12 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .post('/reports')
           .set(auth(clienteToken))
           .send({
+            descripcion: 'Descripción de prueba',
             idPedido: pedido.id_pedido,
             motivo: 'El local estaba cerrado',
             tipo_destino: TipoDestinoReporte.COMERCIO,
           })
-          .expect(400);
+          .expect(201);
       });
 
       it('rechaza si motivo "Otro" sin descripción (ext 3a)', async () => {
@@ -462,14 +539,14 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .post('/reports')
           .set(auth(clienteToken))
           .send({
+            descripcion: 'Descripción de prueba',
             idPedido: nuevoPedido.id_pedido,
             motivo: 'Otro motivo personalizado',
-            descripcion: 'Detalle del problema específico',
             tipo_destino: TipoDestinoReporte.COMERCIO,
           })
           .expect(201);
 
-        expect(res.body.descripcion).toBe('Detalle del problema específico');
+        expect(res.body.descripcion).toBe('Descripción de prueba');
       });
 
       it('rechaza pedido inexistente', async () => {
@@ -477,6 +554,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .post('/reports')
           .set(auth(clienteToken))
           .send({
+            descripcion: 'Descripción de prueba',
             idPedido: '00000000-0000-0000-0000-000000000000',
             motivo: 'Test',
             tipo_destino: TipoDestinoReporte.COMERCIO,
@@ -488,6 +566,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
         await request(server())
           .post('/reports')
           .send({
+            descripcion: 'Descripción de prueba',
             idPedido: pedidoId,
             motivo: 'Test',
             tipo_destino: TipoDestinoReporte.COMERCIO,
@@ -500,6 +579,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           .post('/reports')
           .set(auth(adminToken))
           .send({
+            descripcion: 'Descripción de prueba',
             idPedido: pedidoId,
             motivo: 'Test',
             tipo_destino: TipoDestinoReporte.COMERCIO,
@@ -673,6 +753,10 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
         const pedidos: string[] = [];
         for (const comId of comercios) {
           const p = await crearPedido(usuarioObjetivo.id, comId, 'UMBRAL');
+          await prisma.pedido.update({
+            where: { id_pedido: p.id_pedido },
+            data: { estado: EstadoPedido.PENDIENTE_DE_RETIRO },
+          });
           pedidos.push(p.id_pedido);
         }
 
@@ -684,6 +768,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
             .post('/reports')
             .set(auth(token))
             .send({
+              descripcion: 'Descripción de prueba',
               idPedido: pedidos[i],
               motivo: 'El cliente no se presentó a retirar el producto',
               tipo_destino: TipoDestinoReporte.CLIENTE,
@@ -718,6 +803,10 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
             comercio.idComercio,
             `UMBRAL-REP-${i}`,
           );
+          await prisma.pedido.update({
+            where: { id_pedido: p.id_pedido },
+            data: { estado: EstadoPedido.PENDIENTE_DE_RETIRO },
+          });
           pedidos.push(p.id_pedido);
         }
 
@@ -728,6 +817,7 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
             .post('/reports')
             .set(auth(token))
             .send({
+              descripcion: 'Descripción de prueba',
               idPedido,
               motivo: 'El cliente no se presentó a retirar el producto',
               tipo_destino: TipoDestinoReporte.CLIENTE,
@@ -740,6 +830,162 @@ describe('Reportes bidireccionales CU-5.02 (e2e)', () => {
           where: { id: usuarioObjetivo.id },
         });
         expect(clienteActualizado?.estado).toBe('HABILITADO');
+      });
+    });
+
+    describe('Baja de cuenta y reportes', () => {
+      it('no bloquea la baja del cliente que emitió un reporte', async () => {
+        const emisor = await crearUsuario({
+          email: 'baja-emisor@test.com',
+          dni: '50000301',
+          rol: 'CLIENTE',
+        });
+        const emisorToken = (await login(emisor.email).expect(200)).body
+          .accessToken as string;
+        const pedido = await crearPedido(
+          emisor.id,
+          comercioId,
+          'BAJA-EMISOR',
+        );
+
+        await request(server())
+          .post('/reports')
+          .set(auth(emisorToken))
+          .send({
+            descripcion: 'Descripción de prueba',
+            idPedido: pedido.id_pedido,
+            motivoCodigo: MotivoReporte.PRODUCTO_MAL_ESTADO,
+            tipo_destino: TipoDestinoReporte.COMERCIO,
+          })
+          .expect(201);
+
+        await request(server())
+          .post('/baja-cuenta')
+          .set(auth(emisorToken))
+          .send({ motivo: 'Ya no la uso', password: PASSWORD })
+          .expect(200);
+      });
+
+      it('bloquea la baja del comerciante con un reporte recibido', async () => {
+        const duenio = await crearUsuario({
+          email: 'baja-receptor@test.com',
+          dni: '50000302',
+          rol: 'COMERCIANTE',
+        });
+        const comercio = await crearComercio(duenio.id);
+        const denunciante = await crearUsuario({
+          email: 'baja-denunciante@test.com',
+          dni: '50000303',
+          rol: 'CLIENTE',
+        });
+        const denuncianteToken = (
+          await login(denunciante.email).expect(200)
+        ).body.accessToken as string;
+        const pedido = await crearPedido(
+          denunciante.id,
+          comercio.idComercio,
+          'BAJA-RECIBIDO',
+        );
+
+        await request(server())
+          .post('/reports')
+          .set(auth(denuncianteToken))
+          .send({
+            descripcion: 'Descripción de prueba',
+            idPedido: pedido.id_pedido,
+            motivoCodigo: MotivoReporte.PRODUCTO_MAL_ESTADO,
+            tipo_destino: TipoDestinoReporte.COMERCIO,
+          })
+          .expect(201);
+
+        const duenioToken = (await login(duenio.email).expect(200)).body
+          .accessToken as string;
+
+        const res = await request(server())
+          .post('/baja-cuenta')
+          .set(auth(duenioToken))
+          .send({ motivo: 'Ya no la uso', password: PASSWORD })
+          .expect(400);
+
+        expect(res.body.message).toContain('No se puede dar de baja');
+      });
+
+      it('muestra el saldo real de tarifas en la solicitud de baja', async () => {
+        const duenio = await crearUsuario({
+          email: 'baja-saldo@test.com',
+          dni: '50000304',
+          rol: 'COMERCIANTE',
+        });
+        const comercio = await crearComercio(duenio.id);
+        const pedidoUno = await crearPedido(
+          cliente.id,
+          comercio.idComercio,
+          'SALDO-1',
+        );
+        const pedidoDos = await crearPedido(
+          cliente.id,
+          comercio.idComercio,
+          'SALDO-2',
+        );
+
+        await prisma.pedido.update({
+          where: { id_pedido: pedidoUno.id_pedido },
+          data: { tarifa_servicio: 500 },
+        });
+        await prisma.pedido.update({
+          where: { id_pedido: pedidoDos.id_pedido },
+          data: { tarifa_servicio: 500 },
+        });
+
+        const pagoUno = await prisma.pago.create({
+          data: {
+            pedidoId: pedidoUno.id_pedido,
+            montoTransaccion: 1100,
+            estado: EstadoPago.PAGADO,
+          },
+        });
+        const pagoDos = await prisma.pago.create({
+          data: {
+            pedidoId: pedidoDos.id_pedido,
+            montoTransaccion: 1100,
+            estado: EstadoPago.PAGADO,
+          },
+        });
+        await prisma.splitPago.create({
+          data: {
+            pagoId: pagoUno.idPago,
+            recipientType: TipoSplit.MARKETPLACE,
+            monto: 300,
+          },
+        });
+        await prisma.splitPago.create({
+          data: {
+            pagoId: pagoDos.idPago,
+            recipientType: TipoSplit.MARKETPLACE,
+            monto: 200,
+          },
+        });
+
+        const duenioToken = (await login(duenio.email).expect(200)).body
+          .accessToken as string;
+        await request(server())
+          .post('/baja-cuenta')
+          .set(auth(duenioToken))
+          .send({ motivo: 'Ya no la uso', password: PASSWORD })
+          .expect(200);
+
+        const pendientes = await request(server())
+          .get('/admin/bajas?estado=PENDIENTE')
+          .set(auth(adminToken))
+          .expect(200);
+
+        const solicitud = pendientes.body.find(
+          (s: { usuario: { id: string } }) => s.usuario.id === duenio.id,
+        );
+        expect(solicitud).toMatchObject({
+          pedidosCompletados: 2,
+          saldoTarifas: 500,
+        });
       });
     });
   });

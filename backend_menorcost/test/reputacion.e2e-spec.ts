@@ -3,7 +3,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { hash } from 'bcryptjs';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
-import { EstadoPedido, EstadoUsuario } from '../src/generated/prisma/enums.js';
+import {
+  EstadoPedido,
+  EstadoUsuario,
+  MotivoReporte,
+  TipoDestinoReporte,
+} from '../src/generated/prisma/enums.js';
 import { AppModule } from '../src/app.module.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 
@@ -118,6 +123,9 @@ describe('Reputación CU-5.01 (e2e)', () => {
 
   afterAll(async () => {
     if (pedidoIds.length > 0) {
+      await prisma.reporte.deleteMany({
+        where: { id_pedido: { in: pedidoIds } },
+      });
       await prisma.calificacion.deleteMany({
         where: { id_pedido: { in: pedidoIds } },
       });
@@ -317,6 +325,66 @@ describe('Reputación CU-5.01 (e2e)', () => {
           .set(auth(comercianteToken))
           .send({ idPedido: pedidoId, puntaje: 5 })
           .expect(403);
+      });
+    });
+
+    describe('GET /pedidos/:codigo - Ticket del cliente', () => {
+      it('devuelve calificación y reportes del emisor', async () => {
+        const pedido = await prisma.pedido.findUniqueOrThrow({
+          where: { id_pedido: pedidoId },
+        });
+
+        await request(server())
+          .post('/reports')
+          .set(auth(clienteToken))
+          .send({
+            descripcion: 'Descripción de prueba',
+            idPedido: pedidoId,
+            motivoCodigo: MotivoReporte.PRODUCTO_MAL_ESTADO,
+            tipo_destino: TipoDestinoReporte.COMERCIO,
+          })
+          .expect(201);
+
+        const res = await request(server())
+          .get(`/pedidos/${pedido.codigoAlfanumerico}`)
+          .set(auth(clienteToken))
+          .expect(200);
+
+        expect(res.body).toMatchObject({
+          idPedido: pedidoId,
+          codigoAlfanumerico: pedido.codigoAlfanumerico,
+          estado: 'ENTREGADO',
+          calificacion: {
+            puntaje: 5,
+            comentario: 'Excelente producto y atención',
+          },
+          misReportes: [
+            {
+              motivo: 'El producto estaba en mal estado/era diferente',
+              estado: 'PENDIENTE_REVISION',
+            },
+          ],
+        });
+        expect(res.body.misReportes[0].id).toBeDefined();
+        expect(res.body.misReportes[0].fecha).toBeDefined();
+      });
+
+      it('devuelve 404 si el pedido es de otro usuario', async () => {
+        const pedido = await prisma.pedido.findUniqueOrThrow({
+          where: { id_pedido: pedidoId },
+        });
+        const otroCliente = await crearUsuario({
+          email: 'ticket-ajeno@test.com',
+          dni: '60000005',
+          rol: 'CLIENTE',
+        });
+        const token = (await login(otroCliente.email).expect(200)).body
+          .accessToken as string;
+
+        await request(server())
+          .get(`/pedidos/${pedido.codigoAlfanumerico}`)
+          .set(auth(token))
+          .expect(404);
       });
     });
 

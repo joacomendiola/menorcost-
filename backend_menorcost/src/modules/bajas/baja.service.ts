@@ -89,15 +89,15 @@ export class BajaService {
               estadoPrevioUsuario: usuario.estado,
             },
           });
+
+          if (usuario.rol === 'COMERCIANTE') {
+            await this.bloqueos.pausarOfertas(usuarioId, tx);
+          }
         },
         { isolationLevel: 'Serializable' },
       );
     } catch (error: unknown) {
       propagarConflictoSerializable(error);
-    }
-
-    if (usuario.rol === 'COMERCIANTE') {
-      await this.bloqueos.pausarOfertas(usuarioId);
     }
 
     return {
@@ -193,15 +193,14 @@ export class BajaService {
             where: { userId: solicitud.usuarioId, estado: { not: 'ELIMINADO' } },
             data: { estado: 'ELIMINADO' },
           });
+
+          await this.bloqueos.pausarOfertas(solicitud.usuarioId, tx);
         },
         { isolationLevel: 'Serializable' },
       );
     } catch (error: unknown) {
       propagarConflictoSerializable(error);
     }
-
-    // Las ofertas ya se pausaron al solicitar la baja; se reafirma por integridad.
-    await this.bloqueos.pausarOfertas(solicitud.usuarioId);
 
     return {
       message:
@@ -241,9 +240,9 @@ export class BajaService {
         where: { id: solicitud.usuarioId },
         data: { estado: estadoRestaurado },
       });
-    });
 
-    await this.bloqueos.reactivarOfertas(solicitud.usuarioId);
+      await this.bloqueos.reactivarOfertas(solicitud.usuarioId, tx);
+    });
 
     return { message: 'Solicitud de baja rechazada.' };
   }

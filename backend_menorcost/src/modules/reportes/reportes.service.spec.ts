@@ -7,6 +7,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReportesService } from './reportes.service.js';
 import type { CrearReporteDto } from './dto/crear-reporte.dto.js';
+import type { MotivoReporte } from '../../generated/prisma/enums.js';
 
 const PEDIDO_ID = '11111111-1111-4111-8111-111111111111';
 const CLIENTE_ID = 'cliente-1';
@@ -42,23 +43,32 @@ function pedidoBase(overrides: Record<string, unknown> = {}) {
 function dtoBase(overrides: Partial<CrearReporteDto> = {}): CrearReporteDto {
   return {
     idPedido: PEDIDO_ID,
-    motivoCodigo: 'COMERCIO_CERRADO',
+    motivoCodigo: 'PRODUCTO_MAL_ESTADO',
+    descripcion: 'Descripción de prueba',
     tipo_destino: 'COMERCIO',
     ...overrides,
   };
 }
 
-function motivoParaRol(rol: 'CLIENTE' | 'COMERCIANTE') {
-  return rol === 'COMERCIANTE' ? 'CLIENTE_NO_RETIRO' : 'COMERCIO_CERRADO';
+function motivoValidoPara(
+  rol: 'CLIENTE' | 'COMERCIANTE',
+  estado: string,
+): MotivoReporte {
+  if (rol === 'CLIENTE') {
+    return estado === 'ENTREGADO' ? 'PRODUCTO_MAL_ESTADO' : 'COMERCIO_CERRADO';
+  }
+  if (estado === 'CANCELADO') return 'CANCELACION_INDEBIDA';
+  if (estado === 'ENTREGADO') return 'COMPORTAMIENTO_INADECUADO';
+  return 'CLIENTE_NO_RETIRO';
 }
 
 function reporteCreado(overrides: Record<string, unknown> = {}) {
   return {
     id_reporte: 1,
     id_pedido: PEDIDO_ID,
-    motivo: 'El comercio estaba cerrado al ir a retirar',
-    motivoCodigo: 'COMERCIO_CERRADO',
-    descripcion: null,
+    motivo: 'El producto estaba en mal estado/era diferente',
+    motivoCodigo: 'PRODUCTO_MAL_ESTADO',
+    descripcion: 'Descripción de prueba',
     estado_reporte: 'PENDIENTE_REVISION',
     tipo_destino: 'COMERCIO',
     id_emisor: CLIENTE_ID,
@@ -141,7 +151,7 @@ describe('ReportesService.crearReporte', () => {
     await expect(
       service.crearReporte(COMERCIANTE_ID, 'COMERCIANTE', dtoBase({
         tipo_destino: 'CLIENTE',
-        motivoCodigo: motivoParaRol('COMERCIANTE'),
+        motivoCodigo: motivoValidoPara('COMERCIANTE', 'ENTREGADO'),
       })),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
@@ -154,6 +164,14 @@ describe('ReportesService.crearReporte', () => {
 
   const casosPermitidos = [
     ['CLIENTE', 'ENTREGADO', 'COMERCIO', CLIENTE_ID],
+    ['CLIENTE', 'PENDIENTE_DE_RETIRO', 'COMERCIO', CLIENTE_ID],
+    ['CLIENTE', 'CANCELADO', 'COMERCIO', CLIENTE_ID],
+    [
+      'CLIENTE',
+      'CANCELADO_POR_FALTA_RETIRO',
+      'COMERCIO',
+      CLIENTE_ID,
+    ],
     ['COMERCIANTE', 'ENTREGADO', 'CLIENTE', COMERCIANTE_ID],
     ['COMERCIANTE', 'PENDIENTE_DE_RETIRO', 'CLIENTE', COMERCIANTE_ID],
     ['COMERCIANTE', 'CANCELADO', 'CLIENTE', COMERCIANTE_ID],
@@ -185,7 +203,7 @@ describe('ReportesService.crearReporte', () => {
         rol,
         dtoBase({
           tipo_destino: tipoDestino,
-          motivoCodigo: motivoParaRol(rol),
+            motivoCodigo: motivoValidoPara(rol, estado),
         }),
       );
 
@@ -207,9 +225,6 @@ describe('ReportesService.crearReporte', () => {
   );
 
   const casosRechazados = [
-    ['CLIENTE', 'CANCELADO_POR_FALTA_RETIRO', 'COMERCIO', CLIENTE_ID],
-    ['CLIENTE', 'PENDIENTE_DE_RETIRO', 'COMERCIO', CLIENTE_ID],
-    ['CLIENTE', 'CANCELADO', 'COMERCIO', CLIENTE_ID],
     ['CLIENTE', 'PENDIENTE_PAGO', 'COMERCIO', CLIENTE_ID],
     ['COMERCIANTE', 'PENDIENTE_PAGO', 'CLIENTE', COMERCIANTE_ID],
   ] as const;
@@ -227,7 +242,7 @@ describe('ReportesService.crearReporte', () => {
           rol,
           dtoBase({
             tipo_destino: tipoDestino,
-            motivoCodigo: motivoParaRol(rol),
+          motivoCodigo: motivoValidoPara(rol, estado),
           }),
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -235,6 +250,56 @@ describe('ReportesService.crearReporte', () => {
       expect(prismaMock.reporte.create).not.toHaveBeenCalled();
     },
   );
+
+  const casosMotivoIncompatible = [
+    ['CLIENTE', 'ENTREGADO', 'COMERCIO', CLIENTE_ID, 'COMERCIO_CERRADO'],
+    ['CLIENTE', 'PENDIENTE_DE_RETIRO', 'COMERCIO', CLIENTE_ID, 'PRODUCTO_MAL_ESTADO'],
+    [
+      'COMERCIANTE',
+      'ENTREGADO',
+      'CLIENTE',
+      COMERCIANTE_ID,
+      'CLIENTE_NO_RETIRO',
+    ],
+    [
+      'COMERCIANTE',
+      'CANCELADO',
+      'CLIENTE',
+      COMERCIANTE_ID,
+      'CLIENTE_NO_RETIRO',
+    ],
+  ] as const;
+
+  it.each(casosMotivoIncompatible)(
+    'rechaza motivo %s incompatible con el estado %s',
+    async (rol, estado, tipoDestino, idUsuario, motivoCodigo) => {
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoBase({ estado }));
+
+      await expect(
+        service.crearReporte(
+          idUsuario,
+          rol,
+          dtoBase({ tipo_destino: tipoDestino, motivoCodigo }),
+        ),
+      ).rejects.toMatchObject({
+        message: 'El motivo no corresponde al estado del pedido',
+      });
+      expect(prismaMock.reporte.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('exige justificación aunque el motivo no sea "Otro"', async () => {
+    await expect(
+      service.crearReporte(
+        CLIENTE_ID,
+        'CLIENTE',
+        dtoBase({ descripcion: undefined }),
+      ),
+    ).rejects.toMatchObject({
+      message: 'Por favor, especifica brevemente el problema ocurrido',
+    });
+    expect(prismaMock.reporte.create).not.toHaveBeenCalled();
+  });
 
   it('rechaza un tipo_destino que no corresponde al rol', async () => {
     await expect(
@@ -259,7 +324,7 @@ describe('ReportesService.crearReporte', () => {
       service.crearReporte(
         CLIENTE_ID,
         'CLIENTE',
-        dtoBase({ motivoCodigo: 'OTRO' }),
+        dtoBase({ motivoCodigo: 'OTRO', descripcion: undefined }),
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
@@ -288,8 +353,8 @@ describe('ReportesService.crearReporte', () => {
     expect(prismaMock.reporte.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          motivo: 'El comercio estaba cerrado al ir a retirar',
-          motivoCodigo: 'COMERCIO_CERRADO',
+          motivo: 'El producto estaba en mal estado/era diferente',
+          motivoCodigo: 'PRODUCTO_MAL_ESTADO',
         }),
       }),
     );
@@ -301,15 +366,15 @@ describe('ReportesService.crearReporte', () => {
       'CLIENTE',
       dtoBase({
         motivoCodigo: undefined,
-        motivo: 'El comercio estaba cerrado al ir a retirar',
+        motivo: 'El producto estaba en mal estado/era diferente',
       }),
     );
 
     expect(prismaMock.reporte.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          motivo: 'El comercio estaba cerrado al ir a retirar',
-          motivoCodigo: 'COMERCIO_CERRADO',
+          motivo: 'El producto estaba en mal estado/era diferente',
+          motivoCodigo: 'PRODUCTO_MAL_ESTADO',
         }),
       }),
     );

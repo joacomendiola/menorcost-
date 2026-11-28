@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '../../../generated/prisma/client.js';
 import type {
   BajaBloqueosPort,
   BloqueoBaja,
@@ -24,11 +25,17 @@ export class SinBloqueosProvider implements BajaBloqueosPort {
     return Promise.resolve(new Map());
   }
 
-  pausarOfertas(_usuarioId: string): Promise<void> {
+  pausarOfertas(
+    _usuarioId: string,
+    _tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     return Promise.resolve();
   }
 
-  reactivarOfertas(_usuarioId: string): Promise<void> {
+  reactivarOfertas(
+    _usuarioId: string,
+    _tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     return Promise.resolve();
   }
 }

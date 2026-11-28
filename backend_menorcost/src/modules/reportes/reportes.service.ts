@@ -14,6 +14,7 @@ import type { CrearReporteDto } from './dto/crear-reporte.dto.js';
 import type { ListarMisReportesQueryDto } from './dto/listar-mis-reportes-query.dto.js';
 import {
   esMotivoPermitido,
+  esMotivoValidoParaEstado,
   inferirMotivoCodigo,
   MOTIVO_REPORTE_LABEL,
 } from './reporte-motivos.js';
@@ -30,8 +31,14 @@ const ESTADOS_REPORTES_ABIERTOS = [
 ] as const;
 
 const ESTADOS_REPORTABLES: Record<Rol, EstadoPedido[]> = {
-  // El cliente solo puede reportar pedidos que ya retiró (CU-2.06).
-  CLIENTE: ['ENTREGADO'],
+  // CU-5.02: el cliente reporta pedidos finalizados o en conflicto. Se excluye
+  // PENDIENTE_PAGO porque el checkout todavía no generó un pedido válido.
+  CLIENTE: [
+    'ENTREGADO',
+    'PENDIENTE_DE_RETIRO',
+    'CANCELADO',
+    'CANCELADO_POR_FALTA_RETIRO',
+  ],
   COMERCIANTE: [
     'ENTREGADO',
     'PENDIENTE_DE_RETIRO',
@@ -76,13 +83,16 @@ export class ReportesService {
       throw new BadRequestException('El motivo no corresponde a tu rol');
     }
 
+    // El texto legacy libre se trata como "Otro" para validación: no es una
+    // categoría confirmada y la justificación pasa a ser obligatoria.
+    const motivoCodigoEfectivo = motivoCodigo ?? 'OTRO';
     const motivo = motivoCodigo
       ? MOTIVO_REPORTE_LABEL[motivoCodigo]
       : dto.motivo!.trim();
-    const esOtroMotivo =
-      motivoCodigo === 'OTRO' || motivo.toLowerCase().includes('otro');
-    if (esOtroMotivo && (!dto.descripcion || dto.descripcion.trim() === '')) {
-      throw new BadRequestException('Por favor, especifica brevemente el problema ocurrido');
+    if (!dto.descripcion?.trim()) {
+      throw new BadRequestException(
+        'Por favor, especifica brevemente el problema ocurrido',
+      );
     }
 
     try {
@@ -137,6 +147,17 @@ export class ReportesService {
               `No se puede reportar un pedido en estado ${pedido.estado}`,
             );
           }
+          if (
+            !esMotivoValidoParaEstado(
+              rolUsuario,
+              motivoCodigoEfectivo,
+              pedido.estado,
+            )
+          ) {
+            throw new BadRequestException(
+              'El motivo no corresponde al estado del pedido',
+            );
+          }
           if (dto.tipo_destino !== tipoDestinoEsperado) {
             throw new BadRequestException('El tipo de destino no corresponde a tu rol');
           }
@@ -160,7 +181,7 @@ export class ReportesService {
               id_pedido: dto.idPedido,
               motivo,
               motivoCodigo: motivoCodigo ?? undefined,
-              descripcion: dto.descripcion,
+              descripcion: dto.descripcion.trim(),
               estado_reporte: 'PENDIENTE_REVISION',
               tipo_destino: dto.tipo_destino,
               id_emisor: idUsuario,

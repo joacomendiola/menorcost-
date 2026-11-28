@@ -284,6 +284,18 @@ describe('DenunciasTab', () => {
     expect(screen.getByText('03/02/2026')).toBeTruthy();
   });
 
+  it('ofrece resolver sin sanción en las denuncias pendientes', () => {
+    render(
+      <MantineProvider>
+        <DenunciasTab />
+      </MantineProvider>,
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Resolver sin sanción' }),
+    ).toBeTruthy();
+  });
+
   it('da de baja la publicación reportada', async () => {
     mocks.sancionarDenuncia.mockResolvedValue({
       reporte: { id_reporte: 7, estado_reporte: 'RESUELTO' },

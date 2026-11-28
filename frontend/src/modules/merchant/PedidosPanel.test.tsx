@@ -92,8 +92,8 @@ beforeEach(() => {
   mocks.comercio.mockResolvedValue([]);
   mocks.crear.mockResolvedValue({
     id_reporte: 10,
-    motivo: 'El cliente no se presentó a retirar el producto',
-    motivoCodigo: 'CLIENTE_NO_RETIRO',
+    motivo: 'Comportamiento inadecuado del cliente',
+    motivoCodigo: 'COMPORTAMIENTO_INADECUADO',
     descripcion: null,
     estado_reporte: 'PENDIENTE_REVISION',
     tipo_destino: 'CLIENTE',
@@ -132,6 +132,35 @@ describe('PedidosPanel', () => {
     expect(mocks.crear).not.toHaveBeenCalled();
   });
 
+  it('exige descripción también en los motivos predefinidos', async () => {
+    renderPanel();
+    await screen.findByText('Pedido MC-2');
+
+    await elegirMotivo('Comportamiento inadecuado del cliente');
+    fireEvent.submit(
+      screen.getByRole('button', { name: 'Reportar problema' }).closest('form')!,
+    );
+
+    await waitFor(() =>
+      expect(mocks.show).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Especificá brevemente el problema ocurrido',
+        }),
+      ),
+    );
+    expect(mocks.crear).not.toHaveBeenCalled();
+  });
+
+  it('oculta motivos que no corresponden al estado del pedido', async () => {
+    renderPanel();
+    await screen.findByText('Pedido MC-2');
+
+    await elegirMotivo('Comportamiento inadecuado del cliente');
+    expect(
+      screen.queryByText('El cliente no se presentó a retirar el producto'),
+    ).toBeNull();
+  });
+
   it('no rompe el panel al escribir en la descripción del reporte', async () => {
     // StrictMode re-invoca los updaters de estado; antes, leer
     // `evento.currentTarget` dentro del updater devolvía null y tumbaba la app.
@@ -153,14 +182,17 @@ describe('PedidosPanel', () => {
     renderPanel();
     await screen.findByText('Pedido MC-2');
 
-    await elegirMotivo('El cliente no se presentó a retirar el producto');
+    await elegirMotivo('Comportamiento inadecuado del cliente');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Descripción del problema' }), {
+      target: { value: 'Cliente agresivo en mostrador' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Reportar problema' }));
 
     await waitFor(() =>
       expect(mocks.crear).toHaveBeenCalledWith('token', {
         idPedido: 'p2',
-        motivoCodigo: 'CLIENTE_NO_RETIRO',
-        descripcion: undefined,
+        motivoCodigo: 'COMPORTAMIENTO_INADECUADO',
+        descripcion: 'Cliente agresivo en mostrador',
         tipo_destino: 'CLIENTE',
       }),
     );
@@ -196,8 +228,8 @@ describe('PedidosPanel', () => {
   it('advierte si el reporte se guardó pero no se notificó a soporte', async () => {
     mocks.crear.mockResolvedValue({
       id_reporte: 10,
-      motivo: 'Cancelación indebida en mostrador',
-      motivoCodigo: 'CANCELACION_INDEBIDA',
+      motivo: 'Comportamiento inadecuado del cliente',
+      motivoCodigo: 'COMPORTAMIENTO_INADECUADO',
       descripcion: null,
       estado_reporte: 'PENDIENTE_REVISION',
       tipo_destino: 'CLIENTE',
@@ -211,7 +243,10 @@ describe('PedidosPanel', () => {
     renderPanel();
     await screen.findByText('Pedido MC-2');
 
-    await elegirMotivo('Cancelación indebida en mostrador');
+    await elegirMotivo('Comportamiento inadecuado del cliente');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Descripción del problema' }), {
+      target: { value: 'Insultos en mostrador' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Reportar problema' }));
 
     await waitFor(() =>

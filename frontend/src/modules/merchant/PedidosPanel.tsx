@@ -11,24 +11,9 @@ import type {
 import { useAuth } from '../../auth/contexto';
 import { Badge } from '../../components/ui/Badge';
 import { metaEstadoPago, metaEstadoPedido } from '../orders/estadosPedido';
+import { motivosParaEstado } from '../orders/motivosReporte';
 import { Card } from '../../components/ui/Card';
 import { EscanerQR } from './EscanerQR';
-
-const MOTIVOS: Array<{ value: MotivoReporte; label: string }> = [
-  {
-    value: 'CLIENTE_NO_RETIRO',
-    label: 'El cliente no se presentó a retirar el producto',
-  },
-  {
-    value: 'CANCELACION_INDEBIDA',
-    label: 'Cancelación indebida en mostrador',
-  },
-  {
-    value: 'COMPORTAMIENTO_INADECUADO',
-    label: 'Comportamiento inadecuado del cliente',
-  },
-  { value: 'OTRO', label: 'Otro motivo' },
-];
 
 const money = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -220,7 +205,19 @@ export function PedidosPanel() {
       });
       return;
     }
-    if (motivo === 'OTRO' && !descripcion) {
+    if (
+      !motivosParaEstado('COMERCIANTE', pedido.estado).some(
+        (opcion) => opcion.value === motivo,
+      )
+    ) {
+      notifications.show({
+        color: 'yellow',
+        title: 'Motivo no válido',
+        message: 'Elegí un motivo que corresponda al estado del pedido',
+      });
+      return;
+    }
+    if (!descripcion) {
       notifications.show({
         color: 'yellow',
         title: 'Falta la descripción',
@@ -234,7 +231,7 @@ export function PedidosPanel() {
       const reporte = await reportesApi.crear(token, {
         idPedido: pedido.id_pedido,
         motivoCodigo: motivo,
-        descripcion: descripcion || undefined,
+        descripcion,
         tipo_destino: 'CLIENTE',
       });
       setPedidos((actuales) =>
@@ -508,7 +505,7 @@ export function PedidosPanel() {
                       <Select
                         label="Motivo"
                         placeholder="Elegí un motivo"
-                        data={MOTIVOS}
+                        data={motivosParaEstado('COMERCIANTE', pedido.estado)}
                         value={motivos[pedido.id_pedido] ?? null}
                         onChange={(valor) =>
                           setMotivos((actuales) => ({
@@ -519,11 +516,7 @@ export function PedidosPanel() {
                         required
                       />
                       <Textarea
-                        label={
-                          motivos[pedido.id_pedido] === 'OTRO'
-                            ? 'Descripción del problema'
-                            : 'Descripción (opcional)'
-                        }
+                        label="Descripción del problema"
                         value={descripciones[pedido.id_pedido] ?? ''}
                         onChange={(evento) => {
                           // El valor se lee acá: dentro del updater el evento
@@ -536,7 +529,7 @@ export function PedidosPanel() {
                           }));
                         }}
                         maxLength={300}
-                        required={motivos[pedido.id_pedido] === 'OTRO'}
+                        required
                         autosize
                         minRows={2}
                         maxRows={5}

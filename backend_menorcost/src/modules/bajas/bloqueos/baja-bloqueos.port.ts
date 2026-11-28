@@ -29,8 +29,14 @@ export interface BajaBloqueosPort {
   obtenerResumenesCuentas(
     usuarioIds: string[],
   ): Promise<Map<string, ResumenCuentaBaja>>;
-  pausarOfertas(usuarioId: string): Promise<void>;
-  reactivarOfertas(usuarioId: string): Promise<void>;
+  pausarOfertas(
+    usuarioId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void>;
+  reactivarOfertas(
+    usuarioId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void>;
 }
 
 export const BAJA_BLOQUEOS_PORT = Symbol('BAJA_BLOQUEOS_PORT');

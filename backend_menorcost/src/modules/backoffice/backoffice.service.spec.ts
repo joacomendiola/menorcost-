@@ -249,7 +249,7 @@ describe('BackofficeService.rechazarAlta', () => {
 describe('BackofficeService.cerrarReporte', () => {
   it.each([
     ['desestimar', 'DESESTIMADO', 'desestimado'],
-    ['resolver', 'RESUELTO', 'resuelto'],
+    ['resolver', 'RESUELTO', 'resuelto sin sanción'],
   ] as const)(
     '%s cierra el reporte, restaura la cuenta y notifica a ambas partes',
     async (metodo, estadoFinal, palabra) => {

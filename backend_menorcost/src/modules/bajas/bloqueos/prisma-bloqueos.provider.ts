@@ -38,7 +38,7 @@ export class PrismaBajaBloqueosProvider implements BajaBloqueosPort {
       prisma.reporte.count({
         where: {
           estado_reporte: { in: ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'] },
-          OR: [{ id_emisor: usuarioId }, { id_denunciado: usuarioId }],
+          id_denunciado: usuarioId,
         },
       }),
     ]);
@@ -157,8 +157,12 @@ export class PrismaBajaBloqueosProvider implements BajaBloqueosPort {
     return resumenes;
   }
 
-  async pausarOfertas(usuarioId: string): Promise<void> {
-    const comercio = await this.prisma.comercio.findUnique({
+  async pausarOfertas(
+    usuarioId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const prisma = tx ?? this.prisma;
+    const comercio = await prisma.comercio.findUnique({
       where: { userId: usuarioId },
       select: { idComercio: true },
     });
@@ -166,21 +170,25 @@ export class PrismaBajaBloqueosProvider implements BajaBloqueosPort {
 
     // Solo se marcan las ofertas que la baja pausa, para poder restaurarlas
     // sin reactivar las que el comerciante había pausado manualmente.
-    await this.prisma.producto.updateMany({
+    await prisma.producto.updateMany({
       where: { comercioId: comercio.idComercio, estado: 'ACTIVO' },
       data: { estado: 'PAUSADO', pausadoPorBaja: true },
     });
   }
 
-  async reactivarOfertas(usuarioId: string): Promise<void> {
-    const comercio = await this.prisma.comercio.findUnique({
+  async reactivarOfertas(
+    usuarioId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const prisma = tx ?? this.prisma;
+    const comercio = await prisma.comercio.findUnique({
       where: { userId: usuarioId },
       select: { idComercio: true },
     });
     if (!comercio) return;
 
     // Solo se reactivan las ofertas pausadas por la baja.
-    await this.prisma.producto.updateMany({
+    await prisma.producto.updateMany({
       where: {
         comercioId: comercio.idComercio,
         estado: 'PAUSADO',
