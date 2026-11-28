@@ -45,13 +45,33 @@ describe('PrismaBajaBloqueosProvider', () => {
       expect(bloqueos[0].message).toContain('pago');
     });
 
-    it('bloquea por reportes abiertos', async () => {
+    it('bloquea por reportes abiertos recibidos', async () => {
       prismaMock.reporte.count.mockResolvedValue(1);
 
       const bloqueos = await provider.obtenerBloqueos('u1');
 
+      expect(prismaMock.reporte.count).toHaveBeenCalledWith({
+        where: {
+          estado_reporte: { in: ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'] },
+          id_denunciado: 'u1',
+        },
+      });
       expect(bloqueos).toHaveLength(1);
       expect(bloqueos[0].tipo).toBe('REPORTES');
+    });
+
+    it('no bloquea por reportes emitidos por el propio usuario', async () => {
+      prismaMock.reporte.count.mockResolvedValue(0);
+
+      const bloqueos = await provider.obtenerBloqueos('u1');
+
+      expect(prismaMock.reporte.count).toHaveBeenCalledWith({
+        where: {
+          estado_reporte: { in: ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'] },
+          id_denunciado: 'u1',
+        },
+      });
+      expect(bloqueos).toEqual([]);
     });
   });
 
@@ -155,6 +175,23 @@ describe('PrismaBajaBloqueosProvider', () => {
 
       expect(prismaMock.producto.updateMany).not.toHaveBeenCalled();
     });
+
+    it('usa el cliente de la transacción cuando se provee', async () => {
+      const tx = {
+        comercio: {
+          findUnique: vi.fn().mockResolvedValue({ idComercio: 'c1' }),
+        },
+        producto: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      };
+
+      await provider.pausarOfertas('u1', tx as never);
+
+      expect(tx.comercio.findUnique).toHaveBeenCalled();
+      expect(tx.producto.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { estado: 'PAUSADO', pausadoPorBaja: true } }),
+      );
+      expect(prismaMock.comercio.findUnique).not.toHaveBeenCalled();
+    });
   });
 
   describe('reactivarOfertas', () => {
@@ -171,6 +208,24 @@ describe('PrismaBajaBloqueosProvider', () => {
         },
         data: { estado: 'ACTIVO', pausadoPorBaja: false },
       });
+    });
+
+    it('usa el cliente de la transacción cuando se provee', async () => {
+      const tx = {
+        comercio: {
+          findUnique: vi.fn().mockResolvedValue({ idComercio: 'c1' }),
+        },
+        producto: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      };
+
+      await provider.reactivarOfertas('u1', tx as never);
+
+      expect(tx.producto.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { estado: 'ACTIVO', pausadoPorBaja: false },
+        }),
+      );
+      expect(prismaMock.comercio.findUnique).not.toHaveBeenCalled();
     });
   });
 });

@@ -127,8 +127,23 @@ describe('BajaService.solicitar', () => {
       where: { id: 'u1', estado: 'HABILITADO', deletedAt: null },
       data: { estado: 'SOLICITUD_BAJA_PENDIENTE' },
     });
-    expect(bloqueosMock.pausarOfertas).toHaveBeenCalledWith('u1');
+    expect(bloqueosMock.pausarOfertas).toHaveBeenCalledWith('u1', prismaMock);
     expect(resultado.message).toMatch(/Solicitud de baja registrada/);
+  });
+
+  it('propaga el error si falla la pausa de ofertas dentro de la transacción', async () => {
+    prismaMock.usuario.findFirst.mockResolvedValue(
+      await usuarioBase({ rol: 'COMERCIANTE' }),
+    );
+    bloqueosMock.pausarOfertas.mockRejectedValueOnce(new Error('Pausa fallida'));
+
+    await expect(
+      service.solicitar('u1', {
+        motivo: 'Ya no la uso',
+        password: 'Password123',
+      }),
+    ).rejects.toThrow('Pausa fallida');
+    expect(bloqueosMock.pausarOfertas).toHaveBeenCalledWith('u1', prismaMock);
   });
 
   it('reporta conflictos serializables al solicitar una baja', async () => {
@@ -244,6 +259,7 @@ describe('BajaService.aprobar', () => {
       'u1',
       prismaMock,
     );
+    expect(bloqueosMock.pausarOfertas).toHaveBeenCalledWith('u1', prismaMock);
   });
 
   it('no toca la cuenta si otro administrador ya resolvió la solicitud', async () => {
@@ -300,7 +316,7 @@ describe('BajaService.rechazar', () => {
       where: { id: 'u1' },
       data: { estado: 'HABILITADO' },
     });
-    expect(bloqueosMock.reactivarOfertas).toHaveBeenCalledWith('u1');
+    expect(bloqueosMock.reactivarOfertas).toHaveBeenCalledWith('u1', prismaMock);
   });
 
   it('restaura el estado previo guardado en la solicitud', async () => {
