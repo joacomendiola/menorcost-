@@ -18,10 +18,10 @@ export class CrearReporteDto {
   @IsEnum(MotivoReporte)
   motivoCodigo?: MotivoReporte;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
   @MaxLength(300)
-  descripcion?: string; // Máximo 300 caracteres según CU-5.02
+  descripcion: string; // Justificación obligatoria según CU-5.02, máximo 300 caracteres
 
   @IsNotEmpty()
   @IsEnum(TipoDestinoReporte)
