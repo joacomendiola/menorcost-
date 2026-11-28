@@ -167,7 +167,7 @@ describe('Ticket · calificación', () => {
     expect(screen.getByText('8/250')).toBeTruthy();
   });
 
-  it('no muestra el formulario de calificación si el pedido no fue entregado', async () => {
+  it('no muestra calificación pero sí reporte en pedidos en conflicto', async () => {
     mocks.obtenerPorCodigo.mockResolvedValue(
       pedido({ estado: 'PENDIENTE_DE_RETIRO' }),
     );
@@ -175,8 +175,19 @@ describe('Ticket · calificación', () => {
     await screen.findByText('MC-1');
 
     expect(screen.queryByText('Calificá tu pedido')).toBeNull();
-    // El cliente solo puede reportar pedidos ya entregados (CU-2.06).
-    expect(screen.queryByText('Reportar problema')).toBeNull();
+    // CU-5.02: el cliente puede reportar pedidos finalizados o en conflicto.
+    expect(screen.getByText('Reportar problema')).toBeTruthy();
+  });
+
+  it('muestra reporte en un pedido cancelado', async () => {
+    mocks.obtenerPorCodigo.mockResolvedValue(
+      pedido({ estado: 'CANCELADO' }),
+    );
+    renderTicket();
+    await screen.findByText('MC-1');
+
+    expect(screen.queryByText('Calificá tu pedido')).toBeNull();
+    expect(screen.getByText('Reportar problema')).toBeTruthy();
   });
 
   it('muestra el resumen cuando el pedido ya fue calificado', async () => {
@@ -238,18 +249,48 @@ describe('Ticket · reportes', () => {
     expect(mocks.crearReporte).not.toHaveBeenCalled();
   });
 
+  it('exige descripción también en los motivos predefinidos', async () => {
+    renderTicket();
+    await screen.findByText('MC-1');
+
+    await elegirMotivo('El producto estaba en mal estado/era diferente');
+    fireEvent.submit(
+      screen.getByRole('button', { name: 'Enviar reporte' }).closest('form')!,
+    );
+
+    await waitFor(() =>
+      expect(mocks.show).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Por favor, especifica brevemente el problema ocurrido',
+        }),
+      ),
+    );
+    expect(mocks.crearReporte).not.toHaveBeenCalled();
+  });
+
+  it('oculta motivos que no corresponden al estado del pedido', async () => {
+    renderTicket();
+    await screen.findByText('MC-1');
+
+    await elegirMotivo('El producto estaba en mal estado/era diferente');
+    expect(screen.queryByText('El comercio estaba cerrado al ir a retirar')).toBeNull();
+  });
+
   it('envía un reporte al comercio y actualiza el estado del ticket', async () => {
     renderTicket();
     await screen.findByText('MC-1');
 
     await elegirMotivo('El producto estaba en mal estado/era diferente');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Descripción del problema' }), {
+      target: { value: 'El producto estaba vencido' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Enviar reporte' }));
 
     await waitFor(() =>
       expect(mocks.crearReporte).toHaveBeenCalledWith('token', {
         idPedido: 'p1',
         motivoCodigo: 'PRODUCTO_MAL_ESTADO',
-        descripcion: undefined,
+        descripcion: 'El producto estaba vencido',
         tipo_destino: 'COMERCIO',
       }),
     );
@@ -282,8 +323,8 @@ describe('Ticket · reportes', () => {
   it('advierte si el reporte se guardó pero no se notificó a soporte', async () => {
     mocks.crearReporte.mockResolvedValue({
       id_reporte: 9,
-      motivo: 'El comercio estaba cerrado al ir a retirar',
-      motivoCodigo: 'COMERCIO_CERRADO',
+      motivo: 'El producto estaba en mal estado/era diferente',
+      motivoCodigo: 'PRODUCTO_MAL_ESTADO',
       descripcion: null,
       estado_reporte: 'PENDIENTE_REVISION',
       tipo_destino: 'COMERCIO',
@@ -297,7 +338,10 @@ describe('Ticket · reportes', () => {
     renderTicket();
     await screen.findByText('MC-1');
 
-    await elegirMotivo('El comercio estaba cerrado al ir a retirar');
+    await elegirMotivo('El producto estaba en mal estado/era diferente');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Descripción del problema' }), {
+      target: { value: 'Producto vencido' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Enviar reporte' }));
 
     await waitFor(() =>

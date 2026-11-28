@@ -8,22 +8,10 @@ import { ApiError, pedidosApi, reportesApi, reputacionApi } from '../../api';
 import type { MotivoReporte, PedidoTicket } from '../../api';
 import { Badge } from '../../components/ui/Badge';
 import { metaEstadoPago, metaEstadoPedido } from './estadosPedido';
-
-const MOTIVOS: Array<{ value: MotivoReporte; label: string }> = [
-  {
-    value: 'PRODUCTO_MAL_ESTADO',
-    label: 'El producto estaba en mal estado/era diferente',
-  },
-  {
-    value: 'COMERCIO_CERRADO',
-    label: 'El comercio estaba cerrado al ir a retirar',
-  },
-  {
-    value: 'PRECIO_NO_RESPETADO',
-    label: 'El comercio no respetó el precio',
-  },
-  { value: 'OTRO', label: 'Otro motivo' },
-];
+import {
+  ESTADOS_REPORTABLES_CLIENTE,
+  motivosParaEstado,
+} from './motivosReporte';
 
 const money = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -67,7 +55,11 @@ export function Ticket() {
     const cargarPedido = async () => {
       try {
         const data = await pedidosApi.obtenerPorCodigo(token, codigo);
-        if (activo) setPedido(data);
+        if (activo) {
+          setPedido(data);
+          setMotivo(null);
+          setDescripcion('');
+        }
       } catch (err: unknown) {
         if (activo) setError(mensajeDeError(err));
       } finally {
@@ -87,6 +79,8 @@ export function Ticket() {
     setError(null);
     try {
       setPedido(await pedidosApi.obtenerPorCodigo(token, codigo));
+      setMotivo(null);
+      setDescripcion('');
     } catch (err: unknown) {
       setError(mensajeDeError(err));
     } finally {
@@ -181,7 +175,20 @@ export function Ticket() {
       return;
     }
 
-    if (motivo === 'OTRO' && !descripcion.trim()) {
+    if (
+      !motivosParaEstado('CLIENTE', pedido.estado).some(
+        (opcion) => opcion.value === motivo,
+      )
+    ) {
+      notifications.show({
+        color: 'yellow',
+        title: 'Motivo no válido',
+        message: 'Elegí un motivo que corresponda al estado del pedido',
+      });
+      return;
+    }
+
+    if (!descripcion.trim()) {
       notifications.show({
         color: 'yellow',
         title: 'Falta la descripción',
@@ -195,7 +202,7 @@ export function Ticket() {
       const reporte = await reportesApi.crear(token, {
         idPedido: pedido.idPedido,
         motivoCodigo: motivo,
-        descripcion: descripcion.trim() ? descripcion.trim() : undefined,
+        descripcion: descripcion.trim(),
         tipo_destino: 'COMERCIO',
       });
 
@@ -314,8 +321,8 @@ export function Ticket() {
   const reporteAbierto = pedido.misReportes.find((reporte) =>
     ['PENDIENTE_REVISION', 'BAJO_INVESTIGACION'].includes(reporte.estado),
   );
-  // El cliente solo reporta pedidos ya entregados (CU-2.06).
-  const puedeReportar = pedido.estado === 'ENTREGADO';
+  // CU-5.02: el cliente reporta pedidos finalizados o en conflicto.
+  const puedeReportar = ESTADOS_REPORTABLES_CLIENTE.includes(pedido.estado);
   const pagoMeta = metaEstadoPago(pedido.pagoEstado);
 
   return (
@@ -500,7 +507,7 @@ export function Ticket() {
                 <Select
                   label="Motivo"
                   placeholder="Elegí un motivo"
-                  data={MOTIVOS}
+                  data={motivosParaEstado('CLIENTE', pedido.estado)}
                   value={motivo}
                   onChange={(valor) =>
                     setMotivo(valor as MotivoReporte | null)
@@ -510,11 +517,7 @@ export function Ticket() {
 
                 <div>
                   <Textarea
-                    label={
-                      motivo === 'OTRO'
-                        ? 'Descripción del problema'
-                        : 'Descripción (opcional)'
-                    }
+                    label="Descripción del problema"
                     placeholder="Contanos qué pasó"
                     value={descripcion}
                     onChange={(evento) =>
@@ -524,7 +527,7 @@ export function Ticket() {
                     autosize
                     minRows={3}
                     maxRows={6}
-                    required={motivo === 'OTRO'}
+                    required
                   />
                   <p className="ticket-counter">{descripcion.length}/300</p>
                 </div>
