@@ -349,7 +349,7 @@ export function DenunciasTab() {
                             disabled={bloqueado}
                             onClick={() => void ejecutar(d, 'resolver')}
                           >
-                            Marcar resuelto
+                            Resolver sin sanción
                           </Button>
                           <Button
                             color="red"
